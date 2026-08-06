@@ -1,90 +1,185 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#284536">
-<meta name="description" content="Regula Rustica — a simple homestead record and task manager.">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Regula Rustica</title>
-<style>
-:root{--forest:#284536;--forest2:#365c47;--cream:#f4efe2;--paper:#fffdf7;--ink:#282820;--muted:#746f64;--line:#d9cfbb;--gold:#a47b3c;--red:#8c463e;--green:#4e6d52;--shadow:0 8px 24px rgba(34,45,36,.08)}
-*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:Georgia,'Times New Roman',serif}.top{background:var(--forest);color:#fff;border-bottom:4px solid var(--gold);padding:20px max(16px,calc((100vw - 1120px)/2));display:flex;justify-content:space-between;align-items:center;gap:16px}.brand-small{font:700 .68rem Arial,sans-serif;text-transform:uppercase;letter-spacing:.16em;color:#e6ddc8}.top h1{margin:.15rem 0;font-size:clamp(1.8rem,5vw,3rem)}.motto{margin:0;color:#e8e0cf;font-style:italic}.nav{display:flex;position:sticky;top:0;z-index:10;overflow:auto;background:#fff9ec;border-bottom:1px solid var(--line);padding:0 max(6px,calc((100vw - 1120px)/2))}.nav button{border:0;background:transparent;padding:14px 16px;font-weight:700;color:var(--muted);white-space:nowrap;cursor:pointer}.nav button.active{color:var(--forest);border-bottom:3px solid var(--gold)}main{max-width:1120px;margin:auto;padding:22px 14px 70px}.view{display:none}.view.active{display:block}.grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card,.record-card{background:var(--paper);border:1px solid var(--line);border-radius:15px;padding:18px;box-shadow:var(--shadow)}.record-card{cursor:pointer}.record-card:hover{border-color:var(--gold)}h2,h3{margin:.25rem 0 .6rem}.label{font:700 .68rem Arial,sans-serif;text-transform:uppercase;letter-spacing:.15em;color:var(--forest2)}.muted,.meta{color:var(--muted);font-family:Arial,sans-serif;font-size:.8rem}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.stack{display:grid;gap:10px}.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}.primary{background:var(--gold);color:#fff}.secondary{background:#ece4d5;color:var(--ink)}.danger{background:var(--red);color:#fff}.ghost{background:transparent;color:var(--gold);padding:5px}.pill{display:inline-block;border-radius:999px;background:#e7eee7;color:var(--forest);padding:5px 9px;font:700 .7rem Arial,sans-serif}.task{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:11px}.task.done{opacity:.55}.task.done .task-title{text-decoration:line-through}.task-body{flex:1}.task-title{font-weight:700}.actions{display:flex;gap:6px;flex-wrap:wrap}.quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.empty{color:var(--muted);font-style:italic}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{border:1px solid var(--line);border-radius:10px;background:#faf5e9;padding:12px;text-align:center}.stat strong{display:block;font-size:1.45rem}.stat span{font:normal .7rem Arial,sans-serif;color:var(--muted)}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.type-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.type-block{margin-bottom:22px}.history-row{border-left:3px solid var(--gold);padding:5px 0 5px 12px}.money-in{color:#356038;font-weight:700}.money-out{color:var(--red);font-weight:700}.record-shell{display:none}.record-shell.active{display:block}.record-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.record-actions{display:flex;gap:7px;flex-wrap:wrap}.next-box{border:1px solid #c9d8c9;background:#edf4ec;border-radius:12px;padding:14px}.tabs-mini{display:flex;gap:6px;overflow:auto;margin:14px 0}.tabs-mini button{border:1px solid var(--line);background:#f8f2e7;border-radius:999px;padding:7px 11px;font-weight:700;cursor:pointer}.tabs-mini button.active{background:var(--forest);color:#fff;border-color:var(--forest)}.record-panel{display:none}.record-panel.active{display:block}dialog{border:0;border-radius:15px;width:min(560px,calc(100% - 24px));padding:0;box-shadow:0 24px 80px rgba(0,0,0,.3)}dialog::backdrop{background:rgba(25,35,28,.62)}dialog form{padding:20px}.form-grid{display:grid;gap:12px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{display:grid;gap:5px;font:700 .78rem Arial,sans-serif;color:var(--forest)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;color:var(--ink);font:inherit}textarea{min-height:80px;resize:vertical}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.back{margin-bottom:12px}.hidden{display:none!important}.notice{border:1px solid var(--line);background:#f8f1e3;border-radius:10px;padding:11px;font:normal .8rem Arial,sans-serif}.chronicle-item{border:1px solid var(--line);border-radius:11px;padding:13px}.footer{text-align:center;color:var(--muted);padding:18px;font-size:.8rem}.filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.calendar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.cal-weekday{font:700 .68rem Arial,sans-serif;text-transform:uppercase;color:var(--muted);text-align:center;padding:6px}.cal-day{min-height:105px;border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:7px}.cal-day.out{opacity:.42}.cal-day.today{border:2px solid var(--gold)}.cal-num{font-weight:700;margin-bottom:5px}.cal-item{display:block;border-radius:7px;background:#edf4ec;color:var(--forest);padding:4px 6px;margin:4px 0;font:700 .67rem Arial,sans-serif;cursor:pointer}.template-card{border:1px solid var(--line);border-radius:11px;padding:13px;background:var(--paper)}.template-step{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding:7px 0;font:normal .8rem Arial,sans-serif}.step-row{display:grid;grid-template-columns:1.4fr .6fr .8fr auto;gap:8px;align-items:end}.agenda-day{margin:18px 0 8px}.agenda-day h3{border-bottom:1px solid var(--line);padding-bottom:5px}@media(max-width:800px){.filters{grid-template-columns:1fr 1fr}.calendar-grid{gap:3px}.cal-day{min-height:82px;padding:5px}.cal-item{font-size:.6rem}.step-row{grid-template-columns:1fr 1fr}.step-row .remove-step{grid-column:2}}@media(max-width:520px){.filters{grid-template-columns:1fr}.calendar-grid{grid-template-columns:1fr}.cal-weekday{display:none}.cal-day{min-height:auto}.cal-day.out{display:none}.cal-day:empty{display:none}}
-@media(max-width:800px){.grid2,.grid3{grid-template-columns:1fr}.type-grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.top .btn{width:100%}}@media(max-width:520px){main{padding-left:9px;padding-right:9px}.card,.record-card{padding:15px}.pair{grid-template-columns:1fr}.record-head{flex-direction:column}.stats{gap:5px}.stat{padding:10px 4px}.nav button{padding:13px 12px}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#284536">
+  <meta name="description" content="Regula Rustica — a simple homestead record and task manager.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>Regula Rustica</title>
+  <script src="app.js" defer></script>
 </head>
 <body>
-<header class="top"><div><div id="homesteadHeader" class="brand-small">MY HOMESTEAD</div><h1>Regula Rustica</h1><p class="motto">Ora et labora · Ut in omnibus glorificetur Deus</p></div><button class="btn primary" id="globalAddTask">+ Task</button></header>
-<nav class="nav"><button class="active" data-view="today">Today</button><button data-view="homestead">Homestead</button><button data-view="harvest">Harvest</button><button data-view="tasks">Tasks</button><button data-view="calendar">Calendar</button><button data-view="ledger">Ledger</button><button data-view="chronicle">Chronicle</button><button data-view="settings">Settings</button></nav>
-<main>
-<section id="today" class="view active"><div class="grid2"><article class="card"><span class="label">Today’s Rule</span><h2 id="todayDate"></h2><div id="todayTasks" class="stack"></div><p id="todayEmpty" class="empty">Nothing is due. Add the next useful task.</p></article><aside class="card"><span class="label">At a glance</span><div class="stats"><div class="stat"><strong id="openCount">0</strong><span>Open tasks</span></div><div class="stat"><strong id="recordCount">0</strong><span>Active records</span></div><div class="stat"><strong id="netCash">$0</strong><span>Net cash</span></div></div><div class="quick"><button class="btn secondary" id="todayAddTask">Add task</button><button class="btn secondary" id="todayAddRecord">Add record</button><button class="btn secondary" id="todayMilk">Record milk</button></div></aside></div></section>
-<section id="homestead" class="view"><div class="section-head"><div><span class="label">Things entrusted to your care</span><h2>Homestead</h2></div><button class="btn primary add-record">+ Record</button></div><div id="homesteadGroups"></div></section>
-<section id="harvest" class="view"><div class="section-head"><div><span class="label">What the homestead provides</span><h2>Harvest</h2></div><button class="btn primary add-record" data-default-type="Dairy Batch">+ Batch</button></div><div id="harvestGroups"></div></section>
-<section id="tasks" class="view"><div class="section-head"><div><span class="label">Everything that needs doing</span><h2>All Tasks</h2></div><button class="btn primary" id="tasksAddTask">+ Task</button></div><div class="card"><div class="filters"><label>Status<select id="taskStatusFilter"><option value="open">Open</option><option value="all">All</option><option value="done">Completed</option></select></label><label>Linked record<select id="taskRecordFilter"><option value="all">All records</option><option value="standalone">Standalone</option></select></label><label>Sort by<select id="taskSort"><option value="due">Due date</option><option value="record">Record</option><option value="created">Newest added</option></select></label><label>Due<select id="taskDueFilter"><option value="all">Any date</option><option value="overdue">Overdue</option><option value="today">Today</option><option value="week">Next 7 days</option><option value="nodate">No date</option></select></label></div><div id="allTasksList" class="stack"></div></div></section>
-<section id="calendar" class="view"><div class="section-head"><div><span class="label">Tasks by date</span><h2>Calendar</h2></div><button class="btn primary" id="calendarAddTask">+ Task</button></div><div class="card"><div class="calendar-head"><button class="btn secondary" id="calPrev">←</button><h3 id="calendarTitle"></h3><button class="btn secondary" id="calNext">→</button></div><div class="calendar-grid" id="calendarGrid"></div></div><div class="card" style="margin-top:14px"><span class="label">Upcoming</span><div id="calendarAgenda"></div></div></section>
-<section id="ledger" class="view"><div class="section-head"><div><span class="label">Quick ledger</span><h2>Expenses & revenue</h2></div><button class="btn primary" id="addLedger">+ Entry</button></div><div class="stats" style="margin-bottom:14px"><div class="stat"><strong id="expenseTotal">$0</strong><span>Expenses</span></div><div class="stat"><strong id="revenueTotal">$0</strong><span>Revenue</span></div><div class="stat"><strong id="ledgerNet">$0</strong><span>Net</span></div></div><div id="ledgerList" class="stack"></div></section>
-<section id="chronicle" class="view"><div class="section-head"><div><span class="label">Selected history</span><h2>Chronicle</h2></div><button class="btn primary" id="addChronicle">+ Entry</button></div><div id="chronicleList" class="stack"></div></section>
-<section id="settings" class="view"><div class="grid2"><article class="card"><span class="label">Identity</span><h2>Your homestead</h2><form id="homesteadForm" class="form-grid"><label>Homestead name<input id="homesteadName"></label><button class="btn primary" type="submit">Save name</button></form></article><article class="card"><span class="label">Own your records</span><h2>Backup & restore</h2><p class="muted">Download a backup regularly. Records remain in this browser until cloud sync is added later.</p><div class="quick"><button class="btn secondary" id="exportData">Download backup</button><label class="btn secondary" style="display:inline-block">Restore backup<input id="importData" type="file" accept="application/json" hidden></label><button class="btn danger" id="resetData">Reset sample data</button></div></article></div><article class="card" style="margin-top:16px"><div class="section-head"><div><span class="label">Reusable workflows</span><h2>Templates</h2></div><button class="btn primary" id="addTemplate">+ Template</button></div><div id="templateList" class="stack"></div></article></section>
-<section id="recordView" class="record-shell"><button class="btn secondary back" id="backToList">← Back</button><article class="card"><div class="record-head"><div><span id="recordTypeLabel" class="label"></span><h2 id="recordTitle"></h2><div id="recordIdentity" class="meta"></div></div><div class="record-actions"><button class="btn secondary" id="recordAddTask">+ Task</button><button class="btn secondary" id="recordAddNote">+ Note</button><button class="btn secondary" id="recordAddLedger">+ Ledger</button><button class="btn secondary" id="recordEdit">Edit</button></div></div><div id="recordNext" class="next-box" style="margin-top:15px"></div><div class="tabs-mini"><button class="active" data-panel="tasks">Tasks</button><button data-panel="notes">Notes</button><button data-panel="ledger">Ledger</button><button data-panel="history">History</button></div><div id="panelTasks" class="record-panel active"></div><div id="panelNotes" class="record-panel"></div><div id="panelLedger" class="record-panel"></div><div id="panelHistory" class="record-panel"></div></article></section>
-</main><footer class="footer">Regula Rustica v3.0 · The app remembers so you do not have to.</footer>
+  <header class="top">
+    <div>
+      <div id="homesteadHeader" class="brand-small">MY HOMESTEAD</div>
+      <h1>Regula Rustica</h1>
+      <p class="motto">Ora et labora · Ut in omnibus glorificetur Deus</p>
+    </div>
+    <button class="btn primary" id="globalAddTask">+ Task</button>
+  </header>
 
-<dialog id="modal"><form id="modalForm"><div class="row"><h2 id="modalTitle">Add</h2><button type="button" class="btn ghost" id="modalClose">✕</button></div><div id="modalFields" class="form-grid"></div><div class="dialog-actions"><button type="button" class="btn secondary" id="modalCancel">Cancel</button><button type="submit" class="btn primary">Save</button></div></form></dialog>
-<script>
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)], key='regulaRusticaV3';
-const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7); const today=()=>new Date().toISOString().slice(0,10); const money=n=>new Intl.NumberFormat(undefined,{style:'currency',currency:'USD'}).format(Number(n||0)); const fmt=d=>d?new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'No date'; const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const seed={settings:{homesteadName:'Wood Thief Homestead'},records:[
-{id:'daisy',type:'Livestock',name:'Daisy',status:'Milking',details:{kind:'Jersey dairy cow',purpose:'Dairy'},created:today()},
-{id:'garden1',type:'Garden',name:'Cucumbers',status:'Growing',details:{location:'Kitchen garden',plantDate:'2026-07-26',daysToMaturity:'55'},created:today()},
-{id:'proj1',type:'Project',name:'Kitchen beadboard',status:'Active',details:{nextAction:'Prime rough-sawn panels'},created:today()},
-{id:'tractor',type:'Equipment',name:'Ford 8N',status:'Active',details:{kind:'1948 tractor'},created:today()},
-{id:'pasture1',type:'Pasture',name:'North paddock',status:'Resting',details:{lastGrazed:'2026-07-15'},created:today()},
-{id:'cheddar1',type:'Dairy Batch',name:'Cheddar Batch #1',status:'Drying',details:{made:'2026-08-03',milk:'3 gallons',template:'Standard Cheddar'},created:today()}
-],templates:[{id:'standard-cheddar',name:'Standard Cheddar',recordType:'Dairy Batch',steps:[{title:'Turn cheddar',days:0,time:'Evening'},{title:'Turn cheddar',days:1,time:'Morning'},{title:'Salt cheddar',days:2,time:''},{title:'Move cheddar to cave',days:4,time:''},{title:'Review rind',days:7,time:''},{title:'Aging review',days:30,time:''},{title:'Ready-date review',days:60,time:''}]}],tasks:[{id:uid(),title:'Prime beadboard',due:today(),recordId:'proj1',done:false,source:'manual'},{id:uid(),title:'Turn cheddar',due:today(),recordId:'cheddar1',done:false,source:'template'}],notes:[],ledger:[],history:[],chronicle:[],milk:[]};
-let data=load(), modalMode='', editId=null, contextRecordId=null, currentRecordId=null, priorView='homestead', calendarCursor=new Date(new Date().getFullYear(),new Date().getMonth(),1);
-function normalize(x){return{settings:{homesteadName:x?.settings?.homesteadName||'My Homestead'},records:Array.isArray(x?.records)?x.records:[],tasks:Array.isArray(x?.tasks)?x.tasks:[],notes:Array.isArray(x?.notes)?x.notes:[],ledger:Array.isArray(x?.ledger)?x.ledger:[],history:Array.isArray(x?.history)?x.history:[],chronicle:Array.isArray(x?.chronicle)?x.chronicle:[],milk:Array.isArray(x?.milk)?x.milk:[],templates:Array.isArray(x?.templates)?x.templates:structuredClone(seed.templates)}}
-function load(){try{return normalize(JSON.parse(localStorage.getItem(key))) }catch{return structuredClone(seed)}} function save(){localStorage.setItem(key,JSON.stringify(data));renderAll()}
-function record(id){return data.records.find(r=>r.id===id)} function linkedName(id){return record(id)?.name||''} function addHistory(recordId,text){data.history.unshift({id:uid(),recordId,text,date:new Date().toISOString()})}
-function showView(id){$$('.view,.record-shell').forEach(x=>x.classList.remove('active'));$$('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===id));$('#'+id).classList.add('active');priorView=id;window.scrollTo({top:0,behavior:'smooth'})}
-function openRecord(id){currentRecordId=id;$$('.view,.record-shell').forEach(x=>x.classList.remove('active'));$$('.nav button').forEach(x=>x.classList.remove('active'));$('#recordView').classList.add('active');renderRecord();window.scrollTo({top:0,behavior:'smooth'})}
-function taskRow(t){const div=document.createElement('div');div.className='task'+(t.done?' done':'');div.innerHTML=`<input type="checkbox" ${t.done?'checked':''} aria-label="Complete task"><div class="task-body"><div class="task-title">${esc(t.title)}</div><div class="meta">${t.due?fmt(t.due):'No due date'}${t.recordId?' · '+esc(linkedName(t.recordId)):''}${t.source==='template'?' · Generated':''}</div></div><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button>`;div.querySelector('input').addEventListener('change',e=>{t.done=e.target.checked;t.completed=t.done?new Date().toISOString():null;if(t.done)addHistory(t.recordId,`Completed task: ${t.title}`);save()});div.querySelector('.edit').addEventListener('click',()=>openModal('task',t.id,t.recordId));div.querySelector('.del').addEventListener('click',()=>{if(confirm('Delete this task?')){data.tasks=data.tasks.filter(x=>x.id!==t.id);save()}});return div}
-function renderToday(){const list=$('#todayTasks');list.innerHTML='';const tasks=data.tasks.filter(t=>!t.done&&(!t.due||t.due<=today())).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));tasks.forEach(t=>list.appendChild(taskRow(t)));$('#todayEmpty').classList.toggle('hidden',tasks.length>0);$('#openCount').textContent=data.tasks.filter(t=>!t.done).length;$('#recordCount').textContent=data.records.filter(r=>r.status!=='Archived').length;const net=data.ledger.reduce((s,x)=>s+(x.type==='revenue'?1:-1)*Number(x.amount||0),0);$('#netCash').textContent=money(net)}
-const homesteadTypes=['Livestock','Garden','Pasture','Equipment','Project'], harvestTypes=['Dairy Batch','Harvest','Preservation'];
-function renderGroups(rootSel,types){const root=$(rootSel);root.innerHTML='';types.forEach(type=>{const items=data.records.filter(r=>r.type===type&&r.status!=='Archived');if(!items.length)return;const block=document.createElement('div');block.className='type-block';block.innerHTML=`<div class="row"><h3>${type}</h3><button class="btn ghost add-type">+ Add</button></div><div class="type-grid"></div>`;block.querySelector('.add-type').addEventListener('click',()=>openModal('record',null,null,type));const grid=block.querySelector('.type-grid');items.forEach(r=>{const next=data.tasks.find(t=>t.recordId===r.id&&!t.done);const card=document.createElement('article');card.className='record-card';card.innerHTML=`<div class="row"><div><span class="label">${esc(r.type)}</span><h3>${esc(r.name)}</h3></div><span class="pill">${esc(r.status||'Active')}</span></div><div class="meta">${identityText(r)}</div><p>${next?'Next: '+esc(next.title):'No open task'}</p>`;card.addEventListener('click',()=>openRecord(r.id));grid.appendChild(card)});root.appendChild(block)});if(!root.children.length)root.innerHTML='<p class="empty">No records yet.</p>'}
-function identityText(r){const d=r.details||{};if(r.type==='Livestock')return [d.kind,d.purpose].filter(Boolean).join(' · ');if(r.type==='Garden'){const est=d.plantDate&&d.daysToMaturity?new Date(new Date(d.plantDate+'T12:00:00').getTime()+Number(d.daysToMaturity)*86400000).toISOString().slice(0,10):'';return [d.location,d.plantDate?'Planted '+fmt(d.plantDate):'',est?'Est. harvest '+fmt(est):''].filter(Boolean).join(' · ')}if(r.type==='Dairy Batch')return [d.made?'Made '+fmt(d.made):'',d.milk,d.template].filter(Boolean).join(' · ');if(r.type==='Equipment')return d.kind||'';if(r.type==='Pasture')return d.lastGrazed?'Last grazed '+fmt(d.lastGrazed):'';return d.nextAction||d.objective||''}
-function renderRecord(){const r=record(currentRecordId);if(!r)return showView(priorView);$('#recordTypeLabel').textContent=r.type;$('#recordTitle').textContent=r.name;$('#recordIdentity').textContent=identityText(r);const next=data.tasks.find(t=>t.recordId===r.id&&!t.done);$('#recordNext').innerHTML=next?`<span class="label">Next</span><div class="row"><strong>${esc(next.title)}</strong><button class="btn primary" id="completeNext">Complete</button></div><div class="meta">${next.due?fmt(next.due):'No due date'}</div>`:'<span class="label">Next</span><p class="empty">No open task.</p>';if(next)$('#completeNext').addEventListener('click',()=>{next.done=true;next.completed=new Date().toISOString();addHistory(r.id,`Completed task: ${next.title}`);save()});const tasks=$('#panelTasks');tasks.innerHTML='';data.tasks.filter(t=>t.recordId===r.id).sort((a,b)=>Number(a.done)-Number(b.done)).forEach(t=>tasks.appendChild(taskRow(t)));if(!tasks.children.length)tasks.innerHTML='<p class="empty">No tasks linked to this record.</p>';const notes=$('#panelNotes');notes.innerHTML='';data.notes.filter(n=>n.recordId===r.id).sort((a,b)=>b.date.localeCompare(a.date)).forEach(n=>{const x=document.createElement('div');x.className='history-row';x.innerHTML=`<strong>${fmt(n.date.slice(0,10))}</strong><div>${esc(n.text)}</div>`;notes.appendChild(x)});if(!notes.children.length)notes.innerHTML='<p class="empty">No notes.</p>';const ledger=$('#panelLedger');ledger.innerHTML='';data.ledger.filter(x=>x.recordId===r.id).forEach(x=>ledger.appendChild(ledgerRow(x)));if(!ledger.children.length)ledger.innerHTML='<p class="empty">No ledger entries linked.</p>';const hist=$('#panelHistory');hist.innerHTML='';data.history.filter(h=>h.recordId===r.id).sort((a,b)=>b.date.localeCompare(a.date)).forEach(h=>{const x=document.createElement('div');x.className='history-row';x.innerHTML=`<strong>${new Date(h.date).toLocaleDateString()}</strong><div>${esc(h.text)}</div>`;hist.appendChild(x)});if(!hist.children.length)hist.innerHTML='<p class="empty">History will build automatically.</p>'}
-function ledgerRow(x){const row=document.createElement('div');row.className='task';row.innerHTML=`<div class="task-body"><strong>${esc(x.description)}</strong><div class="meta">${fmt(x.date)}${x.recordId?' · '+esc(linkedName(x.recordId)):''}</div></div><strong class="${x.type==='revenue'?'money-in':'money-out'}">${x.type==='revenue'?'+':'−'}${money(x.amount)}</strong><button class="btn ghost edit">Edit</button>`;row.querySelector('.edit').addEventListener('click',()=>openModal('ledger',x.id,x.recordId));return row}
-function renderLedger(){const root=$('#ledgerList');root.innerHTML='';[...data.ledger].sort((a,b)=>b.date.localeCompare(a.date)).forEach(x=>root.appendChild(ledgerRow(x)));if(!root.children.length)root.innerHTML='<p class="empty">No entries yet.</p>';const exp=data.ledger.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount),0),rev=data.ledger.filter(x=>x.type==='revenue').reduce((s,x)=>s+Number(x.amount),0);$('#expenseTotal').textContent=money(exp);$('#revenueTotal').textContent=money(rev);$('#ledgerNet').textContent=money(rev-exp)}
-function renderChronicle(){const root=$('#chronicleList');root.innerHTML='';[...data.chronicle].sort((a,b)=>b.date.localeCompare(a.date)).forEach(c=>{const d=document.createElement('div');d.className='chronicle-item';d.innerHTML=`<div class="row"><strong>${fmt(c.date)}</strong><button class="btn ghost">Delete</button></div><p>${esc(c.text)}</p>${c.recordId?`<div class="meta">${esc(linkedName(c.recordId))}</div>`:''}`;d.querySelector('button').addEventListener('click',()=>{data.chronicle=data.chronicle.filter(x=>x.id!==c.id);save()});root.appendChild(d)});if(!root.children.length)root.innerHTML='<p class="empty">Save only the milestones worth remembering.</p>'}
-function populateTaskRecordFilter(){const s=$('#taskRecordFilter');if(!s)return;const current=s.value||'all';s.innerHTML='<option value="all">All records</option><option value="standalone">Standalone</option>';data.records.filter(r=>r.status!=='Archived').sort((a,b)=>a.name.localeCompare(b.name)).forEach(r=>s.add(new Option(`${r.name} (${r.type})`,r.id)));if([...s.options].some(o=>o.value===current))s.value=current}
-function renderTasks(){const root=$('#allTasksList');if(!root)return;populateTaskRecordFilter();let rows=[...data.tasks];const status=$('#taskStatusFilter').value,rec=$('#taskRecordFilter').value,due=$('#taskDueFilter').value,sort=$('#taskSort').value;rows=rows.filter(t=>status==='all'||(status==='open'?!t.done:t.done));if(rec==='standalone')rows=rows.filter(t=>!t.recordId);else if(rec!=='all')rows=rows.filter(t=>t.recordId===rec);const now=today(),week=new Date(now+'T12:00:00');week.setDate(week.getDate()+7);const weekEnd=week.toISOString().slice(0,10);if(due==='overdue')rows=rows.filter(t=>!t.done&&t.due&&t.due<now);if(due==='today')rows=rows.filter(t=>t.due===now);if(due==='week')rows=rows.filter(t=>t.due&&t.due>=now&&t.due<=weekEnd);if(due==='nodate')rows=rows.filter(t=>!t.due);if(sort==='due')rows.sort((a,b)=>(a.due||'9999-99-99').localeCompare(b.due||'9999-99-99')||a.title.localeCompare(b.title));if(sort==='record')rows.sort((a,b)=>(linkedName(a.recordId)||'Standalone').localeCompare(linkedName(b.recordId)||'Standalone')||(a.due||'9999').localeCompare(b.due||'9999'));if(sort==='created')rows.sort((a,b)=>String(b.id).localeCompare(String(a.id)));root.innerHTML='';rows.forEach(t=>root.appendChild(taskRow(t)));if(!rows.length)root.innerHTML='<p class="empty">No tasks match these filters.</p>'}
-function renderCalendar(){const grid=$('#calendarGrid'),agenda=$('#calendarAgenda');if(!grid||!agenda)return;const y=calendarCursor.getFullYear(),m=calendarCursor.getMonth();$('#calendarTitle').textContent=calendarCursor.toLocaleDateString(undefined,{month:'long',year:'numeric'});grid.innerHTML='';['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(x=>{const d=document.createElement('div');d.className='cal-weekday';d.textContent=x;grid.appendChild(d)});const start=new Date(y,m,1),first=new Date(y,m,1-start.getDay()),end=new Date(y,m+1,0);for(let i=0;i<42;i++){const d=new Date(first);d.setDate(first.getDate()+i);const ds=d.toISOString().slice(0,10),cell=document.createElement('div');cell.className='cal-day'+(d.getMonth()!==m?' out':'')+(ds===today()?' today':'');cell.innerHTML=`<div class="cal-num">${d.getDate()}</div>`;data.tasks.filter(t=>t.due===ds&&!t.done).slice(0,4).forEach(t=>{const item=document.createElement('button');item.className='cal-item';item.textContent=t.title;item.title=linkedName(t.recordId)||'Standalone';item.addEventListener('click',()=>openModal('task',t.id,t.recordId));cell.appendChild(item)});grid.appendChild(cell)}agenda.innerHTML='';const from=new Date(today()+'T12:00:00'),to=new Date(from);to.setDate(to.getDate()+30);const groups={};data.tasks.filter(t=>!t.done&&t.due&&new Date(t.due+'T12:00:00')>=from&&new Date(t.due+'T12:00:00')<=to).sort((a,b)=>a.due.localeCompare(b.due)).forEach(t=>(groups[t.due]??=[]).push(t));Object.entries(groups).forEach(([date,items])=>{const sec=document.createElement('div');sec.className='agenda-day';sec.innerHTML=`<h3>${fmt(date)}</h3><div class="stack"></div>`;items.forEach(t=>sec.querySelector('.stack').appendChild(taskRow(t)));agenda.appendChild(sec)});if(!agenda.children.length)agenda.innerHTML='<p class="empty">No dated tasks in the next 30 days.</p>'}
-function renderTemplates(){const root=$('#templateList');if(!root)return;root.innerHTML='';data.templates.forEach(t=>{const card=document.createElement('div');card.className='template-card';card.innerHTML=`<div class="row"><div><strong>${esc(t.name)}</strong><div class="meta">${esc(t.recordType)} · ${t.steps.length} steps</div></div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div></div><div class="steps"></div>`;t.steps.forEach(st=>{const r=document.createElement('div');r.className='template-step';r.innerHTML=`<span>${esc(st.title)}</span><span>Day ${Number(st.days)||0}${st.time?' · '+esc(st.time):''}</span>`;card.querySelector('.steps').appendChild(r)});card.querySelector('.edit').addEventListener('click',()=>openModal('template',t.id));card.querySelector('.del').addEventListener('click',()=>{if(confirm('Delete this template? Existing tasks will remain.')){data.templates=data.templates.filter(x=>x.id!==t.id);save()}});root.appendChild(card)});if(!root.children.length)root.innerHTML='<p class="empty">No templates yet.</p>'}
-function applyTemplate(r,templateId){const t=data.templates.find(x=>x.id===templateId||x.name===templateId);if(!t)return;const start=r.details.made||r.details.plantDate||r.created||today();t.steps.forEach(step=>{const d=new Date(start+'T12:00:00');d.setDate(d.getDate()+Number(step.days||0));data.tasks.push({id:uid(),title:step.title,due:d.toISOString().slice(0,10),recordId:r.id,done:false,source:'template',templateId:t.id,time:step.time||''})});addHistory(r.id,`Applied ${t.name} workflow`)}
-function renderAll(){$('#todayDate').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});$('#homesteadHeader').textContent=(data.settings.homesteadName||'My Homestead').toUpperCase();$('#homesteadName').value=data.settings.homesteadName||'';renderToday();renderGroups('#homesteadGroups',homesteadTypes);renderGroups('#harvestGroups',harvestTypes);renderTasks();renderCalendar();renderLedger();renderChronicle();renderTemplates();if(currentRecordId&&$('#recordView').classList.contains('active'))renderRecord()}
-function field(label,name,type='text',value='',options=[]){const l=document.createElement('label');l.textContent=label;let el;if(type==='textarea')el=document.createElement('textarea');else if(type==='select'){el=document.createElement('select');options.forEach(o=>el.add(new Option(o,o)))}else{el=document.createElement('input');el.type=type;if(type==='number'){el.step='0.01';el.min='0'}}el.name=name;el.value=value??'';l.appendChild(el);return l}
-function recordOptions(selected=''){return data.records.filter(r=>r.status!=='Archived').map(r=>({label:`${r.name} (${r.type})`,value:r.id,selected:r.id===selected}))}
-function addSelect(root,label,name,selected,allowBlank=true){const l=document.createElement('label');l.textContent=label;const s=document.createElement('select');s.name=name;if(allowBlank)s.add(new Option('None',''));recordOptions(selected).forEach(o=>{const op=new Option(o.label,o.value);op.selected=o.selected;s.add(op)});l.appendChild(s);root.appendChild(l)}
-function openModal(mode,id=null,recordId=null,defaultType=''){modalMode=mode;editId=id;contextRecordId=recordId||null;const root=$('#modalFields');root.innerHTML='';$('#modalTitle').textContent=(id?'Edit ':'Add ')+({task:'task',record:'record',note:'note',ledger:'ledger entry',chronicle:'chronicle entry',milk:'milk record',template:'template'}[mode]);if(mode==='task'){const x=data.tasks.find(t=>t.id===id)||{};root.append(field('Task','title','text',x.title));root.append(field('Due date','due','date',x.due||''));addSelect(root,'Linked to','recordId',recordId||x.recordId||'',true)}
-if(mode==='note'){root.append(field('Note','text','textarea',''));}
-if(mode==='ledger'){const x=data.ledger.find(t=>t.id===id)||{};root.append(field('Type','type','select',x.type||'expense',['expense','revenue']));root.append(field('Date','date','date',x.date||today()));root.append(field('Amount','amount','number',x.amount||''));root.append(field('Description','description','text',x.description||''));addSelect(root,'Linked to','recordId',recordId||x.recordId||'',true)}
-if(mode==='chronicle'){root.append(field('Date','date','date',today()));root.append(field('Milestone','text','textarea',''));addSelect(root,'Linked record','recordId','',true)}
-if(mode==='milk'){root.append(field('Date','date','date',today()));root.append(field('Morning milk (gal)','am','number',''));root.append(field('Evening milk (gal)','pm','number',''));const cows=data.records.filter(r=>r.type==='Livestock');const l=document.createElement('label');l.textContent='Dairy animal';const s=document.createElement('select');s.name='recordId';cows.forEach(r=>s.add(new Option(r.name,r.id)));l.appendChild(s);root.appendChild(l)}
-if(mode==='template'){const x=data.templates.find(t=>t.id===id)||{steps:[{title:'',days:0,time:''}]};root.append(field('Template name','name','text',x.name||''));root.append(field('Applies to','recordType','select',x.recordType||'Dairy Batch',[...homesteadTypes,...harvestTypes]));const wrap=document.createElement('div');wrap.innerHTML='<div class="row"><span class="label">Steps</span><button type="button" class="btn secondary" id="addTemplateStep">+ Step</button></div><div id="templateSteps" class="stack"></div>';root.appendChild(wrap);const addStep=(st={title:'',days:0,time:''})=>{const row=document.createElement('div');row.className='step-row';row.innerHTML='<label>Task<input name="stepTitle" value="'+esc(st.title)+'"></label><label>Day<input type="number" min="0" name="stepDays" value="'+Number(st.days||0)+'"></label><label>Time<select name="stepTime"><option value="">Any</option><option>Morning</option><option>Evening</option></select></label><button type="button" class="btn ghost remove-step">Remove</button>';row.querySelector('[name=stepTime]').value=st.time||'';row.querySelector('.remove-step').addEventListener('click',()=>row.remove());wrap.querySelector('#templateSteps').appendChild(row)};x.steps.forEach(addStep);wrap.querySelector('#addTemplateStep').addEventListener('click',()=>addStep())}
-if(mode==='record'){const x=data.records.find(r=>r.id===id)||{details:{}};const type=defaultType||x.type||'Livestock';root.append(field('Record type','type','select',type,[...homesteadTypes,...harvestTypes]));root.append(field('Name','name','text',x.name||''));root.append(field('Status','status','text',x.status||'Active'));root.append(field('Identity / brief details','summary','text',x.details?.summary||identityText(x)||''));root.append(field('Date','date','date',x.details?.made||x.details?.plantDate||x.details?.lastGrazed||''));root.append(field('Number / amount','amount','text',x.details?.milk||x.details?.daysToMaturity||''));const templateLabel=field('Use workflow','template','select',x.details?.template||'None',['None']);root.append(templateLabel);const typeSelect=root.querySelector('[name=type]'),templateSelect=templateLabel.querySelector('select');const refreshTemplates=()=>{const selected=templateSelect.value;templateSelect.innerHTML='';templateSelect.add(new Option('None','None'));data.templates.filter(t=>t.recordType===typeSelect.value).forEach(t=>templateSelect.add(new Option(t.name,t.name)));if([...templateSelect.options].some(o=>o.value===selected))templateSelect.value=selected};typeSelect.addEventListener('change',refreshTemplates);refreshTemplates();}
-$('#modal').showModal();setTimeout(()=>root.querySelector('input,textarea,select')?.focus(),50)}
-function applyCheddarTemplate(r){applyTemplate(r,'Standard Cheddar')}
-$('#modalForm').addEventListener('submit',e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));if(modalMode==='template'){const titles=[...e.target.querySelectorAll('[name=stepTitle]')],days=[...e.target.querySelectorAll('[name=stepDays]')],times=[...e.target.querySelectorAll('[name=stepTime]')];const steps=titles.map((el,i)=>({title:el.value.trim(),days:Number(days[i].value||0),time:times[i].value})).filter(x=>x.title);const obj={name:f.name.trim(),recordType:f.recordType,steps};const x=data.templates.find(t=>t.id===editId);if(x)Object.assign(x,obj);else data.templates.push({id:uid(),...obj})}
-if(modalMode==='task'){if(!f.title.trim())return;const x=data.tasks.find(t=>t.id===editId);if(x)Object.assign(x,f);else data.tasks.push({id:uid(),title:f.title.trim(),due:f.due,recordId:f.recordId||null,done:false,source:'manual'})}
-if(modalMode==='note'){data.notes.unshift({id:uid(),recordId:contextRecordId,text:f.text.trim(),date:new Date().toISOString()});addHistory(contextRecordId,'Added note')}
-if(modalMode==='ledger'){const x=data.ledger.find(t=>t.id===editId),obj={type:f.type,date:f.date,amount:Number(f.amount),description:f.description.trim(),recordId:f.recordId||null};if(x)Object.assign(x,obj);else data.ledger.unshift({id:uid(),...obj});if(obj.recordId)addHistory(obj.recordId,`Added ${obj.type}: ${obj.description}`)}
-if(modalMode==='chronicle')data.chronicle.unshift({id:uid(),date:f.date,text:f.text.trim(),recordId:f.recordId||null});
-if(modalMode==='milk'){data.milk.unshift({id:uid(),date:f.date,am:Number(f.am||0),pm:Number(f.pm||0),recordId:f.recordId});addHistory(f.recordId,`Milk recorded: AM ${f.am||0}, PM ${f.pm||0} gal`)}
-if(modalMode==='record'){const x=data.records.find(r=>r.id===editId);const details={summary:f.summary};if(f.type==='Dairy Batch'){details.made=f.date;details.milk=f.amount;details.template=f.template}if(f.type==='Garden'){details.plantDate=f.date;details.daysToMaturity=f.amount}if(f.type==='Pasture')details.lastGrazed=f.date;if(x){Object.assign(x,{type:f.type,name:f.name,status:f.status,details:{...x.details,...details}})}else{const r={id:uid(),type:f.type,name:f.name,status:f.status,details,created:today()};data.records.push(r);addHistory(r.id,'Record created');if(f.template&&f.template!=='None')applyTemplate(r,f.template)}}save();$('#modal').close()});
-$$('.nav button').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));$$('.add-record').forEach(b=>b.addEventListener('click',()=>openModal('record',null,null,b.dataset.defaultType||'')));$('#globalAddTask').addEventListener('click',()=>openModal('task'));$('#todayAddTask').addEventListener('click',()=>openModal('task'));$('#tasksAddTask').addEventListener('click',()=>openModal('task'));$('#calendarAddTask').addEventListener('click',()=>openModal('task'));$('#todayAddRecord').addEventListener('click',()=>openModal('record'));$('#todayMilk').addEventListener('click',()=>openModal('milk'));$('#addLedger').addEventListener('click',()=>openModal('ledger'));$('#addChronicle').addEventListener('click',()=>openModal('chronicle'));$('#recordAddTask').addEventListener('click',()=>openModal('task',null,currentRecordId));$('#recordAddNote').addEventListener('click',()=>openModal('note',null,currentRecordId));$('#recordAddLedger').addEventListener('click',()=>openModal('ledger',null,currentRecordId));$('#recordEdit').addEventListener('click',()=>openModal('record',currentRecordId));$('#backToList').addEventListener('click',()=>showView(priorView));$('#modalClose').addEventListener('click',()=>$('#modal').close());$('#modalCancel').addEventListener('click',()=>$('#modal').close());
-$$('.tabs-mini button').forEach(b=>b.addEventListener('click',()=>{$$('.tabs-mini button').forEach(x=>x.classList.remove('active'));$$('.record-panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#panel'+b.dataset.panel.charAt(0).toUpperCase()+b.dataset.panel.slice(1)).classList.add('active')}));
-$('#homesteadForm').addEventListener('submit',e=>{e.preventDefault();data.settings.homesteadName=$('#homesteadName').value.trim()||'My Homestead';save()});$('#exportData').addEventListener('click',()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=`regula-rustica-v4-${today()}.json`;a.click();URL.revokeObjectURL(a.href)});$('#importData').addEventListener('change',async e=>{try{data=normalize(JSON.parse(await e.target.files[0].text()));save();alert('Backup restored.')}catch{alert('Invalid backup file.')}e.target.value=''});$('#addTemplate').addEventListener('click',()=>openModal('template'));['taskStatusFilter','taskRecordFilter','taskSort','taskDueFilter'].forEach(id=>$('#'+id).addEventListener('change',renderTasks));$('#calPrev').addEventListener('click',()=>{calendarCursor.setMonth(calendarCursor.getMonth()-1);renderCalendar()});$('#calNext').addEventListener('click',()=>{calendarCursor.setMonth(calendarCursor.getMonth()+1);renderCalendar()});$('#resetData').addEventListener('click',()=>{if(confirm('Reset all records to sample data?')){data=structuredClone(seed);save()}});
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));renderAll();
-</script>
-</body></html>
+  <nav class="nav" aria-label="Primary navigation">
+    <button class="active" data-view="today">Today</button>
+    <button data-view="records">Records</button>
+    <button data-view="tasks">Tasks</button>
+    <button data-view="ledger">Ledger</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+
+  <main>
+    <section id="today" class="view active">
+      <div class="grid2">
+        <article class="card">
+          <span class="label">Today’s Rule</span>
+          <h2 id="todayDate"></h2>
+          <div id="todayTasks" class="stack"></div>
+          <p id="todayEmpty" class="empty">Nothing is due. Add the next useful task.</p>
+        </article>
+        <aside class="card">
+          <span class="label">At a glance</span>
+          <div class="stats">
+            <div class="stat"><strong id="openCount">0</strong><span>Open tasks</span></div>
+            <div class="stat"><strong id="recordCount">0</strong><span>Active records</span></div>
+            <div class="stat"><strong id="netCash">$0</strong><span>Net cash</span></div>
+          </div>
+          <div class="quick">
+            <button class="btn secondary" id="todayAddTask">Add task</button>
+            <button class="btn secondary" id="todayAddRecord">Add record</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="records" class="view">
+      <div class="section-head">
+        <div><span class="label">Things entrusted to your care</span><h2>Records</h2></div>
+        <button class="btn primary" id="addRecord">+ Record</button>
+      </div>
+      <div id="recordGroups"></div>
+    </section>
+
+    <section id="tasks" class="view">
+      <div class="section-head">
+        <div><span class="label">What needs to happen?</span><h2>Tasks</h2></div>
+        <button class="btn primary" id="tasksAddTask">+ Task</button>
+      </div>
+      <div class="card">
+        <div class="filters">
+          <label>Status
+            <select id="taskStatusFilter">
+              <option value="open">Open</option>
+              <option value="all">All</option>
+              <option value="done">Completed</option>
+            </select>
+          </label>
+          <label>Linked record
+            <select id="taskRecordFilter">
+              <option value="all">All records</option>
+              <option value="standalone">Standalone</option>
+            </select>
+          </label>
+          <label>Sort by
+            <select id="taskSort">
+              <option value="due">Due date</option>
+              <option value="record">Record</option>
+              <option value="created">Newest added</option>
+            </select>
+          </label>
+        </div>
+        <div id="allTasksList" class="stack"></div>
+      </div>
+    </section>
+
+    <section id="ledger" class="view">
+      <div class="section-head">
+        <div><span class="label">Financial stewardship</span><h2>Ledger</h2></div>
+        <button class="btn primary" id="addLedger">+ Entry</button>
+      </div>
+      <div class="stats stats-spaced">
+        <div class="stat"><strong id="expenseTotal">$0</strong><span>Expenses</span></div>
+        <div class="stat"><strong id="incomeTotal">$0</strong><span>Income</span></div>
+        <div class="stat"><strong id="ledgerNet">$0</strong><span>Net</span></div>
+      </div>
+      <div id="ledgerList" class="stack"></div>
+    </section>
+
+    <section id="settings" class="view">
+      <div class="grid2">
+        <article class="card">
+          <span class="label">Identity</span>
+          <h2>Your homestead</h2>
+          <form id="homesteadForm" class="form-grid">
+            <label>Homestead name<input id="homesteadName"></label>
+            <button class="btn primary" type="submit">Save name</button>
+          </form>
+        </article>
+        <article class="card">
+          <span class="label">Own your records</span>
+          <h2>Backup &amp; restore</h2>
+          <p class="muted">Download a backup regularly. Records remain in this browser; cloud sync is not part of v5.</p>
+          <div class="quick">
+            <button class="btn secondary" id="exportData">Download backup</button>
+            <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
+            <button class="btn danger" id="resetData">Reset sample data</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="recordView" class="record-shell">
+      <button class="btn secondary back" id="backToList">← Back</button>
+      <article class="card">
+        <div class="record-head">
+          <div>
+            <span id="recordTypeLabel" class="label"></span>
+            <h2 id="recordTitle"></h2>
+            <div id="recordIdentity" class="meta"></div>
+          </div>
+          <div class="record-actions">
+            <button class="btn primary" id="recordEvent">Record</button>
+            <button class="btn secondary" id="recordAddTask">+ Task</button>
+            <button class="btn secondary" id="recordAddNote">+ Note</button>
+            <button class="btn secondary" id="recordAddLedger">+ Ledger</button>
+            <button class="btn secondary" id="recordEdit">Edit</button>
+          </div>
+        </div>
+        <div id="recordStewardship" class="steward-box"></div>
+        <div class="tabs-mini" role="tablist" aria-label="Record details">
+          <button class="active" data-panel="tasks">Tasks</button>
+          <button data-panel="chronicle">Chronicle</button>
+          <button data-panel="notes">Notes</button>
+          <button data-panel="ledger">Ledger</button>
+          <button data-panel="photos">Photos</button>
+        </div>
+        <div id="panelTasks" class="record-panel active"></div>
+        <div id="panelChronicle" class="record-panel"></div>
+        <div id="panelNotes" class="record-panel"></div>
+        <div id="panelLedger" class="record-panel"></div>
+        <div id="panelPhotos" class="record-panel">
+          <div class="photo-placeholder">
+            <span class="label">Photos</span>
+            <p>Photo support is planned for a later release.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">Regula Rustica v5 · The app remembers so you do not have to.</footer>
+
+  <dialog id="modal">
+    <form id="modalForm">
+      <div class="row"><h2 id="modalTitle">Add</h2><button type="button" class="btn ghost" id="modalClose" aria-label="Close">✕</button></div>
+      <div id="modalFields" class="form-grid"></div>
+      <div class="dialog-actions">
+        <button type="button" class="btn secondary" id="modalCancel">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
