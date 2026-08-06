@@ -1,0 +1,2 @@
+-- Intentionally empty. Tests create isolated Auth users and Homesteads inside
+-- transactions; production-like sample data does not belong in the foundation.
