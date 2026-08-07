@@ -9,8 +9,11 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="app.js" defer></script>
+  <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
+  <script src="cloud-auth.js" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -126,6 +129,39 @@
             <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
             <button class="btn danger" id="resetData">Reset sample data</button>
           </div>
+        </article>
+        <article class="card cloud-card">
+          <span class="label">Cloud foundation</span>
+          <h2>Your account</h2>
+          <p class="muted">Account access is optional. Your working records remain in this browser; synchronization is not enabled yet.</p>
+          <p id="cloudStatus" class="cloud-status" role="status">Checking cloud configuration…</p>
+          <form id="cloudAuthForm" class="form-grid hidden">
+            <label>Display name<input id="cloudDisplayName" autocomplete="name"></label>
+            <label>Email<input id="cloudEmail" type="email" autocomplete="email" required></label>
+            <label>Password<input id="cloudPassword" type="password" autocomplete="current-password" minlength="8" required></label>
+            <div class="quick">
+              <button class="btn primary" id="cloudSignIn" type="submit">Sign in</button>
+              <button class="btn secondary" id="cloudSignUp" type="button">Create account</button>
+              <button class="btn ghost" id="cloudResetRequest" type="button">Reset password</button>
+            </div>
+          </form>
+          <div id="cloudSignedIn" class="form-grid hidden">
+            <div class="row"><span id="cloudUserEmail" class="meta"></span><button class="btn secondary" id="cloudSignOut" type="button">Sign out</button></div>
+            <div id="cloudMembership" class="hidden">
+              <p class="muted">Signed in as <strong id="cloudRole"></strong> of this Homestead.</p>
+            </div>
+            <div id="cloudOnboarding" class="form-grid hidden">
+              <p class="muted">Create a Homestead or accept a private invitation. An account may belong to one active Homestead.</p>
+              <label>Homestead name<input id="cloudHomesteadName" maxlength="120"></label>
+              <button class="btn primary" id="cloudCreateHomestead" type="button">Create Homestead</button>
+              <label>Invitation token<input id="cloudInvitationToken" autocomplete="off"></label>
+              <button class="btn secondary" id="cloudAcceptInvitation" type="button">Accept invitation</button>
+            </div>
+          </div>
+          <form id="cloudPasswordForm" class="form-grid hidden">
+            <label>New password<input id="cloudNewPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+            <button class="btn primary" type="submit">Save new password</button>
+          </form>
         </article>
       </div>
     </section>

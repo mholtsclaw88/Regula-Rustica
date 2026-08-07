@@ -1,0 +1,16 @@
+.cloud-card {
+  grid-column: 1 / -1;
+}
+
+.cloud-status {
+  border-left: 3px solid var(--gold);
+  padding: 9px 11px;
+  background: #faf5e9;
+  color: var(--muted);
+  font: normal .8rem Arial, sans-serif;
+}
+
+.cloud-status.error {
+  border-color: var(--red);
+  color: var(--red);
+}
