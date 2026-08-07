@@ -341,8 +341,8 @@ declare
 begin
   old_json := old_json - 'token_hash'; new_json := new_json - 'token_hash';
   if tg_op = 'UPDATE' then
-    if old_json -> 'deleted_at' is null and new_json -> 'deleted_at' is not null then event_action := 'soft_delete';
-    elsif old_json -> 'deleted_at' is not null and new_json -> 'deleted_at' is null then event_action := 'restore';
+    if old_json ->> 'deleted_at' is null and new_json ->> 'deleted_at' is not null then event_action := 'soft_delete';
+    elsif old_json ->> 'deleted_at' is not null and new_json ->> 'deleted_at' is null then event_action := 'restore';
     elsif tg_table_name = 'homestead_members' and old_json ->> 'role' is distinct from new_json ->> 'role' then event_action := 'role_change';
     else
       select coalesce(jsonb_agg(key order by key), '[]'::jsonb) into changed

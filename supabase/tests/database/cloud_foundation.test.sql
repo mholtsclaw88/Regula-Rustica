@@ -47,7 +47,8 @@ insert into public.homestead_members (homestead_id, user_id, role, status, joine
 
 select throws_ok(
   format($sql$insert into public.homestead_members (homestead_id,user_id,role,status,joined_at) values (%L,'10000000-0000-0000-0000-000000000002','guest','active',now())$sql$, :'homestead_b'),
-  '23505', 'one active Homestead per user is enforced');
+  '23505', 'duplicate key value violates unique constraint "homestead_members_one_active_homestead_idx"',
+  'one active Homestead per user is enforced');
 select is((select count(*) from public.homestead_members where homestead_id = :'homestead_a' and status = 'active'), 4::bigint, 'one Homestead supports many users');
 
 set local role authenticated;
@@ -100,10 +101,14 @@ insert into public.invitations (homestead_id, email_normalized, role, token_hash
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000002', true);
-select throws_ok($$select public.accept_invitation('expired-token')$$, '22023', 'expired invitation is rejected');
+select throws_ok(
+  $$select public.accept_invitation('expired-token')$$,
+  '22023', 'Invitation is invalid or expired', 'expired invitation is rejected');
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
 select is(public.accept_invitation('valid-token'), :'homestead_a'::uuid, 'valid invitation joins its Homestead');
-select throws_ok($$select public.accept_invitation('valid-token')$$, '23505', 'accepted invitation cannot be reused');
+select throws_ok(
+  $$select public.accept_invitation('valid-token')$$,
+  '23505', 'User already belongs to an active Homestead', 'accepted invitation cannot be reused');
 reset role;
 
 set local role authenticated;
@@ -124,7 +129,8 @@ select ok(exists(select 1 from public.audit_entries where row_id = '40000000-000
 
 select throws_ok(
   $$update public.homestead_members set role = 'keeper' where user_id = '10000000-0000-0000-0000-000000000001'$$,
-  '23514', 'the final Steward cannot be demoted');
+  '23514', 'A Homestead must retain at least one active Steward',
+  'the final Steward cannot be demoted');
 reset role;
 update public.homestead_members set role = 'steward'
   where homestead_id = :'homestead_a' and user_id = '10000000-0000-0000-0000-000000000002';
