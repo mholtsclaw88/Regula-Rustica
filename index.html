@@ -14,6 +14,7 @@
   <script src="app.js" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
+  <script src="sync/runtime.mjs" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -123,7 +124,7 @@
         <article class="card">
           <span class="label">Own your records</span>
           <h2>Backup &amp; restore</h2>
-          <p class="muted">Download a backup regularly. Records remain in this browser; cloud sync is not part of v5.</p>
+          <p class="muted">Download a backup regularly. Records remain available in this browser, including while cloud synchronization is disconnected.</p>
           <div class="quick">
             <button class="btn secondary" id="exportData">Download backup</button>
             <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
@@ -133,7 +134,7 @@
         <article class="card cloud-card">
           <span class="label">Cloud foundation</span>
           <h2>Your account</h2>
-          <p class="muted">Account access is optional. Your working records remain in this browser; synchronization is not enabled yet.</p>
+          <p class="muted">Account access and synchronization are optional. Your working records remain local-first and available offline.</p>
           <p id="cloudStatus" class="cloud-status" role="status">Checking cloud configuration…</p>
           <form id="cloudAuthForm" class="form-grid hidden">
             <label>Display name<input id="cloudDisplayName" autocomplete="name"></label>
@@ -157,6 +158,19 @@
               <label>Invitation token<input id="cloudInvitationToken" autocomplete="off"></label>
               <button class="btn secondary" id="cloudAcceptInvitation" type="button">Accept invitation</button>
             </div>
+          </div>
+          <div id="syncControls" class="form-grid">
+            <p id="syncStatus" class="cloud-status" role="status">Cloud synchronization is not connected.</p>
+            <div id="syncFirstActions" class="form-grid hidden">
+              <p class="muted">Choose how this device should begin. Regula Rustica will never merge two populated Homesteads automatically.</p>
+              <button class="btn primary hidden" id="syncUpload" data-cases="A" type="button">Move this Homestead to the cloud</button>
+              <button class="btn primary hidden" id="syncDownload" data-cases="B" type="button">Download cloud Homestead</button>
+              <button class="btn primary hidden" id="syncUseCloud" data-cases="C" type="button">Back up this device and use cloud Homestead</button>
+              <button class="btn primary hidden" id="syncInitializeEmpty" data-cases="D" type="button">Start cloud synchronization</button>
+              <button class="btn secondary hidden" id="syncCancel" data-cases="ABC" type="button">Cancel</button>
+            </div>
+            <button class="btn secondary hidden" id="syncNow" type="button">Sync now</button>
+            <div id="syncConflicts" class="form-grid"></div>
           </div>
           <form id="cloudPasswordForm" class="form-grid hidden">
             <label>New password<input id="cloudNewPassword" type="password" autocomplete="new-password" minlength="8" required></label>

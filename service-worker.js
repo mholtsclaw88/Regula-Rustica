@@ -1,1 +1,29 @@
-const CACHE='regula-rustica-cloud-foundation-v1';const ASSETS=['./','./index.html','./styles.css','./cloud-auth.css','./app.js','./cloud-auth.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-512-maskable.png'];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
+const CACHE = 'regula-rustica-sync-v1-4';
+const ASSETS = [
+  './', './index.html', './styles.css', './cloud-auth.css', './app.js', './cloud-auth.js',
+  './sync/runtime.mjs', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
+  './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
+];
+const OPTIONAL_ASSETS = [
+  './cloud-runtime-config.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.1/+esm'
+];
+
+self.addEventListener('install', event => event.waitUntil(
+  caches.open(CACHE)
+    .then(async cache => {
+      await cache.addAll(ASSETS);
+      await Promise.all(OPTIONAL_ASSETS.map(asset => cache.add(asset).catch(() => null)));
+    })
+    .then(() => self.skipWaiting())
+));
+
+self.addEventListener('activate', event => event.waitUntil(
+  caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
+    .then(() => self.clients.claim())
+));
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  event.respondWith(caches.match(event.request).then(response => response || fetch(event.request)));
+});
