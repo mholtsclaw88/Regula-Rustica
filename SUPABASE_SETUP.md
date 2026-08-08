@@ -1,6 +1,6 @@
 # Supabase Cloud Foundation Setup
 
-This sprint adds authentication and a secure cloud data foundation without enabling record synchronization. The existing browser data, backup, restore, installability, and offline behavior remain independent of Supabase.
+The Cloud Foundation provides authentication, tenant isolation, and the database used by optional local-first synchronization. Local data, backup, restore, installability, and offline behavior remain available without Supabase. See `SYNC_SETUP.md` for first-sync choices, conflicts, and recovery.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ npm run build:cloud-config
 
 The generated file is ignored by Git. A publishable key is intended for browser use and is constrained by Row Level Security; never substitute a secret key or service-role key.
 
-When no runtime configuration exists, the account card reports that cloud access is unavailable and the local application continues normally. Cloud authentication requires a network connection. Local records are not uploaded in this sprint.
+When no runtime configuration exists, the account card reports that cloud access is unavailable and the local application continues normally. Cloud authentication requires a network connection. Synchronization begins only after the user chooses the explicit first-sync action described in `SYNC_SETUP.md`.
 
 ## Hosted project
 
@@ -83,6 +83,7 @@ The protected RPC surface is:
 - `complete_recurring_task(task_to_complete, operation_key, client_device_id)`
 - `soft_delete_row(target_table, target_id)`
 - `restore_row(target_table, target_id)`
+- `apply_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
 
 Invitation creators must generate a cryptographically random token, give the raw token to the invited person through a private channel, and store only its lowercase SHA-256 hash in `invitations.token_hash`. The token is single-use and expires after seven days by default.
 
@@ -92,17 +93,17 @@ Run before proposing a deployment:
 
 ```sh
 npm run check
+npm run test:sync
 supabase db reset
 supabase test db supabase/tests/database
 supabase db lint --local --level warning
 ```
 
-The 48-assertion pgTAP suite proves the one-active-Homestead rule, multiple members, all four roles and their capability boundaries, two-Homestead RLS isolation, invitation expiry and reuse protection, assigned-Hand task visibility, recurring task generation, idempotent completion, soft deletion and restore auditing, append-only audit data, and final-Steward protection.
+The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The additive Sync v1 suite brings the database total to 69 assertions and covers atomic idempotent writes, server-derived Homestead identity, optimistic conflicts, synchronized soft deletion/restoration, restricted roles, audit behavior, and recurring completion through sync. The client suite covers first-sync cases, recovery, durable queuing, ordering, conflicts, and legacy-ID mapping.
 
 ## Deliberately deferred
 
-- Cloud/local synchronization and conflict UI
-- Realtime subscriptions and offline write queues
+- Realtime subscriptions
 - Photo storage and upload processing
 - Cellarer/AI integration
 - Social login, MFA, and account deletion

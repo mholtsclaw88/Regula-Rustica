@@ -37,6 +37,8 @@ async function initializeCloud() {
       membership.classList.add('hidden');
       onboarding.classList.add('hidden');
       showStatus('Cloud access is ready. Sign in or create an account.');
+      window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session: null, homesteadId: null, role: null };
+      window.dispatchEvent(new CustomEvent('regula-rustica:cloud-context', { detail: window.REGULA_RUSTICA_CLOUD_CONTEXT }));
       return;
     }
 
@@ -52,8 +54,10 @@ async function initializeCloud() {
     onboarding.classList.toggle('hidden', hasMembership);
     document.querySelector('#cloudRole').textContent = role || '';
     showStatus(hasMembership
-      ? 'Account connected. Cloud synchronization is intentionally not enabled in this sprint.'
+      ? 'Account connected. Local-first synchronization is available below.'
       : 'Account ready. Choose how this account joins a Homestead.');
+    window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session, homesteadId, role };
+    window.dispatchEvent(new CustomEvent('regula-rustica:cloud-context', { detail: window.REGULA_RUSTICA_CLOUD_CONTEXT }));
   }
 
   async function run(action, successMessage) {
@@ -119,6 +123,11 @@ async function initializeCloud() {
 
   client.auth.onAuthStateChange((event, session) => {
     window.setTimeout(() => refreshAccount(session, event).catch(error => showStatus(error.message, true)), 0);
+  });
+
+  window.addEventListener('online', async () => {
+    const { data: { session } } = await client.auth.getSession();
+    refreshAccount(session).catch(error => showStatus(error.message || 'Cloud access could not reconnect.', true));
   });
 
   const { data: { session }, error } = await client.auth.getSession();

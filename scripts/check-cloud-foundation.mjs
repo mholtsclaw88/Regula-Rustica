@@ -42,7 +42,7 @@ assert(/minimum_password_length\s*=\s*8/.test(config), 'Minimum password length 
 assert(/id="cloudAuthForm"/.test(html) && /id="cloudOnboarding"/.test(html), 'Cloud auth UI is incomplete.');
 assert(/select plan\(48\)/.test(tests), 'pgTAP plan must match the test suite.');
 
-const assetMatch = worker.match(/const ASSETS=\[(.*?)\]/);
+const assetMatch = worker.match(/const\s+ASSETS\s*=\s*\[([\s\S]*?)\]/);
 assert(assetMatch, 'Service worker asset list is missing.');
 const assets = [...assetMatch[1].matchAll(/'\.\/(.*?)'/g)].map(match => match[1]).filter(Boolean);
 for (const asset of assets) await access(new URL(`../${asset}`, import.meta.url));

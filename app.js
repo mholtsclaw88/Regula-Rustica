@@ -39,7 +39,7 @@ const RECORD_CONFIG = {
 
 const nowIso = () => new Date().toISOString();
 const today = () => nowIso().slice(0, 10);
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const uid = () => crypto.randomUUID();
 const formatDate = date => date
   ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   : 'No date';
@@ -68,23 +68,31 @@ function normalizeRecord(record = {}) {
     identity: record.identity && typeof record.identity === 'object' ? record.identity : {},
     stewardship: record.stewardship && typeof record.stewardship === 'object' ? record.stewardship : {},
     createdAt: timestamp.length === 10 ? `${timestamp}T12:00:00.000Z` : timestamp,
-    updatedAt: record.updatedAt || timestamp
+    updatedAt: record.updatedAt || timestamp,
+    deletedAt: record.deletedAt || null
   };
 }
 
 function normalizeTask(task = {}) {
+  const createdAt = task.createdAt || task.created || nowIso();
   return {
     id: task.id || uid(),
     title: task.title || 'Untitled task',
     dueDate: task.dueDate ?? task.due ?? '',
     recordId: task.recordId || null,
     completed: Boolean(task.completed ?? task.done),
-    createdAt: task.createdAt || task.created || nowIso(),
-    completedAt: task.completedAt || (task.completed || task.done ? nowIso() : null)
+    description: task.description || '',
+    status: task.status || (task.completed || task.done ? 'completed' : 'open'),
+    priority: task.priority || 'normal',
+    createdAt,
+    updatedAt: task.updatedAt || createdAt,
+    completedAt: task.completedAt || (task.completed || task.done ? nowIso() : null),
+    deletedAt: task.deletedAt || null
   };
 }
 
 function normalizeEvent(event = {}) {
+  const createdAt = event.createdAt || (event.date?.includes('T') ? event.date : nowIso());
   return {
     id: event.id || uid(),
     recordId: event.recordId || null,
@@ -93,7 +101,9 @@ function normalizeEvent(event = {}) {
     value: event.value ?? '',
     unit: event.unit || '',
     details: event.details || event.text || '',
-    createdAt: event.createdAt || (event.date?.includes('T') ? event.date : nowIso())
+    createdAt,
+    updatedAt: event.updatedAt || createdAt,
+    deletedAt: event.deletedAt || null
   };
 }
 
@@ -103,11 +113,13 @@ function normalizeNote(note = {}) {
     recordId: note.recordId || null,
     text: note.text || '',
     createdAt: note.createdAt || note.created || note.date || nowIso(),
-    updatedAt: note.updatedAt || note.createdAt || note.created || note.date || nowIso()
+    updatedAt: note.updatedAt || note.createdAt || note.created || note.date || nowIso(),
+    deletedAt: note.deletedAt || null
   };
 }
 
 function normalizeLedgerEntry(entry = {}) {
+  const createdAt = entry.createdAt || nowIso();
   return {
     id: entry.id || uid(),
     type: entry.type === 'revenue' ? 'income' : entry.type === 'income' ? 'income' : 'expense',
@@ -115,7 +127,9 @@ function normalizeLedgerEntry(entry = {}) {
     amount: Number(entry.amount || 0),
     description: entry.description || '',
     recordId: entry.recordId || null,
-    createdAt: entry.createdAt || nowIso()
+    createdAt,
+    updatedAt: entry.updatedAt || createdAt,
+    deletedAt: entry.deletedAt || null
   };
 }
 
@@ -125,6 +139,8 @@ function normalizeData(source = {}) {
     settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
     records: asArray(source.records).map(normalizeRecord),
     tasks: asArray(source.tasks).map(normalizeTask),
+    relationships: asArray(source.relationships),
+    assignments: asArray(source.assignments),
     events: asArray(source.events).map(normalizeEvent),
     notes: asArray(source.notes).map(normalizeNote),
     ledger: asArray(source.ledger).map(normalizeLedgerEntry),
@@ -253,10 +269,13 @@ function loadData() {
   return structuredClone(SEED_DATA);
 }
 
-function saveData(nextData = data) {
+function saveData(nextData = data, source = 'user') {
+  const before = persistedData ? structuredClone(persistedData) : null;
   data = normalizeData(nextData);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  persistedData = structuredClone(data);
   renderAll();
+  window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', { detail: { before, after: structuredClone(data), source } }));
 }
 
 function exportData() {
@@ -266,6 +285,13 @@ function exportData() {
   link.click();
   URL.revokeObjectURL(link.href);
 }
+
+window.RegulaRusticaLocal = {
+  read: () => structuredClone(data),
+  write: (nextData, source = 'sync') => saveData(nextData, source),
+  exportBackup: exportData,
+  storageKey: STORAGE_KEY
+};
 
 async function importData(file) {
   if (!file) return;
@@ -291,6 +317,7 @@ const SEED_DATA = {
 };
 
 let data = loadData();
+let persistedData = structuredClone(data);
 let currentRecordId = null;
 let priorView = 'records';
 let modalMode = '';
@@ -373,14 +400,17 @@ function taskRow(task) {
   row.querySelector('input').addEventListener('change', event => {
     const wasCompleted = task.completed;
     task.completed = event.target.checked;
+    task.status = task.completed ? 'completed' : 'open';
     task.completedAt = task.completed ? nowIso() : null;
+    task.updatedAt = nowIso();
     if (!wasCompleted && task.completed && task.recordId) addEvent(task.recordId, 'Task completed', task.title);
     saveData();
   });
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
   row.querySelector('.del').addEventListener('click', () => {
     if (confirm('Delete this task?')) {
-      data.tasks = data.tasks.filter(item => item.id !== task.id);
+      task.deletedAt = nowIso();
+      task.updatedAt = task.deletedAt;
       saveData();
     }
   });
@@ -391,27 +421,27 @@ function renderToday() {
   const root = $('#todayTasks');
   root.innerHTML = '';
   const tasks = data.tasks
-    .filter(task => !task.completed && (!task.dueDate || task.dueDate <= today()))
+    .filter(task => !task.deletedAt && !task.completed && (!task.dueDate || task.dueDate <= today()))
     .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
   tasks.forEach(task => root.appendChild(taskRow(task)));
   $('#todayEmpty').classList.toggle('hidden', tasks.length > 0);
-  $('#openCount').textContent = data.tasks.filter(task => !task.completed).length;
-  $('#recordCount').textContent = data.records.filter(record => record.status !== 'Archived').length;
-  $('#netCash').textContent = formatMoney(data.ledger.reduce((sum, entry) => sum + (entry.type === 'income' ? 1 : -1) * entry.amount, 0));
+  $('#openCount').textContent = data.tasks.filter(task => !task.deletedAt && !task.completed).length;
+  $('#recordCount').textContent = data.records.filter(record => !record.deletedAt && record.status !== 'Archived').length;
+  $('#netCash').textContent = formatMoney(data.ledger.filter(entry => !entry.deletedAt).reduce((sum, entry) => sum + (entry.type === 'income' ? 1 : -1) * entry.amount, 0));
 }
 
 function renderRecords() {
   const root = $('#recordGroups');
   root.innerHTML = '';
   RECORD_TYPES.forEach(type => {
-    const records = data.records.filter(record => record.type === type && record.status !== 'Archived');
+    const records = data.records.filter(record => !record.deletedAt && record.type === type && record.status !== 'Archived');
     if (!records.length) return;
     const block = document.createElement('div');
     block.className = 'type-block';
     block.innerHTML = `<div class="row"><h3>${RECORD_CONFIG[type].plural}</h3><button class="btn ghost add-type">+ Add</button></div><div class="type-grid"></div>`;
     block.querySelector('.add-type').addEventListener('click', () => openModal('record', null, null, type));
     records.forEach(record => {
-      const nextTask = data.tasks.find(task => task.recordId === record.id && !task.completed);
+      const nextTask = data.tasks.find(task => !task.deletedAt && task.recordId === record.id && !task.completed);
       const card = document.createElement('article');
       card.className = 'record-card';
       card.innerHTML = `<div class="row"><div><span class="label">${escapeHtml(record.type)}</span><h3>${escapeHtml(record.name)}</h3></div><span class="pill">${escapeHtml(record.status)}</span></div><div class="meta">${escapeHtml(identityText(record))}</div><p>${nextTask ? `Next: ${escapeHtml(nextTask.title)}` : 'No open task'}</p>`;
@@ -448,7 +478,7 @@ function renderRecord() {
   const taskPanel = $('#panelTasks');
   taskPanel.innerHTML = '';
   data.tasks
-    .filter(task => task.recordId === record.id)
+    .filter(task => !task.deletedAt && task.recordId === record.id)
     .sort((a, b) => Number(a.completed) - Number(b.completed) || (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'))
     .forEach(task => taskPanel.appendChild(taskRow(task)));
   if (!taskPanel.children.length) taskPanel.innerHTML = '<p class="empty">No linked tasks.</p>';
@@ -456,7 +486,7 @@ function renderRecord() {
   const chroniclePanel = $('#panelChronicle');
   chroniclePanel.innerHTML = '';
   data.events
-    .filter(event => event.recordId === record.id)
+    .filter(event => !event.deletedAt && event.recordId === record.id)
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
     .forEach(event => {
       const item = document.createElement('div');
@@ -464,7 +494,8 @@ function renderRecord() {
       item.innerHTML = `<div class="row"><strong>${escapeHtml(event.eventType)}</strong><div class="actions"><span class="meta">${formatDate(event.date)}</span><button class="btn ghost del">Delete</button></div></div>${event.value ? `<div><strong>${escapeHtml(event.value)} ${escapeHtml(event.unit)}</strong></div>` : ''}${event.details ? `<p>${escapeHtml(event.details)}</p>` : ''}`;
       item.querySelector('.del').addEventListener('click', () => {
         if (confirm('Delete this Chronicle entry?')) {
-          data.events = data.events.filter(candidate => candidate.id !== event.id);
+          event.deletedAt = nowIso();
+          event.updatedAt = event.deletedAt;
           saveData();
         }
       });
@@ -475,7 +506,7 @@ function renderRecord() {
   const notesPanel = $('#panelNotes');
   notesPanel.innerHTML = '';
   data.notes
-    .filter(note => note.recordId === record.id)
+    .filter(note => !note.deletedAt && note.recordId === record.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .forEach(note => {
       const item = document.createElement('div');
@@ -483,7 +514,8 @@ function renderRecord() {
       item.innerHTML = `<div class="row"><div>${escapeHtml(note.text)}</div><button class="btn ghost del">Delete</button></div><div class="meta">${new Date(note.createdAt).toLocaleDateString()}</div>`;
       item.querySelector('.del').addEventListener('click', () => {
         if (confirm('Delete this note?')) {
-          data.notes = data.notes.filter(candidate => candidate.id !== note.id);
+          note.deletedAt = nowIso();
+          note.updatedAt = note.deletedAt;
           saveData();
         }
       });
@@ -494,7 +526,7 @@ function renderRecord() {
   const ledgerPanel = $('#panelLedger');
   ledgerPanel.innerHTML = '';
   data.ledger
-    .filter(entry => entry.recordId === record.id)
+    .filter(entry => !entry.deletedAt && entry.recordId === record.id)
     .sort((a, b) => b.date.localeCompare(a.date))
     .forEach(entry => ledgerPanel.appendChild(ledgerRow(entry)));
   if (!ledgerPanel.children.length) ledgerPanel.innerHTML = '<p class="empty">No linked ledger entries.</p>';
@@ -506,12 +538,12 @@ function renderTasks() {
   const selectedRecord = recordFilter.value || 'all';
   recordFilter.innerHTML = '<option value="all">All records</option><option value="standalone">Standalone</option>';
   data.records
-    .filter(record => record.status !== 'Archived')
+    .filter(record => !record.deletedAt && record.status !== 'Archived')
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(record => recordFilter.add(new Option(`${record.name} (${record.type})`, record.id)));
   if ([...recordFilter.options].some(option => option.value === selectedRecord)) recordFilter.value = selectedRecord;
 
-  let tasks = [...data.tasks];
+  let tasks = data.tasks.filter(task => !task.deletedAt);
   const status = $('#taskStatusFilter').value;
   const linkedRecord = recordFilter.value;
   const sort = $('#taskSort').value;
@@ -533,7 +565,8 @@ function ledgerRow(entry) {
   row.querySelector('.edit').addEventListener('click', () => openModal('ledger', entry.id, entry.recordId));
   row.querySelector('.del').addEventListener('click', () => {
     if (confirm('Delete this ledger entry?')) {
-      data.ledger = data.ledger.filter(candidate => candidate.id !== entry.id);
+      entry.deletedAt = nowIso();
+      entry.updatedAt = entry.deletedAt;
       saveData();
     }
   });
@@ -543,10 +576,10 @@ function ledgerRow(entry) {
 function renderLedger() {
   const root = $('#ledgerList');
   root.innerHTML = '';
-  [...data.ledger].sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => root.appendChild(ledgerRow(entry)));
+  data.ledger.filter(entry => !entry.deletedAt).sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => root.appendChild(ledgerRow(entry)));
   if (!root.children.length) root.innerHTML = '<p class="empty">No ledger entries yet.</p>';
-  const expenses = data.ledger.filter(entry => entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0);
-  const income = data.ledger.filter(entry => entry.type === 'income').reduce((sum, entry) => sum + entry.amount, 0);
+  const expenses = data.ledger.filter(entry => !entry.deletedAt && entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0);
+  const income = data.ledger.filter(entry => !entry.deletedAt && entry.type === 'income').reduce((sum, entry) => sum + entry.amount, 0);
   $('#expenseTotal').textContent = formatMoney(expenses);
   $('#incomeTotal').textContent = formatMoney(income);
   $('#ledgerNet').textContent = formatMoney(income - expenses);
@@ -596,7 +629,7 @@ function addRecordSelect(root, labelText, name, selected = '', excludeId = '') {
   select.name = name;
   select.add(new Option('None', ''));
   data.records
-    .filter(record => record.status !== 'Archived' && record.id !== excludeId)
+    .filter(record => !record.deletedAt && record.status !== 'Archived' && record.id !== excludeId)
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(record => select.add(new Option(`${record.name} (${record.type})`, record.id)));
   select.value = selected || '';
@@ -751,8 +784,8 @@ $('#modalForm').addEventListener('submit', event => {
     if (!form.title.trim()) return;
     const existing = data.tasks.find(task => task.id === editId);
     const values = { title: form.title.trim(), dueDate: form.dueDate || '', recordId: form.recordId || null };
-    if (existing) Object.assign(existing, values);
-    else data.tasks.push({ id: uid(), ...values, completed: false, createdAt: nowIso(), completedAt: null });
+    if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
+    else data.tasks.push({ id: uid(), ...values, completed: false, status: 'open', createdAt: nowIso(), updatedAt: nowIso(), completedAt: null, deletedAt: null });
   }
   if (modalMode === 'note') {
     if (!form.text.trim()) return;
@@ -774,8 +807,8 @@ $('#modalForm').addEventListener('submit', event => {
     if (!form.description.trim()) return;
     const existing = data.ledger.find(entry => entry.id === editId);
     const values = { type: form.type, date: form.date, amount: Number(form.amount || 0), description: form.description.trim(), recordId: form.recordId || null };
-    if (existing) Object.assign(existing, values);
-    else data.ledger.unshift({ id: uid(), ...values, createdAt: nowIso() });
+    if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
+    else data.ledger.unshift({ id: uid(), ...values, createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null });
   }
   if (modalMode === 'record') {
     if (!form.name.trim()) return;
@@ -791,7 +824,7 @@ $('#modalForm').addEventListener('submit', event => {
     };
     if (existing) {
       const previousStatus = existing.status;
-      Object.assign(existing, values);
+      Object.assign(existing, values, { updatedAt: nowIso() });
       if (previousStatus !== existing.status) addEvent(existing.id, 'Status changed', `${previousStatus} → ${existing.status}`);
     } else {
       const created = { id: uid(), ...values, createdAt: timestamp };
