@@ -1,0 +1,7 @@
+[build]
+  # Supabase URL and publishable key are supplied by Netlify environment variables.
+  command = "npm run build:cloud-config"
+  publish = "."
+
+[build.environment]
+  NODE_VERSION = "20"
