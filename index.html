@@ -151,6 +151,37 @@
             <div id="cloudMembership" class="hidden">
               <p class="muted">Signed in as <strong id="cloudRole"></strong> of this Homestead.</p>
             </div>
+            <section id="cloudMemberManagement" class="member-management hidden" aria-labelledby="inviteMemberTitle">
+              <div>
+                <span class="label">Members</span>
+                <h3 id="inviteMemberTitle">Invite Member</h3>
+                <p class="muted">Create a private, single-use link. It expires after seven days; Regula Rustica does not email it automatically.</p>
+              </div>
+              <form id="cloudInvitationForm" class="form-grid">
+                <label>Email<input id="cloudInvitationEmail" type="email" autocomplete="email" maxlength="254" required></label>
+                <label>Role
+                  <select id="cloudInvitationRole" required>
+                    <option value="keeper">Keeper</option>
+                    <option value="hand">Hand</option>
+                    <option value="guest">Guest</option>
+                    <option value="steward">Steward</option>
+                  </select>
+                </label>
+                <p id="cloudRoleDescription" class="muted"></p>
+                <button class="btn primary" type="submit">Create private invitation</button>
+              </form>
+              <div id="cloudInvitationResult" class="invitation-result hidden">
+                <label>Private invitation link<input id="cloudInvitationLink" readonly></label>
+                <div class="quick">
+                  <button class="btn secondary" id="cloudCopyInvitation" type="button">Copy link</button>
+                </div>
+                <p class="muted">Send this link privately to the invited person. It cannot be shown again after you leave or create another invitation.</p>
+              </div>
+              <div>
+                <h3>Invitations</h3>
+                <div id="cloudInvitationList" class="invitation-list" aria-live="polite"></div>
+              </div>
+            </section>
             <div id="cloudOnboarding" class="form-grid hidden">
               <p class="muted">Create a Homestead or accept a private invitation. An account may belong to one active Homestead.</p>
               <label>Homestead name<input id="cloudHomesteadName" maxlength="120"></label>
