@@ -1,7 +1,7 @@
 import { access, readFile } from 'node:fs/promises';
 
 const migrationPath = new URL('../supabase/migrations/20260806034255_cloud_foundation.sql', import.meta.url);
-const invitationMigrationPath = new URL('../supabase/migrations/20260809193711_member_invitations.sql', import.meta.url);
+const invitationMigrationPath = new URL('../supabase/migrations/20260809204827_member_invitations.sql', import.meta.url);
 const [migration, invitationMigration, config, html, worker, tests, invitationTests] = await Promise.all([
   readFile(migrationPath, 'utf8'),
   readFile(invitationMigrationPath, 'utf8'),
