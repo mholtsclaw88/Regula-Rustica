@@ -1,6 +1,6 @@
-const CACHE = 'regula-rustica-member-invitations-3';
+const CACHE = 'regula-rustica-housekeeping-1';
 const ASSETS = [
-  './', './index.html', './styles.css', './cloud-auth.css', './app.js', './cloud-auth.js',
+  './', './index.html', './styles.css', './housekeeping.css', './cloud-auth.css', './housekeeping-data.js', './app.js', './cloud-auth.js',
   './cloud-invitations.mjs',
   './sync/runtime.mjs', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
