@@ -90,6 +90,12 @@
               <option value="standalone">Standalone</option>
             </select>
           </label>
+          <label>Assigned to
+            <select id="taskAssigneeFilter">
+              <option value="all">All people</option>
+              <option value="unassigned">Unassigned</option>
+            </select>
+          </label>
           <label>Timing
             <select id="taskTimingFilter">
               <option value="all">All dates</option>
@@ -195,6 +201,18 @@
             <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
             <button class="btn danger" id="resetData">Reset sample data</button>
           </div>
+        </article>
+        <article class="card">
+          <span class="label">Assignable people</span>
+          <h2>Children</h2>
+          <p class="muted">Add a child without creating an account. Children can be assigned tasks, but receive no sign-in, role, permissions, or cloud access.</p>
+          <form id="childForm" class="form-grid">
+            <label>Child name<input id="childName" maxlength="120" autocomplete="off" required></label>
+            <button class="btn primary" type="submit">Add child</button>
+          </form>
+          <div id="childList" class="stack"></div>
+          <p id="childEmpty" class="empty">No children have been added.</p>
+          <p class="muted">Kiosk access is planned for a later sprint.</p>
         </article>
         <article class="card cloud-card">
           <span class="label">Cloud foundation</span>

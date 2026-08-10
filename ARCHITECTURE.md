@@ -88,10 +88,12 @@ The local data object should use an explicit schema version.
 
 ```json
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "settings": {},
   "records": [],
+  "people": [],
   "tasks": [],
+  "assignments": [],
   "events": [],
   "calendarEvents": [],
   "yieldEntries": [],
@@ -146,7 +148,11 @@ Tasks represent future work.
 }
 ```
 
-`availableFrom` and `dueDate` are independently optional. Schema version 6 also adds distinct local collections for shared calendar events and canonical Milk/Egg yield entries. Older schema-version 5 backups remain importable.
+`availableFrom` and `dueDate` are independently optional. Schema version 6 adds distinct local collections for shared calendar events and canonical Milk/Egg yield entries. Schema version 7 adds an assignable Homestead people directory and normalized task assignments. Older schema-version 5 and 6 backups remain importable.
+
+### Homestead People and Task Assignments
+
+`people` is the local-first assignee directory. Account-backed entries have `personType: "member"` and a membership link supplied by the cloud; `personType: "child"` entries have no account, role, membership, or access. Tasks reference people through the separate `assignments` collection so assignment history is not duplicated on the task. The first UI exposes one active assignee while the underlying model continues to support multiple assignments.
 
 Completing a linked task may create a Chronicle event automatically.
 

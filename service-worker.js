@@ -1,4 +1,4 @@
-const CACHE = 'regula-rustica-housekeeping-1';
+const CACHE = 'regula-rustica-housekeeping-2';
 const ASSETS = [
   './', './index.html', './styles.css', './housekeeping.css', './cloud-auth.css', './housekeeping-data.js', './app.js', './cloud-auth.js',
   './cloud-invitations.mjs',

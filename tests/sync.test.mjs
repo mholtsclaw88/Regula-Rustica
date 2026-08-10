@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SyncEngine } from '../sync/engine.mjs';
 import { LocalSyncState } from '../sync/local-state.mjs';
-import { DOMAIN_ORDER, fromCloud, operationOrder, toCloud } from '../sync/entities.mjs';
+import { DOMAIN_ORDER, fromCloud, hasMeaningfulData, operationOrder, toCloud } from '../sync/entities.mjs';
 import housekeepingData from '../housekeeping-data.js';
 
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
@@ -13,7 +13,7 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-const blank = () => ({ schemaVersion: 6, settings: { homesteadName: 'Test' }, records: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
+const blank = () => ({ schemaVersion: 7, settings: { homesteadName: 'Test' }, records: [], people: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
 const record = (id = crypto.randomUUID()) => ({ id, type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', deletedAt: null });
 
 class MockCloud {
@@ -174,6 +174,34 @@ test('task date windows and recurrence survive cloud conversion', () => {
   assert.equal(payload.available_from, '2026-08-10');
   assert.equal(payload.due_date, '2026-08-12');
   assert.deepEqual(payload.recurrence_rule, task.recurrenceRule);
+});
+
+test('child profiles and task assignments retain their canonical person link', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const child = { id: 'child-one', personType: 'child', displayName: 'Clare', createdAt: '2026-08-10T12:00:00Z' };
+  const taskId = 'task-one';
+  const personPayload = toCloud('homestead_people', child, state);
+  const assignmentPayload = toCloud('task_assignments', {
+    id: 'assignment-one', taskId, personId: child.id, assignmentType: 'assignee', assignedAt: '2026-08-10T12:00:00Z'
+  }, state);
+  assert.equal(personPayload.person_type, 'child');
+  assert.equal(personPayload.member_id, null);
+  assert.equal(assignmentPayload.person_id, state.entity('homestead_people', child.id).cloudId);
+  assert.equal(assignmentPayload.task_id, state.entity('tasks', taskId).cloudId);
+  const local = fromCloud('task_assignments', {
+    id: assignmentPayload.id, task_id: assignmentPayload.task_id, person_id: assignmentPayload.person_id,
+    member_id: null, assignment_type: 'assignee', assigned_at: '2026-08-10T12:00:00Z',
+    updated_at: '2026-08-10T12:00:00Z', removed_at: null
+  }, state);
+  assert.equal(local.personId, child.id);
+});
+
+test('account-backed directory entries do not make an empty Homestead look populated', () => {
+  const data = blank();
+  data.people.push({ id: 'member-one', personType: 'member', displayName: 'Steward', memberId: crypto.randomUUID() });
+  assert.equal(hasMeaningfulData(data), false);
+  data.people.push({ id: 'child-one', personType: 'child', displayName: 'Clare' });
+  assert.equal(hasMeaningfulData(data), true);
 });
 
 test('calendar events retain all-day and optional time metadata', () => {

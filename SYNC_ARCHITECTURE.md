@@ -742,3 +742,5 @@ A slower, explicit workflow is preferable to a fast workflow that can silently o
 ### Housekeeping v1 extension — August 2026
 
 The later approved Housekeeping sprint brings `calendar_events` and `yield_entries` into the existing Sync v1 pipeline. Both use local-first writes, the durable outbox, dependency-ordered initial upload, deterministic pull cursors, optimistic version conflicts, idempotent server operations, soft deletion/restoration, and Homestead-bound RLS. This extension supersedes the earlier Calendar deferral only; Realtime, external calendar services, recurrence, attendees, and `.ics` import/export remain deferred.
+
+The same sprint's assignment extension adds `homestead_people` before `tasks` and `task_assignments` in dependency order. Only child entries count as meaningful first-sync content; automatic member-directory rows therefore do not make a newly created cloud Homestead appear populated. Assignments synchronize a canonical `person_id`, with `member_id` retained only as the authorization bridge for account-backed Hands. Child profiles never create authentication or membership state.

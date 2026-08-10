@@ -12,7 +12,7 @@ This document captures worthwhile ideas that are intentionally deferred. Recordi
 
 ## Tasks
 - Task watchers
-- Role-based task assignment
+- Child kiosk mode for viewing assigned tasks and marking permitted work complete
 - Advanced recurring task exceptions
 
 ## Records

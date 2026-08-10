@@ -100,6 +100,37 @@ function normalizeTask(task = {}) {
   };
 }
 
+function normalizePerson(person = {}) {
+  const createdAt = person.createdAt || nowIso();
+  return {
+    id: person.id || uid(),
+    personType: person.personType === 'member' ? 'member' : 'child',
+    displayName: person.displayName || person.name || 'Unnamed person',
+    memberId: person.memberId || null,
+    createdAt,
+    updatedAt: person.updatedAt || createdAt,
+    deletedAt: person.deletedAt || null
+  };
+}
+
+function normalizeAssignment(assignment = {}, people = []) {
+  const assignedAt = assignment.assignedAt || assignment.createdAt || nowIso();
+  const matchedPerson = assignment.personId
+    ? people.find(person => person.id === assignment.personId)
+    : people.find(person => person.memberId && person.memberId === assignment.memberId);
+  return {
+    id: assignment.id || uid(),
+    taskId: assignment.taskId || null,
+    personId: matchedPerson?.id || assignment.personId || null,
+    memberId: matchedPerson?.memberId || assignment.memberId || null,
+    assignmentType: assignment.assignmentType || 'assignee',
+    assignedAt,
+    createdAt: assignment.createdAt || assignedAt,
+    updatedAt: assignment.updatedAt || assignedAt,
+    removedAt: assignment.removedAt || assignment.deletedAt || null
+  };
+}
+
 function taskDateText(task) {
   if (task.availableFrom && task.dueDate) return `${formatDate(task.availableFrom)} – ${formatDate(task.dueDate)}`;
   if (task.availableFrom) return `Available ${formatDate(task.availableFrom)}`;
@@ -197,6 +228,7 @@ function historicalYield(event) {
 function normalizeData(source = {}) {
   const events = asArray(source.events).map(normalizeEvent);
   const yieldEntries = asArray(source.yieldEntries).map(normalizeYieldEntry);
+  const people = asArray(source.people).map(normalizePerson);
   if (Number(source.schemaVersion || source.version || 0) < 6) {
     const migratedIds = new Set(yieldEntries.map(entry => entry.legacyEventId).filter(Boolean));
     events.forEach(event => {
@@ -206,12 +238,13 @@ function normalizeData(source = {}) {
     });
   }
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
     records: asArray(source.records).map(normalizeRecord),
     tasks: asArray(source.tasks).map(normalizeTask),
+    people,
     relationships: asArray(source.relationships),
-    assignments: asArray(source.assignments),
+    assignments: asArray(source.assignments).map(assignment => normalizeAssignment(assignment, people)),
     events,
     notes: asArray(source.notes).map(normalizeNote),
     ledger: asArray(source.ledger).map(normalizeLedgerEntry),
@@ -296,7 +329,7 @@ function migrateData(source = {}, sourceKey = 'imported legacy data') {
 }
 
 function isSupportedData(value) {
-  return [5, 6].includes(value?.schemaVersion) || [5, 6].includes(value?.version);
+  return [5, 6, 7].includes(value?.schemaVersion) || [5, 6, 7].includes(value?.version);
 }
 
 function prepareImportedData(value, sourceName = 'backup') {
@@ -317,9 +350,9 @@ function loadData() {
   if (currentRaw) {
     try {
       const current = JSON.parse(currentRaw);
-      const beforeMigration = normalizeData({ ...current, schemaVersion: 6 });
+      const beforeMigration = normalizeData({ ...current, schemaVersion: 7 });
       const normalized = isSupportedData(current) ? normalizeData(current) : migrateData(current, STORAGE_KEY);
-      if (current.schemaVersion !== 6) {
+      if (current.schemaVersion !== 7) {
         startupMigrationBefore = beforeMigration;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       }
@@ -358,7 +391,7 @@ function saveData(nextData = data, source = 'user') {
 function exportData() {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-  link.download = `regula-rustica-v6-${today()}.json`;
+  link.download = `regula-rustica-v7-${today()}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -379,7 +412,7 @@ async function importData(file) {
 
 const seedTimestamp = nowIso();
 const SEED_DATA = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   settings: { homesteadName: 'Wood Thief Homestead' },
   records: [
     { id: 'daisy', type: 'Animal', name: 'Daisy', status: 'Active', identity: { managedAs: 'Individual', species: 'Cattle', breed: 'Jersey', purpose: 'Dairy' }, stewardship: { location: 'Barn and east pasture', responsible: '', currentUse: 'Milk cow', stage: '' }, createdAt: seedTimestamp, updatedAt: seedTimestamp },
@@ -388,6 +421,8 @@ const SEED_DATA = {
     { id: 'woodshed', type: 'Work', name: 'Build Woodshed', status: 'Planned', identity: { workType: 'Construction', startDate: '', targetDate: '', linkedRecordId: '' }, stewardship: { responsible: '', stage: 'Planning', blockedBy: '' }, createdAt: seedTimestamp, updatedAt: seedTimestamp }
   ],
   tasks: [{ id: uid(), title: 'Check Daisy and record morning milk', dueDate: today(), recordId: 'daisy', completed: false, createdAt: seedTimestamp, completedAt: null }],
+  people: [],
+  assignments: [],
   events: [],
   notes: [],
   ledger: [],
@@ -411,6 +446,44 @@ function recordById(id) {
 
 function recordName(id) {
   return recordById(id)?.name || '';
+}
+
+function activePeople() {
+  return data.people.filter(person => !person.deletedAt).sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+function assignmentForTask(taskId) {
+  return data.assignments.find(assignment => assignment.taskId === taskId && !assignment.removedAt && assignment.assignmentType === 'assignee');
+}
+
+function personForAssignment(assignment) {
+  if (!assignment) return null;
+  return data.people.find(person => person.id === assignment.personId)
+    || data.people.find(person => person.memberId && person.memberId === assignment.memberId)
+    || null;
+}
+
+function assigneeName(taskId) {
+  const assignment = assignmentForTask(taskId);
+  if (!assignment) return '';
+  return personForAssignment(assignment)?.displayName || 'Former household person';
+}
+
+function setTaskAssignee(taskId, personId) {
+  const timestamp = nowIso();
+  const current = data.assignments.filter(assignment => assignment.taskId === taskId && !assignment.removedAt && assignment.assignmentType === 'assignee');
+  if (current.length === 1 && current[0].personId === personId) return;
+  current.forEach(assignment => {
+    assignment.removedAt = timestamp;
+    assignment.updatedAt = timestamp;
+  });
+  if (!personId) return;
+  const person = data.people.find(item => item.id === personId && !item.deletedAt);
+  if (!person) return;
+  data.assignments.push(normalizeAssignment({
+    id: uid(), taskId, personId: person.id, memberId: person.memberId,
+    assignmentType: 'assignee', assignedAt: timestamp, createdAt: timestamp, updatedAt: timestamp
+  }, data.people));
 }
 
 function addEvent(recordId, eventType, details = '', options = {}) {
@@ -477,7 +550,8 @@ function stewardshipText(record) {
 function taskRow(task) {
   const row = document.createElement('div');
   row.className = `task${task.completed ? ' done' : ''}`;
-  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${escapeHtml(taskDateText(task))}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}${task.priority !== 'normal' ? ` · ${escapeHtml(task.priority)}` : ''}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
+  const assignedTo = assigneeName(task.id);
+  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${escapeHtml(taskDateText(task))}${assignedTo ? ` · Assigned to ${escapeHtml(assignedTo)}` : ''}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}${task.priority !== 'normal' ? ` · ${escapeHtml(task.priority)}` : ''}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
   row.querySelector('input').addEventListener('change', event => {
     const wasCompleted = task.completed;
     task.completed = event.target.checked;
@@ -631,22 +705,30 @@ function renderRecord() {
 function renderTasks() {
   const root = $('#allTasksList');
   const recordFilter = $('#taskRecordFilter');
+  const assigneeFilter = $('#taskAssigneeFilter');
   const selectedRecord = recordFilter.value || 'all';
+  const selectedAssignee = assigneeFilter.value || 'all';
   recordFilter.innerHTML = '<option value="all">All records</option><option value="standalone">Standalone</option>';
   data.records
     .filter(record => !record.deletedAt && record.status !== 'Archived')
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(record => recordFilter.add(new Option(`${record.name} (${record.type})`, record.id)));
   if ([...recordFilter.options].some(option => option.value === selectedRecord)) recordFilter.value = selectedRecord;
+  assigneeFilter.innerHTML = '<option value="all">All people</option><option value="unassigned">Unassigned</option>';
+  activePeople().forEach(person => assigneeFilter.add(new Option(`${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
+  if ([...assigneeFilter.options].some(option => option.value === selectedAssignee)) assigneeFilter.value = selectedAssignee;
 
   let tasks = data.tasks.filter(task => !task.deletedAt);
   const status = $('#taskStatusFilter').value;
   const linkedRecord = recordFilter.value;
   const timing = $('#taskTimingFilter').value;
+  const assignedPerson = assigneeFilter.value;
   const sort = $('#taskSort').value;
   tasks = tasks.filter(task => status === 'all' || (status === 'open' ? !task.completed : task.completed));
   if (linkedRecord === 'standalone') tasks = tasks.filter(task => !task.recordId);
   else if (linkedRecord !== 'all') tasks = tasks.filter(task => task.recordId === linkedRecord);
+  if (assignedPerson === 'unassigned') tasks = tasks.filter(task => !assignmentForTask(task.id));
+  else if (assignedPerson !== 'all') tasks = tasks.filter(task => assignmentForTask(task.id)?.personId === assignedPerson);
   if (timing === 'available') tasks = tasks.filter(task => !task.availableFrom || task.availableFrom <= today());
   if (timing === 'upcoming') tasks = tasks.filter(task => task.availableFrom && task.availableFrom > today());
   if (timing === 'dated') tasks = tasks.filter(task => task.availableFrom || task.dueDate);
@@ -658,6 +740,39 @@ function renderTasks() {
   root.innerHTML = '';
   tasks.forEach(task => root.appendChild(taskRow(task)));
   if (!tasks.length) root.innerHTML = '<p class="empty">No tasks match these filters.</p>';
+}
+
+function renderPeople() {
+  const root = $('#childList');
+  root.innerHTML = '';
+  data.people
+    .filter(person => !person.deletedAt && person.personType === 'child')
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    .forEach(person => {
+      const row = document.createElement('div');
+      row.className = 'task';
+      row.innerHTML = `<div class="task-body"><strong>${escapeHtml(person.displayName)}</strong><div class="meta">Child · No account access</div></div><div class="actions"><button class="btn ghost edit" type="button">Rename</button><button class="btn ghost del" type="button">Remove</button></div>`;
+      row.querySelector('.edit').addEventListener('click', () => {
+        const nextName = prompt('Child name', person.displayName)?.trim();
+        if (!nextName || nextName === person.displayName) return;
+        person.displayName = nextName;
+        person.updatedAt = nowIso();
+        saveData();
+      });
+      row.querySelector('.del').addEventListener('click', () => {
+        if (!confirm(`Remove ${person.displayName} from the Homestead? Open task assignments will become unassigned.`)) return;
+        const timestamp = nowIso();
+        person.deletedAt = timestamp;
+        person.updatedAt = timestamp;
+        data.assignments.filter(assignment => assignment.personId === person.id && !assignment.removedAt).forEach(assignment => {
+          assignment.removedAt = timestamp;
+          assignment.updatedAt = timestamp;
+        });
+        saveData();
+      });
+      root.appendChild(row);
+    });
+  $('#childEmpty').classList.toggle('hidden', root.children.length > 0);
 }
 
 function calendarEventTime(event) {
@@ -778,6 +893,7 @@ function renderAll() {
   renderToday();
   renderRecords();
   renderTasks();
+  renderPeople();
   renderCalendar();
   renderYield();
   renderLedger();
@@ -823,6 +939,21 @@ function addRecordSelect(root, labelText, name, selected = '', excludeId = '') {
     .filter(record => !record.deletedAt && record.status !== 'Archived' && record.id !== excludeId)
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(record => select.add(new Option(`${record.name} (${record.type})`, record.id)));
+  select.value = selected || '';
+  label.appendChild(select);
+  root.appendChild(label);
+}
+
+function addPersonSelect(root, selected = '') {
+  const label = document.createElement('label');
+  label.textContent = 'Assigned to (optional)';
+  const select = document.createElement('select');
+  select.name = 'personId';
+  select.add(new Option('Unassigned', ''));
+  activePeople().forEach(person => select.add(new Option(
+    `${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`,
+    person.id
+  )));
   select.value = selected || '';
   label.appendChild(select);
   root.appendChild(label);
@@ -927,11 +1058,13 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
 
   if (nextMode === 'task') {
     const task = data.tasks.find(item => item.id === id) || {};
+    const assignment = assignmentForTask(task.id);
     root.append(field('Task', 'title', 'text', task.title));
     root.append(field('Details (optional)', 'description', 'textarea', task.description));
     root.append(field('When can this work begin? (optional)', 'availableFrom', 'date', task.availableFrom));
     root.append(field('When should it be completed? (optional)', 'dueDate', 'date', task.dueDate));
     root.append(field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']));
+    addPersonSelect(root, assignment?.personId || personForAssignment(assignment)?.id);
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || task.recordId);
   }
   if (nextMode === 'note') root.append(field('What should I remember?', 'text', 'textarea'));
@@ -1032,8 +1165,16 @@ $('#modalForm').addEventListener('submit', event => {
     }
     const existing = data.tasks.find(task => task.id === editId);
     const values = { title: form.title.trim(), description: form.description.trim(), availableFrom: form.availableFrom || '', dueDate: form.dueDate || '', priority: form.priority || 'normal', recordId: form.recordId || null };
-    if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
-    else data.tasks.push({ id: uid(), ...values, completed: false, status: 'open', createdAt: nowIso(), updatedAt: nowIso(), completedAt: null, deletedAt: null });
+    let taskId;
+    if (existing) {
+      Object.assign(existing, values, { updatedAt: nowIso() });
+      taskId = existing.id;
+    } else {
+      const created = { id: uid(), ...values, completed: false, status: 'open', createdAt: nowIso(), updatedAt: nowIso(), completedAt: null, deletedAt: null };
+      data.tasks.push(created);
+      taskId = created.id;
+    }
+    setTaskAssignee(taskId, form.personId || '');
   }
   if (modalMode === 'note') {
     if (!form.text.trim()) return;
@@ -1161,7 +1302,7 @@ $$('.tabs-mini button').forEach(button => button.addEventListener('click', () =>
   button.classList.add('active');
   $(`#panel${button.dataset.panel.charAt(0).toUpperCase()}${button.dataset.panel.slice(1)}`).classList.add('active');
 }));
-['taskStatusFilter', 'taskRecordFilter', 'taskTimingFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
+['taskStatusFilter', 'taskRecordFilter', 'taskAssigneeFilter', 'taskTimingFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
 $('#calendarFilter').addEventListener('change', renderCalendar);
 $('#calendarPrevious').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1); renderCalendar(); });
 $('#calendarNext').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1); renderCalendar(); });
@@ -1169,6 +1310,14 @@ $('#calendarToday').addEventListener('click', () => { calendarMonth = new Date(n
 $('#homesteadForm').addEventListener('submit', event => {
   event.preventDefault();
   data.settings.homesteadName = $('#homesteadName').value.trim() || 'My Homestead';
+  saveData();
+});
+$('#childForm').addEventListener('submit', event => {
+  event.preventDefault();
+  const displayName = $('#childName').value.trim();
+  if (!displayName) return;
+  data.people.push(normalizePerson({ id: uid(), personType: 'child', displayName, createdAt: nowIso() }));
+  $('#childName').value = '';
   saveData();
 });
 $('#exportData').addEventListener('click', exportData);
