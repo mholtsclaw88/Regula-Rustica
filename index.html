@@ -86,9 +86,19 @@
               <option value="standalone">Standalone</option>
             </select>
           </label>
+          <label>Timing
+            <select id="taskTimingFilter">
+              <option value="all">All dates</option>
+              <option value="available">Available now</option>
+              <option value="upcoming">Not yet available</option>
+              <option value="dated">Has a date</option>
+              <option value="unscheduled">No dates</option>
+            </select>
+          </label>
           <label>Sort by
             <select id="taskSort">
               <option value="due">Due date</option>
+              <option value="available">Available date</option>
               <option value="record">Record</option>
               <option value="created">Newest added</option>
             </select>

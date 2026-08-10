@@ -161,6 +161,20 @@ test('local update carries the known cloud base version', () => {
   h.engine.queueLocalChanges(old, next); assert.equal(h.state.state.outbox[0].baseVersion, 4);
 });
 
+test('task date windows and recurrence survive cloud conversion', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const task = {
+    id: crypto.randomUUID(), title: 'Move hens', description: 'Use the north coop',
+    availableFrom: '2026-08-10', dueDate: '2026-08-12', priority: 'high',
+    completed: false, recurrenceRule: { mode: 'after_completion', frequency: 'weekly', interval: 1 },
+    createdAt: '2026-08-09T12:00:00.000Z', updatedAt: '2026-08-09T12:00:00.000Z'
+  };
+  const payload = toCloud('tasks', task, state);
+  assert.equal(payload.available_from, '2026-08-10');
+  assert.equal(payload.due_date, '2026-08-12');
+  assert.deepEqual(payload.recurrence_rule, task.recurrenceRule);
+});
+
 test('push uses dependency-safe domain order', async () => {
   const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
   for (const table of [...DOMAIN_ORDER].reverse()) h.state.enqueue({ table, localId: crypto.randomUUID(), type: 'create', payload: { id: crypto.randomUUID() } });

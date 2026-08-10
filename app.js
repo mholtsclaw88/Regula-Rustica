@@ -78,17 +78,27 @@ function normalizeTask(task = {}) {
   return {
     id: task.id || uid(),
     title: task.title || 'Untitled task',
+    availableFrom: task.availableFrom ?? task.startDate ?? '',
     dueDate: task.dueDate ?? task.due ?? '',
     recordId: task.recordId || null,
     completed: Boolean(task.completed ?? task.done),
     description: task.description || '',
     status: task.status || (task.completed || task.done ? 'completed' : 'open'),
     priority: task.priority || 'normal',
+    recurrenceRule: task.recurrenceRule || null,
+    parentTaskId: task.parentTaskId || null,
     createdAt,
     updatedAt: task.updatedAt || createdAt,
     completedAt: task.completedAt || (task.completed || task.done ? nowIso() : null),
     deletedAt: task.deletedAt || null
   };
+}
+
+function taskDateText(task) {
+  if (task.availableFrom && task.dueDate) return `${formatDate(task.availableFrom)} – ${formatDate(task.dueDate)}`;
+  if (task.availableFrom) return `Available ${formatDate(task.availableFrom)}`;
+  if (task.dueDate) return `Due ${formatDate(task.dueDate)}`;
+  return 'No date';
 }
 
 function normalizeEvent(event = {}) {
@@ -396,7 +406,7 @@ function stewardshipText(record) {
 function taskRow(task) {
   const row = document.createElement('div');
   row.className = `task${task.completed ? ' done' : ''}`;
-  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${task.dueDate ? formatDate(task.dueDate) : 'No due date'}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}</div></div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
+  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${escapeHtml(taskDateText(task))}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}${task.priority !== 'normal' ? ` · ${escapeHtml(task.priority)}` : ''}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
   row.querySelector('input').addEventListener('change', event => {
     const wasCompleted = task.completed;
     task.completed = event.target.checked;
@@ -421,7 +431,11 @@ function renderToday() {
   const root = $('#todayTasks');
   root.innerHTML = '';
   const tasks = data.tasks
-    .filter(task => !task.deletedAt && !task.completed && (!task.dueDate || task.dueDate <= today()))
+    .filter(task => !task.deletedAt && !task.completed && (
+      (!task.availableFrom && !task.dueDate)
+      || (task.availableFrom && task.availableFrom <= today())
+      || (!task.availableFrom && task.dueDate <= today())
+    ))
     .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
   tasks.forEach(task => root.appendChild(taskRow(task)));
   $('#todayEmpty').classList.toggle('hidden', tasks.length > 0);
@@ -546,11 +560,17 @@ function renderTasks() {
   let tasks = data.tasks.filter(task => !task.deletedAt);
   const status = $('#taskStatusFilter').value;
   const linkedRecord = recordFilter.value;
+  const timing = $('#taskTimingFilter').value;
   const sort = $('#taskSort').value;
   tasks = tasks.filter(task => status === 'all' || (status === 'open' ? !task.completed : task.completed));
   if (linkedRecord === 'standalone') tasks = tasks.filter(task => !task.recordId);
   else if (linkedRecord !== 'all') tasks = tasks.filter(task => task.recordId === linkedRecord);
+  if (timing === 'available') tasks = tasks.filter(task => !task.availableFrom || task.availableFrom <= today());
+  if (timing === 'upcoming') tasks = tasks.filter(task => task.availableFrom && task.availableFrom > today());
+  if (timing === 'dated') tasks = tasks.filter(task => task.availableFrom || task.dueDate);
+  if (timing === 'unscheduled') tasks = tasks.filter(task => !task.availableFrom && !task.dueDate);
   if (sort === 'due') tasks.sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
+  if (sort === 'available') tasks.sort((a, b) => (a.availableFrom || '9999-12-31').localeCompare(b.availableFrom || '9999-12-31'));
   if (sort === 'record') tasks.sort((a, b) => (recordName(a.recordId) || 'Standalone').localeCompare(recordName(b.recordId) || 'Standalone'));
   if (sort === 'created') tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   root.innerHTML = '';
@@ -720,7 +740,10 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '') {
   if (nextMode === 'task') {
     const task = data.tasks.find(item => item.id === id) || {};
     root.append(field('Task', 'title', 'text', task.title));
-    root.append(field('Due date (optional)', 'dueDate', 'date', task.dueDate));
+    root.append(field('Details (optional)', 'description', 'textarea', task.description));
+    root.append(field('When can this work begin? (optional)', 'availableFrom', 'date', task.availableFrom));
+    root.append(field('When should it be completed? (optional)', 'dueDate', 'date', task.dueDate));
+    root.append(field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']));
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || task.recordId);
   }
   if (nextMode === 'note') root.append(field('What should I remember?', 'text', 'textarea'));
@@ -782,8 +805,12 @@ $('#modalForm').addEventListener('submit', event => {
 
   if (modalMode === 'task') {
     if (!form.title.trim()) return;
+    if (form.availableFrom && form.dueDate && form.dueDate < form.availableFrom) {
+      alert('The due date cannot be before the available date.');
+      return;
+    }
     const existing = data.tasks.find(task => task.id === editId);
-    const values = { title: form.title.trim(), dueDate: form.dueDate || '', recordId: form.recordId || null };
+    const values = { title: form.title.trim(), description: form.description.trim(), availableFrom: form.availableFrom || '', dueDate: form.dueDate || '', priority: form.priority || 'normal', recordId: form.recordId || null };
     if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
     else data.tasks.push({ id: uid(), ...values, completed: false, status: 'open', createdAt: nowIso(), updatedAt: nowIso(), completedAt: null, deletedAt: null });
   }
@@ -858,7 +885,7 @@ $$('.tabs-mini button').forEach(button => button.addEventListener('click', () =>
   button.classList.add('active');
   $(`#panel${button.dataset.panel.charAt(0).toUpperCase()}${button.dataset.panel.slice(1)}`).classList.add('active');
 }));
-['taskStatusFilter', 'taskRecordFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
+['taskStatusFilter', 'taskRecordFilter', 'taskTimingFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
 $('#homesteadForm').addEventListener('submit', event => {
   event.preventDefault();
   data.settings.homesteadName = $('#homesteadName').value.trim() || 'My Homestead';
