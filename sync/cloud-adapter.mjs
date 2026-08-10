@@ -22,7 +22,10 @@ export class SupabaseSyncAdapter {
   }
 
   async apply(operation) {
-    const { data, error } = await this.client.rpc('apply_sync_operation', {
+    const rpc = ['calendar_events', 'yield_entries'].includes(operation.table)
+      ? 'apply_housekeeping_sync_operation'
+      : 'apply_sync_operation';
+    const { data, error } = await this.client.rpc(rpc, {
       operation_key: operation.idempotencyKey,
       client_device_id: operation.deviceId,
       target_table: operation.table,
@@ -42,6 +45,8 @@ export class SupabaseSyncAdapter {
       tasks: ['record_id', 'parent_task_id'],
       task_assignments: ['task_id', 'member_id'],
       chronicle_entries: ['record_id', 'task_id', 'corrects_entry_id'],
+      calendar_events: ['record_id'],
+      yield_entries: ['record_id'],
       notes: ['record_id'], ledger_entries: ['record_id']
     };
     for (const table of DOMAIN_ORDER) {
