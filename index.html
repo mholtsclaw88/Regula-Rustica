@@ -9,12 +9,14 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="housekeeping.css">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="app.js" defer></script>
+  <script src="housekeeping-data.js?v=housekeeping-4" defer></script>
+  <script src="app.js?v=housekeeping-4" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs" type="module"></script>
+  <script src="sync/runtime.mjs?v=housekeeping-4" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -30,6 +32,8 @@
     <button class="active" data-view="today">Today</button>
     <button data-view="records">Records</button>
     <button data-view="tasks">Tasks</button>
+    <button data-view="calendar">Calendar</button>
+    <button data-view="yield">Yield</button>
     <button data-view="ledger">Ledger</button>
     <button data-view="settings">Settings</button>
   </nav>
@@ -60,7 +64,7 @@
 
     <section id="records" class="view">
       <div class="section-head">
-        <div><span class="label">Things entrusted to your care</span><h2>Records</h2></div>
+        <div><span class="label">The things entrusted to your care.</span><h2>Homestead Records</h2></div>
         <button class="btn primary" id="addRecord">+ Record</button>
       </div>
       <div id="recordGroups"></div>
@@ -86,9 +90,25 @@
               <option value="standalone">Standalone</option>
             </select>
           </label>
+          <label>Assigned to
+            <select id="taskAssigneeFilter">
+              <option value="all">All people</option>
+              <option value="unassigned">Unassigned</option>
+            </select>
+          </label>
+          <label>Timing
+            <select id="taskTimingFilter">
+              <option value="all">All dates</option>
+              <option value="available">Available now</option>
+              <option value="upcoming">Not yet available</option>
+              <option value="dated">Has a date</option>
+              <option value="unscheduled">No dates</option>
+            </select>
+          </label>
           <label>Sort by
             <select id="taskSort">
               <option value="due">Due date</option>
+              <option value="available">Available date</option>
               <option value="record">Record</option>
               <option value="created">Newest added</option>
             </select>
@@ -96,6 +116,57 @@
         </div>
         <div id="allTasksList" class="stack"></div>
       </div>
+    </section>
+
+    <section id="calendar" class="view">
+      <div class="section-head">
+        <div><span class="label">Shared Homestead time</span><h2>Calendar</h2></div>
+        <button class="btn primary" id="addCalendarEvent">+ Event</button>
+      </div>
+      <div class="card calendar-card">
+        <div class="calendar-toolbar">
+          <div class="quick calendar-nav">
+            <button class="btn secondary" id="calendarPrevious" type="button" aria-label="Previous month">←</button>
+            <button class="btn secondary" id="calendarToday" type="button">Today</button>
+            <button class="btn secondary" id="calendarNext" type="button" aria-label="Next month">→</button>
+          </div>
+          <h3 id="calendarMonthLabel"></h3>
+          <label>Show
+            <select id="calendarFilter">
+              <option value="both">Tasks and events</option>
+              <option value="tasks">Tasks</option>
+              <option value="events">Events</option>
+            </select>
+          </label>
+        </div>
+        <div id="calendarGrid" class="calendar-grid" aria-label="Homestead calendar"></div>
+      </div>
+    </section>
+
+    <section id="yield" class="view">
+      <div class="section-head">
+        <div><span class="label">Daily provision</span><h2>Homestead Yield</h2></div>
+      </div>
+      <div class="grid2">
+        <article class="card">
+          <span class="label">Quick entry</span>
+          <h3>Record today’s yield</h3>
+          <p class="muted">Keep milk and egg collection close to the work itself.</p>
+          <div class="quick">
+            <button class="btn primary" id="addMilkYield">Record milk</button>
+            <button class="btn secondary" id="addEggYield">Record eggs</button>
+          </div>
+        </article>
+        <aside class="card">
+          <span class="label">Today</span>
+          <div class="stats yield-stats">
+            <div class="stat"><strong id="todayMilkYield">0</strong><span>Milk</span></div>
+            <div class="stat"><strong id="todayEggYield">0</strong><span>Eggs</span></div>
+          </div>
+        </aside>
+      </div>
+      <div class="section-head yield-recent-head"><div><span class="label">Most recent</span><h3>Yield entries</h3></div></div>
+      <div id="yieldList" class="stack"></div>
     </section>
 
     <section id="ledger" class="view">
@@ -130,6 +201,18 @@
             <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
             <button class="btn danger" id="resetData">Reset sample data</button>
           </div>
+        </article>
+        <article class="card">
+          <span class="label">Assignable people</span>
+          <h2>Children</h2>
+          <p class="muted">Add a child without creating an account. Children can be assigned tasks, but receive no sign-in, role, permissions, or cloud access.</p>
+          <form id="childForm" class="form-grid">
+            <label>Child name<input id="childName" maxlength="120" autocomplete="off" required></label>
+            <button class="btn primary" type="submit">Add child</button>
+          </form>
+          <div id="childList" class="stack"></div>
+          <p id="childEmpty" class="empty">No children have been added.</p>
+          <p class="muted">Kiosk access is planned for a later sprint.</p>
         </article>
         <article class="card cloud-card">
           <span class="label">Cloud foundation</span>
@@ -222,6 +305,8 @@
           </div>
           <div class="record-actions">
             <button class="btn primary" id="recordEvent">Record</button>
+            <button class="btn secondary hidden" id="recordMilk">Milk</button>
+            <button class="btn secondary hidden" id="recordEggs">Eggs</button>
             <button class="btn secondary" id="recordAddTask">+ Task</button>
             <button class="btn secondary" id="recordAddNote">+ Note</button>
             <button class="btn secondary" id="recordAddLedger">+ Ledger</button>
@@ -257,6 +342,7 @@
       <div class="row"><h2 id="modalTitle">Add</h2><button type="button" class="btn ghost" id="modalClose" aria-label="Close">✕</button></div>
       <div id="modalFields" class="form-grid"></div>
       <div class="dialog-actions">
+        <button type="button" class="btn danger hidden" id="modalDelete">Delete</button>
         <button type="button" class="btn secondary" id="modalCancel">Cancel</button>
         <button type="submit" class="btn primary">Save</button>
       </div>

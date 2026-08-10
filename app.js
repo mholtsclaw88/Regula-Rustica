@@ -8,6 +8,7 @@ const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
 const RECORD_TYPES = ['Animal', 'Land', 'Equipment', 'Structure', 'Work'];
+let startupMigrationBefore = null;
 
 const RECORD_CONFIG = {
   Animal: {
@@ -38,7 +39,12 @@ const RECORD_CONFIG = {
 };
 
 const nowIso = () => new Date().toISOString();
-const today = () => nowIso().slice(0, 10);
+const localDateTime = (value = new Date()) => {
+  const date = value instanceof Date ? value : new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+const today = () => localDateTime().slice(0, 10);
 const uid = () => crypto.randomUUID();
 const formatDate = date => date
   ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -78,17 +84,77 @@ function normalizeTask(task = {}) {
   return {
     id: task.id || uid(),
     title: task.title || 'Untitled task',
+    availableFrom: task.availableFrom ?? task.startDate ?? '',
     dueDate: task.dueDate ?? task.due ?? '',
     recordId: task.recordId || null,
     completed: Boolean(task.completed ?? task.done),
     description: task.description || '',
     status: task.status || (task.completed || task.done ? 'completed' : 'open'),
     priority: task.priority || 'normal',
+    recurrenceRule: task.recurrenceRule || null,
+    parentTaskId: task.parentTaskId || null,
     createdAt,
     updatedAt: task.updatedAt || createdAt,
     completedAt: task.completedAt || (task.completed || task.done ? nowIso() : null),
     deletedAt: task.deletedAt || null
   };
+}
+
+function normalizePerson(person = {}) {
+  const createdAt = person.createdAt || nowIso();
+  return {
+    id: person.id || uid(),
+    personType: person.personType === 'member' ? 'member' : 'child',
+    displayName: person.displayName || person.name || 'Unnamed person',
+    memberId: person.memberId || null,
+    createdAt,
+    updatedAt: person.updatedAt || createdAt,
+    deletedAt: person.deletedAt || null
+  };
+}
+
+function normalizeAssignment(assignment = {}, people = []) {
+  const assignedAt = assignment.assignedAt || assignment.createdAt || nowIso();
+  const matchedPerson = assignment.personId
+    ? people.find(person => person.id === assignment.personId)
+    : people.find(person => person.memberId && person.memberId === assignment.memberId);
+  return {
+    id: assignment.id || uid(),
+    taskId: assignment.taskId || null,
+    personId: matchedPerson?.id || assignment.personId || null,
+    memberId: matchedPerson?.memberId || assignment.memberId || null,
+    assignmentType: assignment.assignmentType || 'assignee',
+    assignedAt,
+    createdAt: assignment.createdAt || assignedAt,
+    updatedAt: assignment.updatedAt || assignedAt,
+    removedAt: assignment.removedAt || assignment.deletedAt || null
+  };
+}
+
+function taskDateText(task) {
+  if (task.availableFrom && task.dueDate) return `${formatDate(task.availableFrom)} – ${formatDate(task.dueDate)}`;
+  if (task.availableFrom) return `Available ${formatDate(task.availableFrom)}`;
+  if (task.dueDate) return `Due ${formatDate(task.dueDate)}`;
+  return 'No date';
+}
+
+function createNextLocalOccurrence(task) {
+  if (!task.recurrenceRule || data.tasks.some(item => !item.deletedAt && item.parentTaskId === task.id)) return;
+  const dueDate = window.RegulaRusticaHousekeeping.nextRecurringDueDate(task, today());
+  if (!dueDate) return;
+  const timestamp = nowIso();
+  data.tasks.push(normalizeTask({
+    id: uid(),
+    title: task.title,
+    description: task.description,
+    dueDate,
+    recordId: task.recordId,
+    priority: task.priority,
+    recurrenceRule: { ...task.recurrenceRule },
+    parentTaskId: task.id,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }));
 }
 
 function normalizeEvent(event = {}) {
@@ -98,6 +164,7 @@ function normalizeEvent(event = {}) {
     recordId: event.recordId || null,
     eventType: event.eventType || 'Other',
     date: (event.date || event.createdAt || today()).slice(0, 10),
+    occurredAt: event.occurredAt || (event.date?.includes('T') ? event.date : null),
     value: event.value ?? '',
     unit: event.unit || '',
     details: event.details || event.text || '',
@@ -133,17 +200,75 @@ function normalizeLedgerEntry(entry = {}) {
   };
 }
 
-function normalizeData(source = {}) {
+function normalizeCalendarEvent(event = {}) {
+  const createdAt = event.createdAt || nowIso();
   return {
-    schemaVersion: 5,
+    id: event.id || uid(),
+    title: event.title || 'Untitled event',
+    startDate: (event.startDate || event.date || today()).slice(0, 10),
+    endDate: (event.endDate || event.startDate || event.date || today()).slice(0, 10),
+    allDay: event.allDay !== false,
+    startTime: event.startTime || '',
+    endTime: event.endTime || '',
+    location: event.location || '',
+    notes: event.notes || '',
+    recordId: event.recordId || null,
+    createdAt,
+    updatedAt: event.updatedAt || createdAt,
+    deletedAt: event.deletedAt || null
+  };
+}
+
+function normalizeYieldEntry(entry = {}) {
+  const createdAt = entry.createdAt || nowIso();
+  const occurredAt = entry.occurredAt || `${entry.date || today()}T${entry.time || '12:00'}:00`;
+  return {
+    id: entry.id || uid(),
+    recordId: entry.recordId || null,
+    type: entry.type === 'eggs' ? 'eggs' : 'milk',
+    occurredAt,
+    session: ['morning', 'evening', 'other'].includes(entry.session) ? entry.session : 'other',
+    quantity: Number(entry.quantity ?? entry.value ?? 0),
+    unit: entry.unit || (entry.type === 'eggs' ? 'eggs' : 'gal'),
+    unusableQuantity: Number(entry.unusableQuantity ?? entry.loss ?? 0),
+    details: entry.details || entry.notes || '',
+    legacyEventId: entry.legacyEventId || null,
+    createdAt,
+    updatedAt: entry.updatedAt || createdAt,
+    deletedAt: entry.deletedAt || null
+  };
+}
+
+function historicalYield(event) {
+  const candidate = window.RegulaRusticaHousekeeping.historicalYieldCandidate(event);
+  return candidate ? normalizeYieldEntry(candidate) : null;
+}
+
+function normalizeData(source = {}) {
+  const events = asArray(source.events).map(normalizeEvent);
+  const yieldEntries = asArray(source.yieldEntries).map(normalizeYieldEntry);
+  const people = asArray(source.people).map(normalizePerson);
+  if (Number(source.schemaVersion || source.version || 0) < 6) {
+    const migratedIds = new Set(yieldEntries.map(entry => entry.legacyEventId).filter(Boolean));
+    events.forEach(event => {
+      if (migratedIds.has(event.id)) return;
+      const migrated = historicalYield(event);
+      if (migrated) yieldEntries.push(migrated);
+    });
+  }
+  return {
+    schemaVersion: 7,
     settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
     records: asArray(source.records).map(normalizeRecord),
     tasks: asArray(source.tasks).map(normalizeTask),
+    people,
     relationships: asArray(source.relationships),
-    assignments: asArray(source.assignments),
-    events: asArray(source.events).map(normalizeEvent),
+    assignments: asArray(source.assignments).map(assignment => normalizeAssignment(assignment, people)),
+    events,
     notes: asArray(source.notes).map(normalizeNote),
     ledger: asArray(source.ledger).map(normalizeLedgerEntry),
+    calendarEvents: asArray(source.calendarEvents).map(normalizeCalendarEvent),
+    yieldEntries,
     ...(source.legacy ? { legacy: source.legacy } : {})
   };
 }
@@ -222,13 +347,13 @@ function migrateData(source = {}, sourceKey = 'imported legacy data') {
   });
 }
 
-function isV5Data(value) {
-  return value?.schemaVersion === 5 || value?.version === 5;
+function isSupportedData(value) {
+  return [5, 6, 7].includes(value?.schemaVersion) || [5, 6, 7].includes(value?.version);
 }
 
 function prepareImportedData(value, sourceName = 'backup') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup must contain a data object.');
-  return isV5Data(value) ? normalizeData(value) : migrateData(value, sourceName);
+  return isSupportedData(value) ? normalizeData(value) : migrateData(value, sourceName);
 }
 
 function safelyStoreBackup(key, rawValue) {
@@ -244,8 +369,12 @@ function loadData() {
   if (currentRaw) {
     try {
       const current = JSON.parse(currentRaw);
-      const normalized = isV5Data(current) ? normalizeData(current) : migrateData(current, STORAGE_KEY);
-      if (current.schemaVersion !== 5) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      const beforeMigration = normalizeData({ ...current, schemaVersion: 7 });
+      const normalized = isSupportedData(current) ? normalizeData(current) : migrateData(current, STORAGE_KEY);
+      if (current.schemaVersion !== 7) {
+        startupMigrationBefore = beforeMigration;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      }
       return normalized;
     } catch (error) {
       console.warn('The v5 data could not be read; it has not been overwritten.', error);
@@ -281,7 +410,7 @@ function saveData(nextData = data, source = 'user') {
 function exportData() {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-  link.download = `regula-rustica-v5-${today()}.json`;
+  link.download = `regula-rustica-v7-${today()}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -302,7 +431,7 @@ async function importData(file) {
 
 const seedTimestamp = nowIso();
 const SEED_DATA = {
-  schemaVersion: 5,
+  schemaVersion: 7,
   settings: { homesteadName: 'Wood Thief Homestead' },
   records: [
     { id: 'daisy', type: 'Animal', name: 'Daisy', status: 'Active', identity: { managedAs: 'Individual', species: 'Cattle', breed: 'Jersey', purpose: 'Dairy' }, stewardship: { location: 'Barn and east pasture', responsible: '', currentUse: 'Milk cow', stage: '' }, createdAt: seedTimestamp, updatedAt: seedTimestamp },
@@ -311,9 +440,13 @@ const SEED_DATA = {
     { id: 'woodshed', type: 'Work', name: 'Build Woodshed', status: 'Planned', identity: { workType: 'Construction', startDate: '', targetDate: '', linkedRecordId: '' }, stewardship: { responsible: '', stage: 'Planning', blockedBy: '' }, createdAt: seedTimestamp, updatedAt: seedTimestamp }
   ],
   tasks: [{ id: uid(), title: 'Check Daisy and record morning milk', dueDate: today(), recordId: 'daisy', completed: false, createdAt: seedTimestamp, completedAt: null }],
+  people: [],
+  assignments: [],
   events: [],
   notes: [],
-  ledger: []
+  ledger: [],
+  calendarEvents: [],
+  yieldEntries: []
 };
 
 let data = loadData();
@@ -323,6 +456,8 @@ let priorView = 'records';
 let modalMode = '';
 let editId = null;
 let contextRecordId = null;
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calendarDefaultDate = null;
 
 function recordById(id) {
   return data.records.find(record => record.id === id);
@@ -330,6 +465,44 @@ function recordById(id) {
 
 function recordName(id) {
   return recordById(id)?.name || '';
+}
+
+function activePeople() {
+  return data.people.filter(person => !person.deletedAt).sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+function assignmentForTask(taskId) {
+  return data.assignments.find(assignment => assignment.taskId === taskId && !assignment.removedAt && assignment.assignmentType === 'assignee');
+}
+
+function personForAssignment(assignment) {
+  if (!assignment) return null;
+  return data.people.find(person => person.id === assignment.personId)
+    || data.people.find(person => person.memberId && person.memberId === assignment.memberId)
+    || null;
+}
+
+function assigneeName(taskId) {
+  const assignment = assignmentForTask(taskId);
+  if (!assignment) return '';
+  return personForAssignment(assignment)?.displayName || 'Former household person';
+}
+
+function setTaskAssignee(taskId, personId) {
+  const timestamp = nowIso();
+  const current = data.assignments.filter(assignment => assignment.taskId === taskId && !assignment.removedAt && assignment.assignmentType === 'assignee');
+  if (current.length === 1 && current[0].personId === personId) return;
+  current.forEach(assignment => {
+    assignment.removedAt = timestamp;
+    assignment.updatedAt = timestamp;
+  });
+  if (!personId) return;
+  const person = data.people.find(item => item.id === personId && !item.deletedAt);
+  if (!person) return;
+  data.assignments.push(normalizeAssignment({
+    id: uid(), taskId, personId: person.id, memberId: person.memberId,
+    assignmentType: 'assignee', assignedAt: timestamp, createdAt: timestamp, updatedAt: timestamp
+  }, data.people));
 }
 
 function addEvent(recordId, eventType, details = '', options = {}) {
@@ -396,7 +569,9 @@ function stewardshipText(record) {
 function taskRow(task) {
   const row = document.createElement('div');
   row.className = `task${task.completed ? ' done' : ''}`;
-  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${task.dueDate ? formatDate(task.dueDate) : 'No due date'}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}</div></div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
+  const assignedTo = assigneeName(task.id);
+  const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
+  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${escapeHtml(taskDateText(task))}${recurrence ? ` · ${escapeHtml(recurrence)}` : ''}${assignedTo ? ` · Assigned to ${escapeHtml(assignedTo)}` : ''}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}${task.priority !== 'normal' ? ` · ${escapeHtml(task.priority)}` : ''}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
   row.querySelector('input').addEventListener('change', event => {
     const wasCompleted = task.completed;
     task.completed = event.target.checked;
@@ -404,6 +579,7 @@ function taskRow(task) {
     task.completedAt = task.completed ? nowIso() : null;
     task.updatedAt = nowIso();
     if (!wasCompleted && task.completed && task.recordId) addEvent(task.recordId, 'Task completed', task.title);
+    if (!wasCompleted && task.completed && task.recurrenceRule && !window.RegulaRusticaSync?.isInitialized?.()) createNextLocalOccurrence(task);
     saveData();
   });
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
@@ -421,7 +597,11 @@ function renderToday() {
   const root = $('#todayTasks');
   root.innerHTML = '';
   const tasks = data.tasks
-    .filter(task => !task.deletedAt && !task.completed && (!task.dueDate || task.dueDate <= today()))
+    .filter(task => !task.deletedAt && !task.completed && (
+      (!task.availableFrom && !task.dueDate)
+      || (task.availableFrom && task.availableFrom <= today())
+      || (!task.availableFrom && task.dueDate <= today())
+    ))
     .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
   tasks.forEach(task => root.appendChild(taskRow(task)));
   $('#todayEmpty').classList.toggle('hidden', tasks.length > 0);
@@ -459,8 +639,7 @@ function eventChoices(record) {
   if (record.type === 'Animal') {
     const purpose = (record.identity?.purpose || '').toLowerCase();
     const species = (record.identity?.species || '').toLowerCase();
-    if (purpose.includes('dairy')) specialized.push('Morning Milk', 'Evening Milk', 'Freshened', 'Dry Off');
-    if (purpose.includes('egg')) specialized.push('Egg Collection');
+    if (purpose.includes('dairy')) specialized.push('Freshened', 'Dry Off');
     if (species.includes('bee') || purpose.includes('honey')) specialized.push('Inspection', 'Honey Harvest', 'Split', 'Requeened');
   }
   return [...new Set([...specialized, ...standard])].slice(0, 9).concat('Other');
@@ -474,6 +653,9 @@ function renderRecord() {
   $('#recordTitle').textContent = record.name;
   $('#recordIdentity').textContent = identityText(record);
   $('#recordStewardship').innerHTML = `<span class="label">Stewardship</span><div>${escapeHtml(stewardshipText(record))}</div>`;
+  const purpose = (record.identity?.purpose || '').toLowerCase();
+  $('#recordMilk').classList.toggle('hidden', record.type !== 'Animal' || !purpose.includes('dairy'));
+  $('#recordEggs').classList.toggle('hidden', record.type !== 'Animal' || !purpose.includes('egg'));
 
   const taskPanel = $('#panelTasks');
   taskPanel.innerHTML = '';
@@ -486,7 +668,7 @@ function renderRecord() {
   const chroniclePanel = $('#panelChronicle');
   chroniclePanel.innerHTML = '';
   data.events
-    .filter(event => !event.deletedAt && event.recordId === record.id)
+    .filter(event => !event.deletedAt && event.recordId === record.id && !data.yieldEntries.some(entry => !entry.deletedAt && entry.legacyEventId === event.id))
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
     .forEach(event => {
       const item = document.createElement('div');
@@ -499,6 +681,15 @@ function renderRecord() {
           saveData();
         }
       });
+      chroniclePanel.appendChild(item);
+    });
+  data.yieldEntries
+    .filter(entry => !entry.deletedAt && entry.recordId === record.id)
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+    .forEach(entry => {
+      const item = document.createElement('div');
+      item.className = 'chronicle-item yield-chronicle';
+      item.innerHTML = `<div class="row"><strong>${entry.type === 'milk' ? 'Milk' : 'Egg collection'}</strong><span class="meta">${new Date(entry.occurredAt).toLocaleString()}</span></div><div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong> · ${escapeHtml(entry.session)}</div>${entry.unusableQuantity ? `<div class="meta">${escapeHtml(entry.unusableQuantity)} unusable</div>` : ''}${entry.details ? `<p>${escapeHtml(entry.details)}</p>` : ''}`;
       chroniclePanel.appendChild(item);
     });
   if (!chroniclePanel.children.length) chroniclePanel.innerHTML = '<p class="empty">The Chronicle will grow as events are recorded.</p>';
@@ -535,27 +726,158 @@ function renderRecord() {
 function renderTasks() {
   const root = $('#allTasksList');
   const recordFilter = $('#taskRecordFilter');
+  const assigneeFilter = $('#taskAssigneeFilter');
   const selectedRecord = recordFilter.value || 'all';
+  const selectedAssignee = assigneeFilter.value || 'all';
   recordFilter.innerHTML = '<option value="all">All records</option><option value="standalone">Standalone</option>';
   data.records
     .filter(record => !record.deletedAt && record.status !== 'Archived')
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(record => recordFilter.add(new Option(`${record.name} (${record.type})`, record.id)));
   if ([...recordFilter.options].some(option => option.value === selectedRecord)) recordFilter.value = selectedRecord;
+  assigneeFilter.innerHTML = '<option value="all">All people</option><option value="unassigned">Unassigned</option>';
+  activePeople().forEach(person => assigneeFilter.add(new Option(`${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
+  if ([...assigneeFilter.options].some(option => option.value === selectedAssignee)) assigneeFilter.value = selectedAssignee;
 
   let tasks = data.tasks.filter(task => !task.deletedAt);
   const status = $('#taskStatusFilter').value;
   const linkedRecord = recordFilter.value;
+  const timing = $('#taskTimingFilter').value;
+  const assignedPerson = assigneeFilter.value;
   const sort = $('#taskSort').value;
   tasks = tasks.filter(task => status === 'all' || (status === 'open' ? !task.completed : task.completed));
   if (linkedRecord === 'standalone') tasks = tasks.filter(task => !task.recordId);
   else if (linkedRecord !== 'all') tasks = tasks.filter(task => task.recordId === linkedRecord);
+  if (assignedPerson === 'unassigned') tasks = tasks.filter(task => !assignmentForTask(task.id));
+  else if (assignedPerson !== 'all') tasks = tasks.filter(task => assignmentForTask(task.id)?.personId === assignedPerson);
+  if (timing === 'available') tasks = tasks.filter(task => !task.availableFrom || task.availableFrom <= today());
+  if (timing === 'upcoming') tasks = tasks.filter(task => task.availableFrom && task.availableFrom > today());
+  if (timing === 'dated') tasks = tasks.filter(task => task.availableFrom || task.dueDate);
+  if (timing === 'unscheduled') tasks = tasks.filter(task => !task.availableFrom && !task.dueDate);
   if (sort === 'due') tasks.sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
+  if (sort === 'available') tasks.sort((a, b) => (a.availableFrom || '9999-12-31').localeCompare(b.availableFrom || '9999-12-31'));
   if (sort === 'record') tasks.sort((a, b) => (recordName(a.recordId) || 'Standalone').localeCompare(recordName(b.recordId) || 'Standalone'));
   if (sort === 'created') tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   root.innerHTML = '';
   tasks.forEach(task => root.appendChild(taskRow(task)));
   if (!tasks.length) root.innerHTML = '<p class="empty">No tasks match these filters.</p>';
+}
+
+function renderPeople() {
+  const root = $('#childList');
+  root.innerHTML = '';
+  data.people
+    .filter(person => !person.deletedAt && person.personType === 'child')
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    .forEach(person => {
+      const row = document.createElement('div');
+      row.className = 'task';
+      row.innerHTML = `<div class="task-body"><strong>${escapeHtml(person.displayName)}</strong><div class="meta">Child · No account access</div></div><div class="actions"><button class="btn ghost edit" type="button">Rename</button><button class="btn ghost del" type="button">Remove</button></div>`;
+      row.querySelector('.edit').addEventListener('click', () => {
+        const nextName = prompt('Child name', person.displayName)?.trim();
+        if (!nextName || nextName === person.displayName) return;
+        person.displayName = nextName;
+        person.updatedAt = nowIso();
+        saveData();
+      });
+      row.querySelector('.del').addEventListener('click', () => {
+        if (!confirm(`Remove ${person.displayName} from the Homestead? Open task assignments will become unassigned.`)) return;
+        const timestamp = nowIso();
+        person.deletedAt = timestamp;
+        person.updatedAt = timestamp;
+        data.assignments.filter(assignment => assignment.personId === person.id && !assignment.removedAt).forEach(assignment => {
+          assignment.removedAt = timestamp;
+          assignment.updatedAt = timestamp;
+        });
+        saveData();
+      });
+      root.appendChild(row);
+    });
+  $('#childEmpty').classList.toggle('hidden', root.children.length > 0);
+}
+
+function calendarEventTime(event) {
+  if (event.allDay) return 'All day';
+  if (!event.startTime) return 'Time not set';
+  const [hours, minutes] = event.startTime.split(':').map(Number);
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function renderCalendar() {
+  const root = $('#calendarGrid');
+  if (!root) return;
+  root.innerHTML = '';
+  $('#calendarMonthLabel').textContent = calendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+    const heading = document.createElement('div');
+    heading.className = 'calendar-weekday';
+    heading.textContent = day;
+    root.appendChild(heading);
+  });
+  const filter = $('#calendarFilter').value;
+  const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1 - calendarMonth.getDay());
+  for (let offset = 0; offset < 42; offset += 1) {
+    const date = new Date(first.getFullYear(), first.getMonth(), first.getDate() + offset);
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = `calendar-day${date.getMonth() !== calendarMonth.getMonth() ? ' outside' : ''}${dateKey === today() ? ' current' : ''}`;
+    cell.innerHTML = `<span class="calendar-date">${date.getDate()}</span><span class="calendar-items"></span>`;
+    cell.addEventListener('click', () => openModal('calendar', null, null, '', dateKey));
+    const items = cell.querySelector('.calendar-items');
+    if (filter !== 'events') {
+      data.tasks.filter(task => !task.deletedAt && !task.completed && (task.dueDate || task.availableFrom) === dateKey).forEach(task => {
+        const item = document.createElement('span');
+        item.className = 'calendar-item task-item';
+        item.textContent = task.title;
+        item.title = taskDateText(task);
+        item.addEventListener('click', event => { event.stopPropagation(); openModal('task', task.id, task.recordId); });
+        items.appendChild(item);
+      });
+    }
+    if (filter !== 'tasks') {
+      data.calendarEvents.filter(event => !event.deletedAt && event.startDate <= dateKey && event.endDate >= dateKey).forEach(event => {
+        const item = document.createElement('span');
+        item.className = 'calendar-item event-item';
+        item.textContent = `${event.startDate === dateKey ? `${calendarEventTime(event)} · ` : ''}${event.title}`;
+        item.addEventListener('click', click => { click.stopPropagation(); openModal('calendar', event.id, event.recordId); });
+        items.appendChild(item);
+      });
+    }
+    root.appendChild(cell);
+  }
+}
+
+function summarizeYield(entries) {
+  const totals = new Map();
+  entries.forEach(entry => totals.set(entry.unit, (totals.get(entry.unit) || 0) + entry.quantity));
+  return [...totals].map(([unit, quantity]) => `${Number(quantity.toFixed(2))} ${unit}`).join(' · ') || '0';
+}
+
+function yieldRow(entry) {
+  const row = document.createElement('div');
+  row.className = 'task yield-row';
+  row.innerHTML = `<div class="yield-mark" aria-hidden="true">${entry.type === 'milk' ? 'M' : 'E'}</div><div class="task-body"><strong>${escapeHtml(recordName(entry.recordId) || 'Unlinked animal')}</strong><div class="meta">${new Date(entry.occurredAt).toLocaleString()} · ${escapeHtml(entry.session)}</div>${entry.details ? `<div class="task-description">${escapeHtml(entry.details)}</div>` : ''}</div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong>${entry.unusableQuantity ? `<span class="meta">${escapeHtml(entry.unusableQuantity)} unusable</span>` : ''}<div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
+  row.querySelector('.edit').addEventListener('click', () => openModal('yield', entry.id, entry.recordId, entry.type));
+  row.querySelector('.del').addEventListener('click', () => {
+    if (confirm('Delete this yield entry?')) {
+      entry.deletedAt = nowIso();
+      entry.updatedAt = entry.deletedAt;
+      saveData();
+    }
+  });
+  return row;
+}
+
+function renderYield() {
+  const active = data.yieldEntries.filter(entry => !entry.deletedAt);
+  const todayEntries = active.filter(entry => localDateTime(entry.occurredAt).slice(0, 10) === localDateTime().slice(0, 10));
+  $('#todayMilkYield').textContent = summarizeYield(todayEntries.filter(entry => entry.type === 'milk'));
+  $('#todayEggYield').textContent = summarizeYield(todayEntries.filter(entry => entry.type === 'eggs'));
+  const root = $('#yieldList');
+  root.innerHTML = '';
+  active.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 30).forEach(entry => root.appendChild(yieldRow(entry)));
+  if (!root.children.length) root.innerHTML = '<p class="empty">No yield has been recorded yet.</p>';
 }
 
 function ledgerRow(entry) {
@@ -592,6 +914,9 @@ function renderAll() {
   renderToday();
   renderRecords();
   renderTasks();
+  renderPeople();
+  renderCalendar();
+  renderYield();
   renderLedger();
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 }
@@ -610,7 +935,10 @@ function field(labelText, name, type = 'text', value = '', options = []) {
     if (type === 'number') input.step = '0.01';
   }
   input.name = name;
-  input.value = value ?? '';
+  if (type === 'checkbox') {
+    input.checked = Boolean(value);
+    input.value = 'true';
+  } else input.value = value ?? '';
   label.appendChild(input);
   return label;
 }
@@ -633,6 +961,60 @@ function addRecordSelect(root, labelText, name, selected = '', excludeId = '') {
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(record => select.add(new Option(`${record.name} (${record.type})`, record.id)));
   select.value = selected || '';
+  label.appendChild(select);
+  root.appendChild(label);
+}
+
+function addPersonSelect(root, selected = '') {
+  const label = document.createElement('label');
+  label.textContent = 'Assigned to (optional)';
+  const select = document.createElement('select');
+  select.name = 'personId';
+  select.add(new Option('Unassigned', ''));
+  activePeople().forEach(person => select.add(new Option(
+    `${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`,
+    person.id
+  )));
+  select.value = selected || '';
+  label.appendChild(select);
+  root.appendChild(label);
+}
+
+function addRecurrenceFields(root, recurrenceRule) {
+  const rule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule(recurrenceRule);
+  const repeat = field('Repeat', 'recurrenceFrequency', 'select', rule?.frequency || '', ['', 'daily', 'weekly', 'monthly']);
+  repeat.querySelector('option[value=""]').textContent = 'Does not repeat';
+  root.append(repeat);
+  const details = document.createElement('div');
+  details.className = 'form-grid';
+  details.append(field('Repeat every', 'recurrenceInterval', 'number', rule?.interval || 1));
+  details.querySelector('[name=recurrenceInterval]').min = '1';
+  details.querySelector('[name=recurrenceInterval]').step = '1';
+  const mode = field('Schedule from', 'recurrenceMode', 'select', rule?.mode || 'fixed_schedule', ['fixed_schedule', 'after_completion']);
+  mode.querySelector('option[value=fixed_schedule]').textContent = 'Due date';
+  mode.querySelector('option[value=after_completion]').textContent = 'Completion date';
+  details.append(mode);
+  const help = document.createElement('p');
+  help.className = 'muted';
+  help.textContent = 'Only the next occurrence is created when this task is completed.';
+  details.append(help);
+  root.append(details);
+  const toggle = () => details.classList.toggle('hidden', !repeat.querySelector('select').value);
+  repeat.querySelector('select').addEventListener('change', toggle);
+  toggle();
+}
+
+function addYieldAnimalSelect(root, type, selected = '') {
+  const label = document.createElement('label');
+  label.textContent = 'Animal';
+  const select = document.createElement('select');
+  select.name = 'recordId';
+  let animals = data.records.filter(record => !record.deletedAt && record.type === 'Animal' && record.status !== 'Archived');
+  const matched = animals.filter(record => (record.identity?.purpose || '').toLowerCase().includes(type === 'milk' ? 'dairy' : 'egg'));
+  if (matched.length) animals = matched;
+  animals.sort((a, b) => a.name.localeCompare(b.name)).forEach(record => select.add(new Option(record.name, record.id)));
+  select.value = selected || animals[0]?.id || '';
+  select.required = true;
   label.appendChild(select);
   root.appendChild(label);
 }
@@ -708,19 +1090,27 @@ function appendRecordFields(root, record, type) {
   }
 }
 
-function openModal(nextMode, id = null, recordId = null, defaultType = '') {
+function openModal(nextMode, id = null, recordId = null, defaultType = '', defaultDate = null) {
   modalMode = nextMode;
   editId = id;
   contextRecordId = recordId || null;
+  calendarDefaultDate = defaultDate;
   const root = $('#modalFields');
   root.innerHTML = '';
-  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'Record', note: 'Add note', ledger: id ? 'Edit ledger entry' : 'Record expense or income' };
+  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'Record', note: 'Add note', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit yield entry' : (defaultType === 'eggs' ? 'Record eggs' : 'Record milk') };
   $('#modalTitle').textContent = titles[nextMode];
+  $('#modalDelete').classList.toggle('hidden', !(id && ['calendar', 'yield'].includes(nextMode)));
 
   if (nextMode === 'task') {
     const task = data.tasks.find(item => item.id === id) || {};
+    const assignment = assignmentForTask(task.id);
     root.append(field('Task', 'title', 'text', task.title));
-    root.append(field('Due date (optional)', 'dueDate', 'date', task.dueDate));
+    root.append(field('Details (optional)', 'description', 'textarea', task.description));
+    root.append(field('When can this work begin? (optional)', 'availableFrom', 'date', task.availableFrom));
+    root.append(field('When should it be completed? (optional)', 'dueDate', 'date', task.dueDate));
+    addRecurrenceFields(root, task.recurrenceRule);
+    root.append(field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']));
+    addPersonSelect(root, assignment?.personId || personForAssignment(assignment)?.id);
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || task.recordId);
   }
   if (nextMode === 'note') root.append(field('What should I remember?', 'text', 'textarea'));
@@ -740,6 +1130,39 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '') {
     root.append(field('Measurement or amount (optional)', 'value', 'text'));
     root.append(field('Unit (optional)', 'unit', 'text'));
     root.append(field('Details (describe Other here)', 'details', 'textarea'));
+  }
+  if (nextMode === 'calendar') {
+    const calendarEvent = data.calendarEvents.find(item => item.id === id) || {};
+    const startDate = calendarEvent.startDate || calendarDefaultDate || today();
+    root.append(field('Event', 'title', 'text', calendarEvent.title));
+    root.append(field('Start date', 'startDate', 'date', startDate));
+    root.append(field('End date', 'endDate', 'date', calendarEvent.endDate || startDate));
+    root.append(field('All day', 'allDay', 'checkbox', calendarEvent.allDay !== false));
+    root.append(field('Start time (optional)', 'startTime', 'time', calendarEvent.startTime));
+    root.append(field('End time (optional)', 'endTime', 'time', calendarEvent.endTime));
+    root.append(field('Location (optional)', 'location', 'text', calendarEvent.location));
+    root.append(field('Notes (optional)', 'notes', 'textarea', calendarEvent.notes));
+    addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || calendarEvent.recordId);
+  }
+  if (nextMode === 'yield') {
+    const entry = data.yieldEntries.find(item => item.id === id) || {};
+    const type = entry.type || (defaultType === 'eggs' ? 'eggs' : 'milk');
+    const typeField = field('Yield type', 'yieldTypeDisplay', 'select', type, [type]);
+    typeField.querySelector('select').disabled = true;
+    root.append(typeField);
+    const typeInput = document.createElement('input');
+    typeInput.type = 'hidden';
+    typeInput.name = 'yieldType';
+    typeInput.value = type;
+    root.append(typeInput);
+    addYieldAnimalSelect(root, type, recordId || entry.recordId);
+    root.append(field('Date and time', 'occurredAt', 'datetime-local', localDateTime(entry.occurredAt || new Date())));
+    const defaultSession = type === 'milk' ? (new Date().getHours() < 15 ? 'morning' : 'evening') : 'other';
+    root.append(field('Session', 'session', 'select', entry.session || defaultSession, ['morning', 'evening', 'other']));
+    root.append(field('Quantity', 'quantity', 'number', entry.quantity));
+    root.append(field('Unit', 'unit', 'select', entry.unit || (type === 'eggs' ? 'eggs' : 'gal'), type === 'eggs' ? ['eggs'] : ['gal', 'qt', 'lb', 'L']));
+    root.append(field('Loss or unusable amount', 'unusableQuantity', 'number', entry.unusableQuantity || 0));
+    root.append(field('Notes (optional)', 'details', 'textarea', entry.details));
   }
   if (nextMode === 'record') {
     const record = data.records.find(item => item.id === id) || { type: defaultType || 'Animal', name: '', status: 'Active', identity: {}, stewardship: {} };
@@ -782,10 +1205,27 @@ $('#modalForm').addEventListener('submit', event => {
 
   if (modalMode === 'task') {
     if (!form.title.trim()) return;
+    if (form.availableFrom && form.dueDate && form.dueDate < form.availableFrom) {
+      alert('The due date cannot be before the available date.');
+      return;
+    }
     const existing = data.tasks.find(task => task.id === editId);
-    const values = { title: form.title.trim(), dueDate: form.dueDate || '', recordId: form.recordId || null };
-    if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
-    else data.tasks.push({ id: uid(), ...values, completed: false, status: 'open', createdAt: nowIso(), updatedAt: nowIso(), completedAt: null, deletedAt: null });
+    const recurrenceRule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule({
+      frequency: form.recurrenceFrequency,
+      mode: form.recurrenceMode,
+      interval: form.recurrenceInterval
+    });
+    const values = { title: form.title.trim(), description: form.description.trim(), availableFrom: form.availableFrom || '', dueDate: form.dueDate || '', priority: form.priority || 'normal', recordId: form.recordId || null, recurrenceRule };
+    let taskId;
+    if (existing) {
+      Object.assign(existing, values, { updatedAt: nowIso() });
+      taskId = existing.id;
+    } else {
+      const created = { id: uid(), ...values, completed: false, status: 'open', createdAt: nowIso(), updatedAt: nowIso(), completedAt: null, deletedAt: null };
+      data.tasks.push(created);
+      taskId = created.id;
+    }
+    setTaskAssignee(taskId, form.personId || '');
   }
   if (modalMode === 'note') {
     if (!form.text.trim()) return;
@@ -802,6 +1242,36 @@ $('#modalForm').addEventListener('submit', event => {
       record.status = 'Completed';
       record.updatedAt = nowIso();
     }
+  }
+  if (modalMode === 'calendar') {
+    if (!form.title.trim()) return;
+    if (form.endDate < form.startDate || (form.endDate === form.startDate && form.startTime && form.endTime && form.endTime < form.startTime)) {
+      alert('The event end cannot be before its start.');
+      return;
+    }
+    const existing = data.calendarEvents.find(item => item.id === editId);
+    const values = {
+      title: form.title.trim(), startDate: form.startDate, endDate: form.endDate,
+      allDay: form.allDay === 'true', startTime: form.startTime || '', endTime: form.endTime || '',
+      location: form.location.trim(), notes: form.notes.trim(), recordId: form.recordId || null
+    };
+    if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
+    else data.calendarEvents.push(normalizeCalendarEvent({ id: uid(), ...values, createdAt: nowIso() }));
+  }
+  if (modalMode === 'yield') {
+    const quantity = Number(form.quantity);
+    const unusableQuantity = Number(form.unusableQuantity || 0);
+    if (!form.recordId || !Number.isFinite(quantity) || quantity <= 0 || unusableQuantity < 0 || unusableQuantity > quantity) {
+      alert('Choose an animal and enter a positive quantity. Unusable yield cannot exceed the total.');
+      return;
+    }
+    const existing = data.yieldEntries.find(item => item.id === editId);
+    const values = {
+      recordId: form.recordId, type: form.yieldType, occurredAt: new Date(form.occurredAt).toISOString(),
+      session: form.session, quantity, unit: form.unit, unusableQuantity, details: form.details.trim()
+    };
+    if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
+    else data.yieldEntries.unshift(normalizeYieldEntry({ id: uid(), ...values, createdAt: nowIso() }));
   }
   if (modalMode === 'ledger') {
     if (!form.description.trim()) return;
@@ -844,7 +1314,12 @@ $('#tasksAddTask').addEventListener('click', () => openModal('task'));
 $('#todayAddRecord').addEventListener('click', () => openModal('record'));
 $('#addRecord').addEventListener('click', () => openModal('record'));
 $('#addLedger').addEventListener('click', () => openModal('ledger'));
+$('#addCalendarEvent').addEventListener('click', () => openModal('calendar'));
+$('#addMilkYield').addEventListener('click', () => openModal('yield', null, null, 'milk'));
+$('#addEggYield').addEventListener('click', () => openModal('yield', null, null, 'eggs'));
 $('#recordEvent').addEventListener('click', () => openModal('event', null, currentRecordId));
+$('#recordMilk').addEventListener('click', () => openModal('yield', null, currentRecordId, 'milk'));
+$('#recordEggs').addEventListener('click', () => openModal('yield', null, currentRecordId, 'eggs'));
 $('#recordAddTask').addEventListener('click', () => openModal('task', null, currentRecordId));
 $('#recordAddNote').addEventListener('click', () => openModal('note', null, currentRecordId));
 $('#recordAddLedger').addEventListener('click', () => openModal('ledger', null, currentRecordId));
@@ -852,16 +1327,48 @@ $('#recordEdit').addEventListener('click', () => openModal('record', currentReco
 $('#backToList').addEventListener('click', () => showView(priorView));
 $('#modalClose').addEventListener('click', () => $('#modal').close());
 $('#modalCancel').addEventListener('click', () => $('#modal').close());
+$('#modalDelete').addEventListener('click', () => {
+  if (modalMode === 'calendar' && editId && confirm('Delete this calendar event?')) {
+    const calendarEvent = data.calendarEvents.find(item => item.id === editId);
+    if (calendarEvent) {
+      calendarEvent.deletedAt = nowIso();
+      calendarEvent.updatedAt = calendarEvent.deletedAt;
+      saveData();
+    }
+    $('#modal').close();
+  }
+  if (modalMode === 'yield' && editId && confirm('Delete this yield entry?')) {
+    const entry = data.yieldEntries.find(item => item.id === editId);
+    if (entry) {
+      entry.deletedAt = nowIso();
+      entry.updatedAt = entry.deletedAt;
+      saveData();
+    }
+    $('#modal').close();
+  }
+});
 $$('.tabs-mini button').forEach(button => button.addEventListener('click', () => {
   $$('.tabs-mini button').forEach(item => item.classList.remove('active'));
   $$('.record-panel').forEach(panel => panel.classList.remove('active'));
   button.classList.add('active');
   $(`#panel${button.dataset.panel.charAt(0).toUpperCase()}${button.dataset.panel.slice(1)}`).classList.add('active');
 }));
-['taskStatusFilter', 'taskRecordFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
+['taskStatusFilter', 'taskRecordFilter', 'taskAssigneeFilter', 'taskTimingFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
+$('#calendarFilter').addEventListener('change', renderCalendar);
+$('#calendarPrevious').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1); renderCalendar(); });
+$('#calendarNext').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1); renderCalendar(); });
+$('#calendarToday').addEventListener('click', () => { calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderCalendar(); });
 $('#homesteadForm').addEventListener('submit', event => {
   event.preventDefault();
   data.settings.homesteadName = $('#homesteadName').value.trim() || 'My Homestead';
+  saveData();
+});
+$('#childForm').addEventListener('submit', event => {
+  event.preventDefault();
+  const displayName = $('#childName').value.trim();
+  if (!displayName) return;
+  data.people.push(normalizePerson({ id: uid(), personType: 'child', displayName, createdAt: nowIso() }));
+  $('#childName').value = '';
   saveData();
 });
 $('#exportData').addEventListener('click', exportData);
@@ -883,3 +1390,6 @@ if ('serviceWorker' in navigator) window.addEventListener('load', () => navigato
 
 window.RegulaRustica = { normalizeData, migrateData, prepareImportedData };
 renderAll();
+if (startupMigrationBefore) setTimeout(() => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {
+  detail: { before: startupMigrationBefore, after: structuredClone(data), source: 'migration' }
+})), 0);

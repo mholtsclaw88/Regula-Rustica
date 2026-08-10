@@ -7,14 +7,12 @@ This document captures worthwhile ideas that are intentionally deferred. Recordi
 ## User Experience
 - Conditional fields based on record type and species
 - Global filtering and sorting across records, tasks, and Chronicle
-- Calendar view
 - Workflow templates
 - Custom homestead logo and branding
 
 ## Tasks
 - Task watchers
-- Flexible task windows
-- Role-based task assignment
+- Child kiosk mode for viewing assigned tasks and marking permitted work complete
 - Advanced recurring task exceptions
 
 ## Records

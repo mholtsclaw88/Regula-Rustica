@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SyncEngine } from '../sync/engine.mjs';
 import { LocalSyncState } from '../sync/local-state.mjs';
-import { DOMAIN_ORDER, operationOrder, toCloud } from '../sync/entities.mjs';
+import { DOMAIN_ORDER, fromCloud, hasMeaningfulData, operationOrder, toCloud } from '../sync/entities.mjs';
+import housekeepingData from '../housekeeping-data.js';
 
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
 
@@ -12,7 +13,7 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-const blank = () => ({ schemaVersion: 5, settings: { homesteadName: 'Test' }, records: [], tasks: [], relationships: [], assignments: [], events: [], notes: [], ledger: [] });
+const blank = () => ({ schemaVersion: 7, settings: { homesteadName: 'Test' }, records: [], people: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
 const record = (id = crypto.randomUUID()) => ({ id, type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', deletedAt: null });
 
 class MockCloud {
@@ -159,6 +160,100 @@ test('local update carries the known cloud base version', () => {
   h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true; h.state.entity('records', item.id).cloudVersion = 4; h.state.save();
   const next = structuredClone(old); next.records[0].name = 'Daisy II'; next.records[0].updatedAt = '2026-08-02T00:00:00.000Z';
   h.engine.queueLocalChanges(old, next); assert.equal(h.state.state.outbox[0].baseVersion, 4);
+});
+
+test('task date windows and recurrence survive cloud conversion', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const task = {
+    id: crypto.randomUUID(), title: 'Move hens', description: 'Use the north coop',
+    availableFrom: '2026-08-10', dueDate: '2026-08-12', priority: 'high',
+    completed: false, recurrenceRule: { mode: 'after_completion', frequency: 'weekly', interval: 1 },
+    createdAt: '2026-08-09T12:00:00.000Z', updatedAt: '2026-08-09T12:00:00.000Z'
+  };
+  const payload = toCloud('tasks', task, state);
+  assert.equal(payload.available_from, '2026-08-10');
+  assert.equal(payload.due_date, '2026-08-12');
+  assert.deepEqual(payload.recurrence_rule, task.recurrenceRule);
+});
+
+test('recurrence rules normalize supported schedules and reject unsupported ones', () => {
+  assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'weekly', mode: 'after_completion', interval: '2' }), {
+    frequency: 'weekly', mode: 'after_completion', interval: 2
+  });
+  assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', interval: 0 }), {
+    frequency: 'daily', mode: 'fixed_schedule', interval: 1
+  });
+  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'monthly', interval: Infinity }).interval, 1);
+  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'yearly' }), null);
+});
+
+test('recurring due dates follow fixed and after-completion schedules', () => {
+  assert.equal(housekeepingData.nextRecurringDueDate({ dueDate: '2026-08-10', recurrenceRule: { frequency: 'weekly', interval: 2 } }, '2026-08-20'), '2026-08-24');
+  assert.equal(housekeepingData.nextRecurringDueDate({ dueDate: '2026-08-10', recurrenceRule: { frequency: 'daily', mode: 'after_completion', interval: 3 } }, '2026-08-20'), '2026-08-23');
+  assert.equal(housekeepingData.nextRecurringDueDate({ dueDate: '2027-01-31', recurrenceRule: { frequency: 'monthly', interval: 1 } }, '2027-02-02'), '2027-02-28');
+});
+
+test('recurrence summary describes cadence and scheduling mode', () => {
+  assert.equal(housekeepingData.recurrenceSummary({ frequency: 'monthly', interval: 1 }), 'Repeats every month');
+  assert.equal(housekeepingData.recurrenceSummary({ frequency: 'weekly', interval: 2, mode: 'after_completion' }), 'Repeats every 2 weeks after completion');
+});
+
+test('child profiles and task assignments retain their canonical person link', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const child = { id: 'child-one', personType: 'child', displayName: 'Clare', createdAt: '2026-08-10T12:00:00Z' };
+  const taskId = 'task-one';
+  const personPayload = toCloud('homestead_people', child, state);
+  const assignmentPayload = toCloud('task_assignments', {
+    id: 'assignment-one', taskId, personId: child.id, assignmentType: 'assignee', assignedAt: '2026-08-10T12:00:00Z'
+  }, state);
+  assert.equal(personPayload.person_type, 'child');
+  assert.equal(personPayload.member_id, null);
+  assert.equal(assignmentPayload.person_id, state.entity('homestead_people', child.id).cloudId);
+  assert.equal(assignmentPayload.task_id, state.entity('tasks', taskId).cloudId);
+  const local = fromCloud('task_assignments', {
+    id: assignmentPayload.id, task_id: assignmentPayload.task_id, person_id: assignmentPayload.person_id,
+    member_id: null, assignment_type: 'assignee', assigned_at: '2026-08-10T12:00:00Z',
+    updated_at: '2026-08-10T12:00:00Z', removed_at: null
+  }, state);
+  assert.equal(local.personId, child.id);
+});
+
+test('account-backed directory entries do not make an empty Homestead look populated', () => {
+  const data = blank();
+  data.people.push({ id: 'member-one', personType: 'member', displayName: 'Steward', memberId: crypto.randomUUID() });
+  assert.equal(hasMeaningfulData(data), false);
+  data.people.push({ id: 'child-one', personType: 'child', displayName: 'Clare' });
+  assert.equal(hasMeaningfulData(data), true);
+});
+
+test('calendar events retain all-day and optional time metadata', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const event = { id: crypto.randomUUID(), title: 'Farmers market', startDate: '2026-08-15', endDate: '2026-08-15', allDay: false, startTime: '08:30', endTime: '11:00', location: 'Town green', notes: '', createdAt: '2026-08-09T12:00:00Z' };
+  const cloud = toCloud('calendar_events', event, state);
+  assert.equal(cloud.start_time, '08:30');
+  assert.equal(cloud.all_day, false);
+  const local = fromCloud('calendar_events', { ...cloud, id: cloud.id, created_at: event.createdAt, updated_at: event.createdAt }, state);
+  assert.equal(local.location, 'Town green');
+});
+
+test('yield entries retain session, loss, and canonical record link', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const recordId = crypto.randomUUID();
+  const entry = { id: crypto.randomUUID(), recordId, type: 'milk', occurredAt: '2026-08-09T12:00:00Z', session: 'morning', quantity: 2.5, unit: 'gal', unusableQuantity: .25, details: 'Fresh', createdAt: '2026-08-09T12:00:00Z' };
+  const cloud = toCloud('yield_entries', entry, state);
+  assert.equal(cloud.record_id, state.entity('records', recordId).cloudId);
+  assert.equal(cloud.unusable_quantity, .25);
+  assert.equal(cloud.session, 'morning');
+});
+
+test('historical yield migration is conservative and preserves exact AM/PM meanings', () => {
+  const base = { recordId: 'cow', date: '2026-08-01', value: 2, unit: 'gal' };
+  assert.deepEqual(
+    ['AM Milk', 'Evening Milk', 'Egg Collection'].map((eventType, index) => housekeepingData.historicalYieldCandidate({ ...base, id: String(index), eventType } )?.session),
+    ['morning', 'evening', 'other']
+  );
+  assert.equal(housekeepingData.historicalYieldCandidate({ ...base, id: 'weight', eventType: 'Weight' }), null);
+  assert.equal(housekeepingData.historicalYieldCandidate({ ...base, id: 'ambiguous', eventType: 'Milked' }), null);
 });
 
 test('push uses dependency-safe domain order', async () => {

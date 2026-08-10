@@ -14,7 +14,9 @@ export class SupabaseSyncAdapter {
   async counts() {
     const result = {};
     for (const table of DOMAIN_ORDER) {
-      const { count, error } = await this.client.from(table).select('id', { count: 'exact', head: true });
+      let query = this.client.from(table).select('id', { count: 'exact', head: true });
+      if (table === 'homestead_people') query = query.eq('person_type', 'child').is('deleted_at', null);
+      const { count, error } = await query;
       if (error) throw error;
       result[table] = count || 0;
     }
@@ -22,7 +24,12 @@ export class SupabaseSyncAdapter {
   }
 
   async apply(operation) {
-    const { data, error } = await this.client.rpc('apply_sync_operation', {
+    const rpc = ['homestead_people', 'task_assignments'].includes(operation.table)
+      ? 'apply_people_sync_operation'
+      : ['calendar_events', 'yield_entries'].includes(operation.table)
+        ? 'apply_housekeeping_sync_operation'
+        : 'apply_sync_operation';
+    const { data, error } = await this.client.rpc(rpc, {
       operation_key: operation.idempotencyKey,
       client_device_id: operation.deviceId,
       target_table: operation.table,
@@ -40,8 +47,11 @@ export class SupabaseSyncAdapter {
     const referenceFields = {
       record_relationships: ['source_record_id', 'target_record_id'],
       tasks: ['record_id', 'parent_task_id'],
-      task_assignments: ['task_id', 'member_id'],
+      homestead_people: ['member_id'],
+      task_assignments: ['task_id', 'person_id', 'member_id'],
       chronicle_entries: ['record_id', 'task_id', 'corrects_entry_id'],
+      calendar_events: ['record_id'],
+      yield_entries: ['record_id'],
       notes: ['record_id'], ledger_entries: ['record_id']
     };
     for (const table of DOMAIN_ORDER) {

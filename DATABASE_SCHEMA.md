@@ -1012,3 +1012,20 @@ The database implementation is acceptable when:
 # Governing Principle
 
 > **The database exists to preserve the stewardship history of a Homestead in a durable, understandable, secure, and extensible form.**
+
+---
+
+# Housekeeping v1 Extension — August 2026
+
+The Housekeeping sprint adds two synchronized Homestead-owned tables using the same standard metadata, stable UUIDs, optimistic versions, audit triggers, soft deletion, explicit grants, and Row-Level Security as the original content tables.
+
+- `calendar_events` stores distinct shared calendar events with an optional Record link, title, start/end dates, optional start/end times, all-day state, location, and notes. Calendar events are not Chronicle entries.
+- `yield_entries` is the canonical source for Milk and Egg production. It stores a required Animal Record link, type, occurrence time, session, quantity, unit, unusable quantity, and JSON details. Yield is rendered into the related Record Chronicle without creating a duplicate `chronicle_entries` row.
+
+Calendar writes require the ordinary task-management capability. Yield creation requires the event-recording capability; correction and deletion require the event-editing capability. Guests remain read-only, tenant-safe Record relationships are validated server-side, and both tables participate in the existing idempotent local-first synchronization design.
+
+## Assignable Homestead People
+
+`homestead_people` provides one tenant-scoped task-assignee directory for account-backed members and children. Member entries are maintained from active `homestead_members`; child entries deliberately have no `auth.users` row, membership, role, invitation, or authorization capability. `task_assignments.person_id` is the canonical assignee link, while the nullable legacy `member_id` remains populated for account-backed people so existing Hand task visibility and completion checks remain unchanged.
+
+Stewards and Keepers may manage child profiles under the existing `assign_tasks` capability. Hands and Guests may read the directory for task display but cannot create or edit children. Removing a child is a synchronized soft deletion and never grants or revokes authenticated access. The first UI supports one active assignee; the table continues to support multiple assignees. Child kiosk access is explicitly deferred.
