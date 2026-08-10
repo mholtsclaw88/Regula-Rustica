@@ -1012,3 +1012,14 @@ The database implementation is acceptable when:
 # Governing Principle
 
 > **The database exists to preserve the stewardship history of a Homestead in a durable, understandable, secure, and extensible form.**
+
+---
+
+# Housekeeping v1 Extension — August 2026
+
+The Housekeeping sprint adds two synchronized Homestead-owned tables using the same standard metadata, stable UUIDs, optimistic versions, audit triggers, soft deletion, explicit grants, and Row-Level Security as the original content tables.
+
+- `calendar_events` stores distinct shared calendar events with an optional Record link, title, start/end dates, optional start/end times, all-day state, location, and notes. Calendar events are not Chronicle entries.
+- `yield_entries` is the canonical source for Milk and Egg production. It stores a required Animal Record link, type, occurrence time, session, quantity, unit, unusable quantity, and JSON details. Yield is rendered into the related Record Chronicle without creating a duplicate `chronicle_entries` row.
+
+Calendar writes require the ordinary task-management capability. Yield creation requires the event-recording capability; correction and deletion require the event-editing capability. Guests remain read-only, tenant-safe Record relationships are validated server-side, and both tables participate in the existing idempotent local-first synchronization design.

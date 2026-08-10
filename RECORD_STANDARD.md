@@ -72,12 +72,17 @@ Tasks may be:
 
 A task created from inside a record should automatically link to that record.
 
-A task should contain only:
+A task should contain:
 
 - Title
+- Available date, optional
 - Due date, optional
 - Linked record, optional
 - Completion status
+- Priority and supporting details, optional
+- Assignment and recurrence metadata, optional
+
+The available date and due date are independent. When both are present, the due date may not precede the available date.
 
 ### 4. Record / Events
 

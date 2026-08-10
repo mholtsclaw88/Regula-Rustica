@@ -88,11 +88,13 @@ The local data object should use an explicit schema version.
 
 ```json
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "settings": {},
   "records": [],
   "tasks": [],
   "events": [],
+  "calendarEvents": [],
+  "yieldEntries": [],
   "notes": [],
   "ledger": []
 }
@@ -135,6 +137,7 @@ Tasks represent future work.
 {
   "id": "stable-id",
   "title": "Trim hooves",
+  "availableFrom": "YYYY-MM-DD",
   "dueDate": "YYYY-MM-DD",
   "recordId": "optional-record-id",
   "completed": false,
@@ -142,6 +145,8 @@ Tasks represent future work.
   "completedAt": null
 }
 ```
+
+`availableFrom` and `dueDate` are independently optional. Schema version 6 also adds distinct local collections for shared calendar events and canonical Milk/Egg yield entries. Older schema-version 5 backups remain importable.
 
 Completing a linked task may create a Chronicle event automatically.
 
