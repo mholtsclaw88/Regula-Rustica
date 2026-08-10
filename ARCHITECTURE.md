@@ -150,6 +150,8 @@ Tasks represent future work.
 
 `availableFrom` and `dueDate` are independently optional. Schema version 6 adds distinct local collections for shared calendar events and canonical Milk/Egg yield entries. Schema version 7 adds an assignable Homestead people directory and normalized task assignments. Older schema-version 5 and 6 backups remain importable.
 
+Optional recurrence metadata uses a daily, weekly, or monthly frequency, a positive interval, and either a fixed schedule based on the prior due date or a schedule based on completion. Completing a recurring task creates only its next occurrence. A Homestead that has never initialized cloud synchronization generates that occurrence locally; after cloud initialization, the idempotent database completion path owns generation and the client receives the next occurrence through synchronization.
+
 ### Homestead People and Task Assignments
 
 `people` is the local-first assignee directory. Account-backed entries have `personType: "member"` and a membership link supplied by the cloud; `personType: "child"` entries have no account, role, membership, or access. Tasks reference people through the separate `assignments` collection so assignment history is not duplicated on the task. The first UI exposes one active assignee while the underlying model continues to support multiple assignments.
@@ -280,7 +282,7 @@ Every record uses the same layout:
 
 ### Tasks
 
-Provides a consolidated task list with simple status, record, and due-date filtering.
+Provides a consolidated task list with simple status, record, assignee, timing, and due-date filtering. The task menu supports daily, weekly, and monthly recurrence from either the due date or completion date.
 
 ### Ledger
 

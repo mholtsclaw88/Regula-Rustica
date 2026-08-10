@@ -18,6 +18,10 @@ let engine = offlineEngine;
 let context = null;
 let firstCase = null;
 
+window.RegulaRusticaSync = Object.freeze({
+  isInitialized: () => state.state.initialSyncCompleted
+});
+
 function message(kind, error) {
   const waiting = state.state.outbox.length;
   const conflicts = state.state.conflicts.filter(item => item.status === 'unresolved').length;

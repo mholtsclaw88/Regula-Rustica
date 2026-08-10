@@ -176,6 +176,28 @@ test('task date windows and recurrence survive cloud conversion', () => {
   assert.deepEqual(payload.recurrence_rule, task.recurrenceRule);
 });
 
+test('recurrence rules normalize supported schedules and reject unsupported ones', () => {
+  assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'weekly', mode: 'after_completion', interval: '2' }), {
+    frequency: 'weekly', mode: 'after_completion', interval: 2
+  });
+  assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', interval: 0 }), {
+    frequency: 'daily', mode: 'fixed_schedule', interval: 1
+  });
+  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'monthly', interval: Infinity }).interval, 1);
+  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'yearly' }), null);
+});
+
+test('recurring due dates follow fixed and after-completion schedules', () => {
+  assert.equal(housekeepingData.nextRecurringDueDate({ dueDate: '2026-08-10', recurrenceRule: { frequency: 'weekly', interval: 2 } }, '2026-08-20'), '2026-08-24');
+  assert.equal(housekeepingData.nextRecurringDueDate({ dueDate: '2026-08-10', recurrenceRule: { frequency: 'daily', mode: 'after_completion', interval: 3 } }, '2026-08-20'), '2026-08-23');
+  assert.equal(housekeepingData.nextRecurringDueDate({ dueDate: '2027-01-31', recurrenceRule: { frequency: 'monthly', interval: 1 } }, '2027-02-02'), '2027-02-28');
+});
+
+test('recurrence summary describes cadence and scheduling mode', () => {
+  assert.equal(housekeepingData.recurrenceSummary({ frequency: 'monthly', interval: 1 }), 'Repeats every month');
+  assert.equal(housekeepingData.recurrenceSummary({ frequency: 'weekly', interval: 2, mode: 'after_completion' }), 'Repeats every 2 weeks after completion');
+});
+
 test('child profiles and task assignments retain their canonical person link', () => {
   const state = new LocalSyncState(new MemoryStorage());
   const child = { id: 'child-one', personType: 'child', displayName: 'Clare', createdAt: '2026-08-10T12:00:00Z' };

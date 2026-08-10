@@ -138,6 +138,25 @@ function taskDateText(task) {
   return 'No date';
 }
 
+function createNextLocalOccurrence(task) {
+  if (!task.recurrenceRule || data.tasks.some(item => !item.deletedAt && item.parentTaskId === task.id)) return;
+  const dueDate = window.RegulaRusticaHousekeeping.nextRecurringDueDate(task, today());
+  if (!dueDate) return;
+  const timestamp = nowIso();
+  data.tasks.push(normalizeTask({
+    id: uid(),
+    title: task.title,
+    description: task.description,
+    dueDate,
+    recordId: task.recordId,
+    priority: task.priority,
+    recurrenceRule: { ...task.recurrenceRule },
+    parentTaskId: task.id,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }));
+}
+
 function normalizeEvent(event = {}) {
   const createdAt = event.createdAt || (event.date?.includes('T') ? event.date : nowIso());
   return {
@@ -551,7 +570,8 @@ function taskRow(task) {
   const row = document.createElement('div');
   row.className = `task${task.completed ? ' done' : ''}`;
   const assignedTo = assigneeName(task.id);
-  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${escapeHtml(taskDateText(task))}${assignedTo ? ` · Assigned to ${escapeHtml(assignedTo)}` : ''}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}${task.priority !== 'normal' ? ` · ${escapeHtml(task.priority)}` : ''}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
+  const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
+  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${escapeHtml(taskDateText(task))}${recurrence ? ` · ${escapeHtml(recurrence)}` : ''}${assignedTo ? ` · Assigned to ${escapeHtml(assignedTo)}` : ''}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}${task.priority !== 'normal' ? ` · ${escapeHtml(task.priority)}` : ''}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
   row.querySelector('input').addEventListener('change', event => {
     const wasCompleted = task.completed;
     task.completed = event.target.checked;
@@ -559,6 +579,7 @@ function taskRow(task) {
     task.completedAt = task.completed ? nowIso() : null;
     task.updatedAt = nowIso();
     if (!wasCompleted && task.completed && task.recordId) addEvent(task.recordId, 'Task completed', task.title);
+    if (!wasCompleted && task.completed && task.recurrenceRule && !window.RegulaRusticaSync?.isInitialized?.()) createNextLocalOccurrence(task);
     saveData();
   });
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
@@ -959,6 +980,30 @@ function addPersonSelect(root, selected = '') {
   root.appendChild(label);
 }
 
+function addRecurrenceFields(root, recurrenceRule) {
+  const rule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule(recurrenceRule);
+  const repeat = field('Repeat', 'recurrenceFrequency', 'select', rule?.frequency || '', ['', 'daily', 'weekly', 'monthly']);
+  repeat.querySelector('option[value=""]').textContent = 'Does not repeat';
+  root.append(repeat);
+  const details = document.createElement('div');
+  details.className = 'form-grid';
+  details.append(field('Repeat every', 'recurrenceInterval', 'number', rule?.interval || 1));
+  details.querySelector('[name=recurrenceInterval]').min = '1';
+  details.querySelector('[name=recurrenceInterval]').step = '1';
+  const mode = field('Schedule from', 'recurrenceMode', 'select', rule?.mode || 'fixed_schedule', ['fixed_schedule', 'after_completion']);
+  mode.querySelector('option[value=fixed_schedule]').textContent = 'Due date';
+  mode.querySelector('option[value=after_completion]').textContent = 'Completion date';
+  details.append(mode);
+  const help = document.createElement('p');
+  help.className = 'muted';
+  help.textContent = 'Only the next occurrence is created when this task is completed.';
+  details.append(help);
+  root.append(details);
+  const toggle = () => details.classList.toggle('hidden', !repeat.querySelector('select').value);
+  repeat.querySelector('select').addEventListener('change', toggle);
+  toggle();
+}
+
 function addYieldAnimalSelect(root, type, selected = '') {
   const label = document.createElement('label');
   label.textContent = 'Animal';
@@ -1063,6 +1108,7 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     root.append(field('Details (optional)', 'description', 'textarea', task.description));
     root.append(field('When can this work begin? (optional)', 'availableFrom', 'date', task.availableFrom));
     root.append(field('When should it be completed? (optional)', 'dueDate', 'date', task.dueDate));
+    addRecurrenceFields(root, task.recurrenceRule);
     root.append(field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']));
     addPersonSelect(root, assignment?.personId || personForAssignment(assignment)?.id);
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || task.recordId);
@@ -1164,7 +1210,12 @@ $('#modalForm').addEventListener('submit', event => {
       return;
     }
     const existing = data.tasks.find(task => task.id === editId);
-    const values = { title: form.title.trim(), description: form.description.trim(), availableFrom: form.availableFrom || '', dueDate: form.dueDate || '', priority: form.priority || 'normal', recordId: form.recordId || null };
+    const recurrenceRule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule({
+      frequency: form.recurrenceFrequency,
+      mode: form.recurrenceMode,
+      interval: form.recurrenceInterval
+    });
+    const values = { title: form.title.trim(), description: form.description.trim(), availableFrom: form.availableFrom || '', dueDate: form.dueDate || '', priority: form.priority || 'normal', recordId: form.recordId || null, recurrenceRule };
     let taskId;
     if (existing) {
       Object.assign(existing, values, { updatedAt: nowIso() });
