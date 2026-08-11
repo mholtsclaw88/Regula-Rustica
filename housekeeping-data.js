@@ -33,11 +33,100 @@
     const frequency = ['daily', 'weekly', 'monthly'].includes(rule?.frequency) ? rule.frequency : '';
     if (!frequency) return null;
     const candidateInterval = Math.floor(Number(rule?.interval) || 1);
+    const configuredRoutine = rule?.routineType || rule?.routine_type || rule?.completionAction || rule?.completion_action;
+    const routineType = ['milk_morning', 'milk_evening', 'egg_collection'].includes(configuredRoutine)
+      ? configuredRoutine
+      : null;
     return {
       mode: rule?.mode === 'after_completion' ? 'after_completion' : 'fixed_schedule',
       frequency,
-      interval: Number.isFinite(candidateInterval) ? Math.max(1, candidateInterval) : 1
+      interval: Number.isFinite(candidateInterval) ? Math.max(1, candidateInterval) : 1,
+      ...(routineType ? { routineType } : {})
     };
+  }
+
+  function routineType(task = {}) {
+    return normalizeRecurrenceRule(task.recurrenceRule)?.routineType || null;
+  }
+
+  function routineYieldType(task = {}) {
+    return routineType(task) === 'egg_collection' ? 'eggs' : routineType(task) ? 'milk' : null;
+  }
+
+  function routineSession(task = {}) {
+    const type = routineType(task);
+    if (type === 'milk_morning') return 'morning';
+    if (type === 'milk_evening') return 'evening';
+    if (type === 'egg_collection') return 'other';
+    return null;
+  }
+
+  function routineLabel(task = {}) {
+    const type = routineType(task);
+    if (type === 'milk_morning') return 'Morning Milking';
+    if (type === 'milk_evening') return 'Evening Milking';
+    if (type === 'egg_collection') return 'Egg Collection';
+    return '';
+  }
+
+  function taskWorkDate(task = {}) {
+    return task.dueDate || task.availableFrom || '';
+  }
+
+  function localDate(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || '').slice(0, 10);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+  }
+
+  function matchesRoutineTask(task = {}, yieldEntry = {}) {
+    const session = routineSession(task);
+    const yieldType = routineYieldType(task);
+    return Boolean(
+      !task.deletedAt && !task.completed && task.status !== 'completed'
+      && session && yieldEntry.type === yieldType
+      && task.recordId && task.recordId === yieldEntry.recordId
+      && session === yieldEntry.session
+      && taskWorkDate(task) === localDate(yieldEntry.occurredAt)
+    );
+  }
+
+  function matchingRoutineTasks(tasks = [], yieldEntry = {}) {
+    return tasks.filter(task => matchesRoutineTask(task, yieldEntry));
+  }
+
+  function matchingYieldForTask(entries = [], task = {}) {
+    const session = routineSession(task);
+    const yieldType = routineYieldType(task);
+    if (!session) return null;
+    return entries.find(entry => !entry.deletedAt && entry.type === yieldType
+      && entry.recordId === task.recordId && entry.session === session
+      && localDate(entry.occurredAt) === taskWorkDate(task)) || null;
+  }
+
+  function taskCalendarBounds(task = {}) {
+    const start = task.availableFrom || task.dueDate || '';
+    const end = task.dueDate || task.availableFrom || '';
+    if (!start || !end) return null;
+    return start <= end ? { start, end } : { start: end, end: start };
+  }
+
+  function taskCalendarSegment(task = {}, date = '') {
+    const bounds = taskCalendarBounds(task);
+    if (!bounds || date < bounds.start || date > bounds.end) return null;
+    if (bounds.start === bounds.end) return 'single';
+    if (date === bounds.start) return 'start';
+    if (date === bounds.end) return 'end';
+    return 'middle';
+  }
+
+  function taskCalendarBarSegment(task = {}, date = '', dayOfWeek = -1) {
+    const bounds = taskCalendarBounds(task);
+    if (!bounds || bounds.start === bounds.end || !taskCalendarSegment(task, date)) return null;
+    const starts = date === bounds.start || dayOfWeek === 0;
+    const ends = date === bounds.end || dayOfWeek === 6;
+    return { starts, ends, showLabel: starts };
   }
 
   function dateParts(value) {
@@ -74,5 +163,9 @@
     return `Repeats every ${cadence}${normalized.mode === 'after_completion' ? ' after completion' : ''}`;
   }
 
-  return { historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary };
+  return {
+    historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
+    routineType, routineYieldType, routineSession, routineLabel, taskWorkDate,
+    matchingRoutineTasks, matchingYieldForTask, taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment
+  };
 }));

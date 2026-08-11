@@ -13,7 +13,7 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-const blank = () => ({ schemaVersion: 7, settings: { homesteadName: 'Test' }, records: [], people: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
+const blank = () => ({ schemaVersion: 8, settings: { homesteadName: 'Test' }, records: [], people: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
 const record = (id = crypto.randomUUID()) => ({ id, type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', deletedAt: null });
 
 class MockCloud {
@@ -84,6 +84,71 @@ test('durable outbox survives reload', () => {
   const storage = new MemoryStorage(); const state = new LocalSyncState(storage);
   state.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: {} });
   assert.equal(new LocalSyncState(storage).state.outbox.length, 1);
+});
+
+test('recurrence normalization preserves explicit record Routine metadata', () => {
+  assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', interval: 1, completionAction: 'milk_morning' }), {
+    mode: 'fixed_schedule', frequency: 'daily', interval: 1, routineType: 'milk_morning'
+  });
+  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', routineType: 'guess_from_title' }).routineType, undefined);
+  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', routineType: 'egg_collection' }).routineType, 'egg_collection');
+});
+
+test('Routine matching uses yield type, record, work date, session, and explicit metadata', () => {
+  const configured = { id: 'morning', recordId: 'daisy', dueDate: '2026-08-10', status: 'open', completed: false, recurrenceRule: { frequency: 'daily', interval: 1, routineType: 'milk_morning' } };
+  const eggCollection = { ...configured, id: 'eggs', recordId: 'layers', recurrenceRule: { frequency: 'daily', interval: 1, routineType: 'egg_collection' } };
+  const titleOnly = { ...configured, id: 'title-only', recurrenceRule: { frequency: 'daily', interval: 1 }, title: 'Milk Daisy this morning' };
+  const yieldEntry = { recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-10T07:00:00' };
+  const eggYield = { recordId: 'layers', type: 'eggs', session: 'other', occurredAt: '2026-08-10T12:00:00' };
+  assert.deepEqual(housekeepingData.matchingRoutineTasks([configured, titleOnly], yieldEntry).map(task => task.id), ['morning']);
+  assert.equal(housekeepingData.matchingRoutineTasks([configured], { ...yieldEntry, session: 'evening' }).length, 0);
+  assert.deepEqual(housekeepingData.matchingRoutineTasks([eggCollection], eggYield).map(task => task.id), ['eggs']);
+  assert.equal(housekeepingData.matchingRoutineTasks([eggCollection], { ...eggYield, type: 'milk' }).length, 0);
+});
+
+test('a task-linked yield reuses the task cloud identity and existing outbox', () => {
+  const setup = harness();
+  setup.state.bind(crypto.randomUUID());
+  setup.state.state.initialSyncCompleted = true;
+  const after = blank();
+  after.records.push(record('daisy'));
+  after.tasks.push({ id: 'milk-task', recordId: 'daisy', title: 'Barn round', status: 'completed', completed: true, dueDate: '2026-08-10', recurrenceRule: { frequency: 'daily', interval: 1, routineType: 'milk_morning' }, createdAt: '2026-08-10T00:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
+  after.yieldEntries.push({ id: 'milk-task', taskId: 'milk-task', recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-10T11:00:00Z', quantity: 2, unit: 'gal', unusableQuantity: 0, details: '', createdAt: '2026-08-10T11:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
+  setup.engine.queueLocalChanges(blank(), after);
+  const taskOperation = setup.state.state.outbox.find(item => item.table === 'tasks');
+  const yieldOperation = setup.state.state.outbox.find(item => item.table === 'yield_entries');
+  assert.equal(yieldOperation.rowId, taskOperation.rowId);
+  assert.equal(yieldOperation.payload.task_id, taskOperation.rowId);
+  assert.equal(yieldOperation.payload.details.task_id, taskOperation.rowId);
+});
+
+test('offline linked completion queues both changes and reconnect sync succeeds once', async () => {
+  const before = blank();
+  before.records.push(record('daisy'));
+  before.tasks.push({ id: 'milk-task', recordId: 'daisy', title: 'Morning round', status: 'open', completed: false, dueDate: '2026-08-10', recurrenceRule: { frequency: 'daily', interval: 1, routineType: 'milk_morning' }, createdAt: '2026-08-10T00:00:00Z', updatedAt: '2026-08-10T00:00:00Z' });
+  const setup = harness(before);
+  setup.state.bind(crypto.randomUUID());
+  setup.state.state.initialSyncCompleted = true;
+  const recordEntity = setup.state.entity('records', 'daisy'); recordEntity.cloudVersion = 1;
+  const taskEntity = setup.state.entity('tasks', 'milk-task'); taskEntity.cloudVersion = 1;
+  setup.cloud.rows.records.push({ id: recordEntity.cloudId, version: 1, type: 'animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {} });
+  setup.cloud.rows.tasks.push({ id: taskEntity.cloudId, version: 1, record_id: recordEntity.cloudId, title: 'Morning round', status: 'open', due_date: '2026-08-10', recurrence_rule: { frequency: 'daily', interval: 1, routineType: 'milk_morning' } });
+  const after = structuredClone(before);
+  Object.assign(after.tasks[0], { status: 'completed', completed: true, completedAt: '2026-08-10T11:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
+  after.yieldEntries.push({ id: 'milk-task', taskId: 'milk-task', recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-10T11:00:00Z', quantity: 2, unit: 'gal', unusableQuantity: 0, details: '', createdAt: '2026-08-10T11:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
+  setup.engine.queueLocalChanges(before, after);
+  assert.deepEqual(setup.state.state.outbox.map(item => [item.table, item.type]), [['tasks', 'update'], ['yield_entries', 'create']]);
+  await setup.engine.sync();
+  assert.equal(setup.state.state.outbox.length, 0);
+  assert.equal(setup.cloud.rows.yield_entries.length, 1);
+  assert.equal(setup.cloud.rows.tasks.filter(row => row.id === taskEntity.cloudId && row.status === 'completed').length, 1);
+});
+
+test('matching an existing yield ignores deleted entries and does not require title text', () => {
+  const task = { recordId: 'daisy', dueDate: '2026-08-10', recurrenceRule: { frequency: 'daily', routineType: 'milk_evening' } };
+  const deleted = { id: 'deleted', recordId: 'daisy', type: 'milk', session: 'evening', occurredAt: '2026-08-10T18:00:00', deletedAt: '2026-08-11T00:00:00Z' };
+  const active = { ...deleted, id: 'active', deletedAt: null };
+  assert.equal(housekeepingData.matchingYieldForTask([deleted, active], task).id, 'active');
 });
 
 test('a verified pre-migration backup is readable', () => {
@@ -196,6 +261,33 @@ test('recurring due dates follow fixed and after-completion schedules', () => {
 test('recurrence summary describes cadence and scheduling mode', () => {
   assert.equal(housekeepingData.recurrenceSummary({ frequency: 'monthly', interval: 1 }), 'Repeats every month');
   assert.equal(housekeepingData.recurrenceSummary({ frequency: 'weekly', interval: 2, mode: 'after_completion' }), 'Repeats every 2 weeks after completion');
+});
+
+test('calendar displays a Task from its start date through its due date', () => {
+  const task = { availableFrom: '2026-08-10', dueDate: '2026-08-13' };
+  assert.deepEqual(housekeepingData.taskCalendarBounds(task), { start: '2026-08-10', end: '2026-08-13' });
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-09'), null);
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-10'), 'start');
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-11'), 'middle');
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-13'), 'end');
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-14'), null);
+});
+
+test('calendar range bars restart cleanly when they cross a week', () => {
+  const task = { availableFrom: '2026-08-10', dueDate: '2026-08-18' };
+  assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-10', 1), { starts: true, ends: false, showLabel: true });
+  assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-15', 6), { starts: false, ends: true, showLabel: false });
+  assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-16', 0), { starts: true, ends: false, showLabel: true });
+  assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-18', 2), { starts: false, ends: true, showLabel: false });
+  assert.equal(housekeepingData.taskCalendarBarSegment({ dueDate: '2026-08-10' }, '2026-08-10', 1), null);
+});
+
+test('calendar keeps single-date and malformed legacy Tasks safe', () => {
+  assert.equal(housekeepingData.taskCalendarSegment({ dueDate: '2026-08-12' }, '2026-08-12'), 'single');
+  assert.deepEqual(housekeepingData.taskCalendarBounds({ availableFrom: '2026-08-13', dueDate: '2026-08-10' }), {
+    start: '2026-08-10', end: '2026-08-13'
+  });
+  assert.equal(housekeepingData.taskCalendarSegment({}, '2026-08-12'), null);
 });
 
 test('child profiles and task assignments retain their canonical person link', () => {

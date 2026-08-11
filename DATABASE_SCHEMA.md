@@ -366,7 +366,6 @@ Stewardship example:
 {
   "location": "East Pasture",
   "assigned_member_id": "uuid",
-  "current_workflow": "Lactation",
   "current_stage": "Active"
 }
 ```
@@ -473,6 +472,13 @@ Recurrence example:
   "end_date": null
 }
 ```
+
+Record-specific Routines use recurring Tasks underneath. Their
+`recurrence_rule.routineType` may be `milk_morning`, `milk_evening`, or
+`egg_collection`. This metadata is explicit; Task titles are never interpreted
+to infer Routine behavior. Milking Routines require an active dairy Animal,
+Egg Collection requires an active laying Animal, and every Routine requires a
+work date. Only one open Routine of each type may exist for an Animal.
 
 Supported initial modes:
 
@@ -965,8 +971,6 @@ Photos may remain a placeholder until private storage and offline upload behavio
 
 Potential later additions:
 
-- `workflow_templates`
-- `workflow_steps`
 - `recurrence_exceptions`
 - `task_watchers`
 - `notifications`
@@ -1020,7 +1024,7 @@ The database implementation is acceptable when:
 The Housekeeping sprint adds two synchronized Homestead-owned tables using the same standard metadata, stable UUIDs, optimistic versions, audit triggers, soft deletion, explicit grants, and Row-Level Security as the original content tables.
 
 - `calendar_events` stores distinct shared calendar events with an optional Record link, title, start/end dates, optional start/end times, all-day state, location, and notes. Calendar events are not Chronicle entries.
-- `yield_entries` is the canonical source for Milk and Egg production. It stores a required Animal Record link, type, occurrence time, session, quantity, unit, unusable quantity, and JSON details. Yield is rendered into the related Record Chronicle without creating a duplicate `chronicle_entries` row.
+- `yield_entries` is the canonical source for Milk and Egg production. It stores a required Animal Record link, optional unique `task_id`, type, occurrence time, session, quantity, unit, unusable quantity, and JSON details. Yield is rendered into the related Record Chronicle without creating a duplicate `chronicle_entries` row. A linked Milk Yield must match the Task's Homestead, Animal, work date, and configured morning/evening session.
 
 Calendar writes require the ordinary task-management capability. Yield creation requires the event-recording capability; correction and deletion require the event-editing capability. Guests remain read-only, tenant-safe Record relationships are validated server-side, and both tables participate in the existing idempotent local-first synchronization design.
 

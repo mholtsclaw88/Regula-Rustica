@@ -20,6 +20,15 @@ supabase db reset
 supabase test db supabase/tests/database
 ```
 
+If `supabase` is not installed globally, Windows PowerShell can run the same
+verified commands through npm without changing the execution policy:
+
+```powershell
+npx.cmd --yes supabase@latest start
+npx.cmd --yes supabase@latest db reset
+npx.cmd --yes supabase@latest test db supabase/tests/database
+```
+
 `supabase db reset` applies every file in `supabase/migrations` and then runs the intentionally empty `supabase/seed.sql`. Tests create their own users and data inside a transaction and roll everything back.
 
 The local Auth mail viewer is available at the Inbucket URL printed by `supabase status`. The generated configuration uses email/password authentication, allows sign-up, disables anonymous sign-in, and requires passwords with at least eight characters containing letters and digits.
@@ -107,7 +116,7 @@ supabase test db supabase/tests/database
 supabase db lint --local --level warning
 ```
 
-The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The 21-assertion member-invitation suite covers Steward-only access, tenant isolation, Steward-role invitations, server-generated token hashing, expiration, revocation, audit entries, and acceptance. The additive Sync v1 suite adds 21 assertions. The 39-assertion Housekeeping suite covers task date-window constraints, Calendar and Yield RLS, two-Homestead isolation, all four roles, tenant-safe links, idempotency, audit, validation, and soft deletion/restoration. The 37-assertion Homestead people suite covers automatic member-directory entries, account-free children, all four roles, account and child task assignment, tenant isolation, idempotency, soft deletion, audit behavior, and RLS. The database total is 166 assertions. Client suites cover invitation-link behavior, first-sync cases, recovery, durable queuing, ordering, conflicts, legacy-ID mapping, assignable people, and the synchronized domains.
+The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The 21-assertion member-invitation suite covers Steward-only access, tenant isolation, Steward-role invitations, server-generated token hashing, expiration, revocation, audit entries, and acceptance. The additive Sync v1 suite adds 21 assertions. The 39-assertion Housekeeping suite covers task date-window constraints, Calendar and Yield RLS, two-Homestead isolation, all four roles, tenant-safe links, idempotency, audit, validation, and soft deletion/restoration. The 37-assertion Homestead people suite covers automatic member-directory entries, account-free children, all four roles, account and child task assignment, tenant isolation, idempotency, soft deletion, audit behavior, and RLS. The Record Routine/Yield link suite adds 33 assertions for explicit Milk and Egg linkage, validation, automatic completion, recurrence, active-Routine uniqueness, idempotency, role enforcement, and non-reopening deletion behavior. The database total is 199 assertions. Client suites cover invitation-link behavior, first-sync cases, recovery, durable queuing, ordering, conflicts, legacy-ID mapping, assignable people, linked Routine behavior, and the synchronized domains.
 
 ## Deliberately deferred
 
