@@ -12,11 +12,11 @@
   <link rel="stylesheet" href="housekeeping.css">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=housekeeping-4" defer></script>
-  <script src="app.js?v=housekeeping-4" defer></script>
+  <script src="housekeeping-data.js?v=milking-link-1" defer></script>
+  <script src="app.js?v=milking-link-1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=housekeeping-4" type="module"></script>
+  <script src="sync/runtime.mjs?v=milking-link-1" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -343,8 +343,9 @@
       <div id="modalFields" class="form-grid"></div>
       <div class="dialog-actions">
         <button type="button" class="btn danger hidden" id="modalDelete">Delete</button>
+        <button type="button" class="btn secondary hidden" id="modalCompleteWithoutYield">Complete Without Yield</button>
         <button type="button" class="btn secondary" id="modalCancel">Cancel</button>
-        <button type="submit" class="btn primary">Save</button>
+        <button type="submit" class="btn primary" id="modalSubmit">Save</button>
       </div>
     </form>
   </dialog>

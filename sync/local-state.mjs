@@ -70,6 +70,16 @@ export class LocalSyncState {
     return this.state.entities[key];
   }
 
+  linkEntityIdentity(table, localId, targetTable, targetLocalId) {
+    const key = this.entityKey(table, localId);
+    if (!this.state.entities[key]) {
+      const target = this.entity(targetTable, targetLocalId);
+      this.state.entities[key] = { localId, cloudId: target.cloudId, cloudVersion: null, cloudRow: null };
+      this.save();
+    }
+    return this.state.entities[key];
+  }
+
   localIdForCloud(table, cloudId) {
     const match = Object.entries(this.state.entities)
       .find(([key, value]) => key.startsWith(`${table}:`) && value.cloudId === cloudId);

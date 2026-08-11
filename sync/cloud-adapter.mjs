@@ -51,7 +51,7 @@ export class SupabaseSyncAdapter {
       task_assignments: ['task_id', 'person_id', 'member_id'],
       chronicle_entries: ['record_id', 'task_id', 'corrects_entry_id'],
       calendar_events: ['record_id'],
-      yield_entries: ['record_id'],
+      yield_entries: ['record_id', 'task_id'],
       notes: ['record_id'], ledger_entries: ['record_id']
     };
     for (const table of DOMAIN_ORDER) {

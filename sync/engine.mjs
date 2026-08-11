@@ -31,6 +31,7 @@ export class SyncEngine {
       const previous = new Map((before[collection] || []).map(row => [row.id, row]));
       const current = new Map((after[collection] || []).map(row => [row.id, row]));
       for (const [id, row] of current) {
+        if (table === 'yield_entries' && row.taskId) this.state.linkEntityIdentity(table, id, 'tasks', row.taskId);
         const old = previous.get(id);
         if (!old) {
           this.state.enqueue({ table, localId: id, type: 'create', payload: toCloud(table, row, this.state) });
@@ -77,6 +78,7 @@ export class SyncEngine {
     this.state.createVerifiedBackup(local, 'before-first-cloud-migration');
     for (const table of DOMAIN_ORDER) {
       for (const row of local[COLLECTIONS[table]] || []) {
+        if (table === 'yield_entries' && row.taskId) this.state.linkEntityIdentity(table, row.id, 'tasks', row.taskId);
         const payload = toCloud(table, row, this.state, 'migration');
         expected[table].push(payload);
         const entity = this.state.entity(table, row.id);

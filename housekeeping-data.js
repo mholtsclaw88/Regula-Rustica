@@ -33,11 +33,56 @@
     const frequency = ['daily', 'weekly', 'monthly'].includes(rule?.frequency) ? rule.frequency : '';
     if (!frequency) return null;
     const candidateInterval = Math.floor(Number(rule?.interval) || 1);
+    const completionAction = ['milk_morning', 'milk_evening'].includes(rule?.completionAction || rule?.completion_action)
+      ? (rule.completionAction || rule.completion_action)
+      : null;
     return {
       mode: rule?.mode === 'after_completion' ? 'after_completion' : 'fixed_schedule',
       frequency,
-      interval: Number.isFinite(candidateInterval) ? Math.max(1, candidateInterval) : 1
+      interval: Number.isFinite(candidateInterval) ? Math.max(1, candidateInterval) : 1,
+      ...(completionAction ? { completionAction } : {})
     };
+  }
+
+  function milkingSession(task = {}) {
+    const action = normalizeRecurrenceRule(task.recurrenceRule)?.completionAction;
+    if (action === 'milk_morning') return 'morning';
+    if (action === 'milk_evening') return 'evening';
+    return null;
+  }
+
+  function taskWorkDate(task = {}) {
+    return task.dueDate || task.availableFrom || '';
+  }
+
+  function localDate(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || '').slice(0, 10);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+  }
+
+  function matchesMilkingTask(task = {}, yieldEntry = {}) {
+    const session = milkingSession(task);
+    return Boolean(
+      !task.deletedAt && !task.completed && task.status !== 'completed'
+      && session && yieldEntry.type === 'milk'
+      && task.recordId && task.recordId === yieldEntry.recordId
+      && session === yieldEntry.session
+      && taskWorkDate(task) === localDate(yieldEntry.occurredAt)
+    );
+  }
+
+  function matchingMilkingTasks(tasks = [], yieldEntry = {}) {
+    return tasks.filter(task => matchesMilkingTask(task, yieldEntry));
+  }
+
+  function matchingYieldForTask(entries = [], task = {}) {
+    const session = milkingSession(task);
+    if (!session) return null;
+    return entries.find(entry => !entry.deletedAt && entry.type === 'milk'
+      && entry.recordId === task.recordId && entry.session === session
+      && localDate(entry.occurredAt) === taskWorkDate(task)) || null;
   }
 
   function dateParts(value) {
@@ -74,5 +119,8 @@
     return `Repeats every ${cadence}${normalized.mode === 'after_completion' ? ' after completion' : ''}`;
   }
 
-  return { historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary };
+  return {
+    historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
+    milkingSession, taskWorkDate, matchingMilkingTasks, matchingYieldForTask
+  };
 }));
