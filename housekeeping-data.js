@@ -121,6 +121,14 @@
     return 'middle';
   }
 
+  function taskCalendarBarSegment(task = {}, date = '', dayOfWeek = -1) {
+    const bounds = taskCalendarBounds(task);
+    if (!bounds || bounds.start === bounds.end || !taskCalendarSegment(task, date)) return null;
+    const starts = date === bounds.start || dayOfWeek === 0;
+    const ends = date === bounds.end || dayOfWeek === 6;
+    return { starts, ends, showLabel: starts };
+  }
+
   function dateParts(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
     if (!match) return null;
@@ -158,6 +166,6 @@
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
     routineType, routineYieldType, routineSession, routineLabel, taskWorkDate,
-    matchingRoutineTasks, matchingYieldForTask, taskCalendarBounds, taskCalendarSegment
+    matchingRoutineTasks, matchingYieldForTask, taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment
   };
 }));

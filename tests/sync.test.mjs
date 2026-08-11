@@ -273,6 +273,15 @@ test('calendar displays a Task from its start date through its due date', () => 
   assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-14'), null);
 });
 
+test('calendar range bars restart cleanly when they cross a week', () => {
+  const task = { availableFrom: '2026-08-10', dueDate: '2026-08-18' };
+  assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-10', 1), { starts: true, ends: false, showLabel: true });
+  assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-15', 6), { starts: false, ends: true, showLabel: false });
+  assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-16', 0), { starts: true, ends: false, showLabel: true });
+  assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-18', 2), { starts: false, ends: true, showLabel: false });
+  assert.equal(housekeepingData.taskCalendarBarSegment({ dueDate: '2026-08-10' }, '2026-08-10', 1), null);
+});
+
 test('calendar keeps single-date and malformed legacy Tasks safe', () => {
   assert.equal(housekeepingData.taskCalendarSegment({ dueDate: '2026-08-12' }, '2026-08-12'), 'single');
   assert.deepEqual(housekeepingData.taskCalendarBounds({ availableFrom: '2026-08-13', dueDate: '2026-08-10' }), {

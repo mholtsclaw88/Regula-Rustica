@@ -870,6 +870,21 @@ function calendarEventTime(event) {
   return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
+function calendarTaskLabel(task) {
+  const assignedTo = assigneeName(task.id);
+  return `${task.recurrenceRule ? '↻ ' : ''}${task.title}${assignedTo ? ` · ${assignedTo}` : ''}`;
+}
+
+function calendarTaskTitle(task) {
+  const assignedTo = assigneeName(task.id);
+  return `${taskDateText(task)}${assignedTo ? ` · Assigned to ${assignedTo}` : ''}${task.recurrenceRule ? ' · Recurring' : ''}`;
+}
+
+function openCalendarTask(task, event) {
+  event.stopPropagation();
+  openModal(window.RegulaRusticaHousekeeping.routineType(task) ? 'routine' : 'task', task.id, task.recordId);
+}
+
 function renderCalendar() {
   const root = $('#calendarGrid');
   if (!root) return;
@@ -886,6 +901,25 @@ function renderCalendar() {
   const showEvents = $('#calendarShowEvents').checked;
   const showCompleted = $('#calendarShowCompleted').checked;
   const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1 - calendarMonth.getDay());
+  const visibleTasks = data.tasks
+    .filter(task => {
+      if (task.deletedAt || (task.completed && !showCompleted)) return false;
+      const isRoutine = Boolean(window.RegulaRusticaHousekeeping.routineType(task));
+      return isRoutine ? showRoutines : showTasks;
+    })
+    .sort((a, b) => {
+      const aBounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(a);
+      const bBounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(b);
+      return (aBounds?.start || '').localeCompare(bBounds?.start || '') || a.title.localeCompare(b.title);
+    });
+  const rangeTasks = visibleTasks.filter(task => {
+    const bounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(task);
+    return bounds && bounds.start !== bounds.end;
+  });
+  const singleDateTasks = visibleTasks.filter(task => {
+    const bounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(task);
+    return bounds && bounds.start === bounds.end;
+  });
   for (let offset = 0; offset < 42; offset += 1) {
     const date = new Date(first.getFullYear(), first.getMonth(), first.getDate() + offset);
     const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -895,35 +929,45 @@ function renderCalendar() {
     cell.innerHTML = `<span class="calendar-date">${date.getDate()}</span><span class="calendar-items"></span>`;
     cell.addEventListener('click', () => openModal('calendar', null, null, '', dateKey));
     const items = cell.querySelector('.calendar-items');
-    if (showTasks || showRoutines) {
-      data.tasks
-        .filter(task => {
-          if (task.deletedAt || (task.completed && !showCompleted)) return false;
-          const isRoutine = Boolean(window.RegulaRusticaHousekeeping.routineType(task));
-          return (isRoutine ? showRoutines : showTasks)
-            && Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey));
-        })
-        .sort((a, b) => {
-          const aBounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(a);
-          const bBounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(b);
-          return aBounds.start.localeCompare(bBounds.start) || a.title.localeCompare(b.title);
-        })
-        .forEach(task => {
-          const routineType = window.RegulaRusticaHousekeeping.routineType(task);
-          const segment = window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey);
-          const assignedTo = assigneeName(task.id);
-          const recurringMark = task.recurrenceRule ? '↻ ' : '';
-          const item = document.createElement('span');
-          item.className = `calendar-item ${routineType ? 'routine-item' : 'task-item'} range-${segment}${task.completed ? ' completed-item' : ''}`;
-          item.textContent = `${recurringMark}${task.title}${assignedTo ? ` · ${assignedTo}` : ''}`;
-          item.title = `${taskDateText(task)}${assignedTo ? ` · Assigned to ${assignedTo}` : ''}${task.recurrenceRule ? ' · Recurring' : ''}`;
-          item.addEventListener('click', event => {
-            event.stopPropagation();
-            openModal(routineType ? 'routine' : 'task', task.id, task.recordId);
-          });
-          items.appendChild(item);
-        });
-    }
+    const weekStart = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
+    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+    const weekStartKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
+    const weekEndKey = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}-${String(weekEnd.getDate()).padStart(2, '0')}`;
+    rangeTasks
+      .filter(task => {
+        const bounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(task);
+        return bounds.start <= weekEndKey && bounds.end >= weekStartKey;
+      })
+      .forEach(task => {
+        const occursToday = Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey));
+        if (!occursToday) {
+          const placeholder = document.createElement('span');
+          placeholder.className = 'calendar-item calendar-placeholder';
+          placeholder.textContent = '\u00a0';
+          placeholder.setAttribute('aria-hidden', 'true');
+          items.appendChild(placeholder);
+          return;
+        }
+        const barSegment = window.RegulaRusticaHousekeeping.taskCalendarBarSegment(task, dateKey, date.getDay());
+        const routineType = window.RegulaRusticaHousekeeping.routineType(task);
+        const item = document.createElement('span');
+        item.className = `calendar-item calendar-range-bar ${routineType ? 'routine-item' : 'task-item'}${barSegment.starts ? ' bar-start' : ''}${barSegment.ends ? ' bar-end' : ''}${task.completed ? ' completed-item' : ''}`;
+        item.textContent = barSegment.showLabel ? calendarTaskLabel(task) : '\u00a0';
+        item.title = calendarTaskTitle(task);
+        item.addEventListener('click', event => openCalendarTask(task, event));
+        items.appendChild(item);
+      });
+    singleDateTasks
+      .filter(task => window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey))
+      .forEach(task => {
+        const routineType = window.RegulaRusticaHousekeeping.routineType(task);
+        const item = document.createElement('span');
+        item.className = `calendar-item calendar-single-item ${routineType ? 'routine-item' : 'task-item'}${task.completed ? ' completed-item' : ''}`;
+        item.textContent = calendarTaskLabel(task);
+        item.title = calendarTaskTitle(task);
+        item.addEventListener('click', event => openCalendarTask(task, event));
+        items.appendChild(item);
+      });
     if (showEvents) {
       data.calendarEvents.filter(event => !event.deletedAt && event.startDate <= dateKey && event.endDate >= dateKey).forEach(event => {
         const item = document.createElement('span');

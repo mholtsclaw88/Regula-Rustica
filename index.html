@@ -9,14 +9,14 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css">
+  <link rel="stylesheet" href="housekeeping.css?v=calendar-bars-2">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=routine-calendar-1" defer></script>
-  <script src="app.js?v=routine-calendar-1" defer></script>
+  <script src="housekeeping-data.js?v=calendar-bars-2" defer></script>
+  <script src="app.js?v=calendar-bars-2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=routine-calendar-1" type="module"></script>
+  <script src="sync/runtime.mjs?v=calendar-bars-2" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -132,11 +132,13 @@
           </div>
           <h3 id="calendarMonthLabel"></h3>
           <fieldset class="calendar-filters">
-            <legend>Show</legend>
-            <label><input type="checkbox" id="calendarShowTasks" checked> Tasks</label>
-            <label><input type="checkbox" id="calendarShowRoutines" checked> Routines</label>
-            <label><input type="checkbox" id="calendarShowEvents" checked> Events</label>
-            <label><input type="checkbox" id="calendarShowCompleted"> Completed</label>
+            <legend>Show on calendar</legend>
+            <div class="calendar-filter-pills">
+              <label><input type="checkbox" id="calendarShowTasks" checked><span class="filter-dot task-dot"></span>Tasks</label>
+              <label><input type="checkbox" id="calendarShowRoutines" checked><span class="filter-dot routine-dot"></span>Routines</label>
+              <label><input type="checkbox" id="calendarShowEvents" checked><span class="filter-dot event-dot"></span>Events</label>
+              <label><input type="checkbox" id="calendarShowCompleted"><span class="filter-dot completed-dot"></span>Completed</label>
+            </div>
           </fieldset>
         </div>
         <div id="calendarGrid" class="calendar-grid" aria-label="Homestead calendar"></div>

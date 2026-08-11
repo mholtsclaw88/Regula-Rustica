@@ -1,8 +1,8 @@
-const CACHE = 'regula-rustica-routine-calendar-1';
+const CACHE = 'regula-rustica-calendar-bars-2';
 const ASSETS = [
-  './', './index.html', './styles.css', './housekeeping.css', './cloud-auth.css', './housekeeping-data.js?v=routine-calendar-1', './app.js?v=routine-calendar-1', './cloud-auth.js',
+  './', './index.html', './styles.css', './housekeeping.css?v=calendar-bars-2', './cloud-auth.css', './housekeeping-data.js?v=calendar-bars-2', './app.js?v=calendar-bars-2', './cloud-auth.js',
   './cloud-invitations.mjs',
-  './sync/runtime.mjs?v=routine-calendar-1', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
+  './sync/runtime.mjs?v=calendar-bars-2', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
 ];
 const OPTIONAL_ASSETS = [
