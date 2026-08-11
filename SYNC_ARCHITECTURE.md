@@ -745,11 +745,12 @@ The later approved Housekeeping sprint brings `calendar_events` and `yield_entri
 
 The same sprint's assignment extension adds `homestead_people` before `tasks` and `task_assignments` in dependency order. Only child entries count as meaningful first-sync content; automatic member-directory rows therefore do not make a newly created cloud Homestead appear populated. Assignments synchronize a canonical `person_id`, with `member_id` retained only as the authorization bridge for account-backed Hands. Child profiles never create authentication or membership state.
 
-### Milking Task/Yield link
+### Record Routine/Yield link
 
-Recurring morning and evening milking Tasks carry an explicit completion action
-inside their existing recurrence rule. A corresponding Milk Yield carries the
-Task foreign key and travels through the ordinary `yield_entries` outbox path.
+Morning Milking, Evening Milking, and Egg Collection Routines carry an explicit
+Routine type inside their existing recurrence rule. A corresponding Milk or Egg
+Yield carries the Task foreign key and travels through the ordinary
+`yield_entries` outbox path.
 Linked local Task and Yield rows deliberately share the Task's cloud UUID, and
 the database enforces one Yield per Task. The Task update remains earlier in
 dependency order; a protected Yield insert also completes an open authorized

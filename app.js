@@ -461,7 +461,7 @@ let editId = null;
 let contextRecordId = null;
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let calendarDefaultDate = null;
-let milkingTaskId = null;
+let routineTaskId = null;
 
 function recordById(id) {
   return data.records.find(record => record.id === id);
@@ -570,10 +570,16 @@ function stewardshipText(record) {
     .join(' · ') || 'No current stewardship details.';
 }
 
-function isDairyAnimal(recordId) {
-  const record = recordById(recordId);
-  return Boolean(record && record.type === 'Animal' && record.status !== 'Archived'
-    && String(record.identity?.purpose || '').toLowerCase() === 'dairy');
+function routineOptions(record) {
+  if (!record || record.type !== 'Animal' || record.status === 'Archived') return [];
+  const purpose = String(record.identity?.purpose || '').toLowerCase();
+  if (purpose === 'dairy') return ['milk_morning', 'milk_evening'];
+  if (purpose === 'eggs') return ['egg_collection'];
+  return [];
+}
+
+function routineButtonText(task) {
+  return window.RegulaRusticaHousekeeping.routineYieldType(task) === 'eggs' ? 'Record Eggs' : 'Record Milk';
 }
 
 function completeTask(task) {
@@ -586,23 +592,24 @@ function completeTask(task) {
   if (task.recurrenceRule && !window.RegulaRusticaSync?.isInitialized?.()) createNextLocalOccurrence(task);
 }
 
-function openMilkingYield(task) {
-  const session = window.RegulaRusticaHousekeeping.milkingSession(task);
+function openRoutineYield(task) {
+  const session = window.RegulaRusticaHousekeeping.routineSession(task);
+  const yieldType = window.RegulaRusticaHousekeeping.routineYieldType(task);
   const workDate = window.RegulaRusticaHousekeeping.taskWorkDate(task) || today();
-  openModal('yield', null, task.recordId, 'milk', workDate);
-  milkingTaskId = task.id;
-  $('#modalTitle').textContent = 'Record milk yield for this milking?';
+  openModal('yield', null, task.recordId, yieldType, workDate);
+  routineTaskId = task.id;
+  $('#modalTitle').textContent = yieldType === 'eggs' ? 'Record eggs for this collection' : 'Record milk for this milking';
   $('#modalSubmit').textContent = 'Record Yield';
   $('#modalCompleteWithoutYield').classList.remove('hidden');
   $('#modalFields [name=session]').value = session;
-  $('#modalFields [name=occurredAt]').value = `${workDate}T${session === 'morning' ? '07:00' : '18:00'}`;
+  $('#modalFields [name=occurredAt]').value = `${workDate}T${session === 'morning' ? '07:00' : session === 'evening' ? '18:00' : '12:00'}`;
 }
 
-function chooseMatchingMilkingTask(yieldEntry) {
-  const matches = window.RegulaRusticaHousekeeping.matchingMilkingTasks(data.tasks, yieldEntry);
+function chooseMatchingRoutineTask(yieldEntry) {
+  const matches = window.RegulaRusticaHousekeeping.matchingRoutineTasks(data.tasks, yieldEntry);
   if (matches.length < 2) return matches[0] || null;
   const choices = matches.map((task, index) => `${index + 1}. ${task.title}`).join('\n');
-  const answer = prompt(`More than one milking task matches this yield:\n\n${choices}\n\nEnter a number to complete that task, or leave blank to leave tasks unchanged.`);
+  const answer = prompt(`More than one routine matches this yield:\n\n${choices}\n\nEnter a number to complete that routine, or leave blank to leave routines unchanged.`);
   if (!answer) return null;
   const index = Number(answer) - 1;
   return Number.isInteger(index) && matches[index] ? matches[index] : null;
@@ -613,21 +620,26 @@ function taskRow(task) {
   row.className = `task${task.completed ? ' done' : ''}`;
   const assignedTo = assigneeName(task.id);
   const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
-  const milkingSession = window.RegulaRusticaHousekeeping.milkingSession(task);
+  const routineType = window.RegulaRusticaHousekeeping.routineType(task);
   row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${escapeHtml(taskDateText(task))}${recurrence ? ` · ${escapeHtml(recurrence)}` : ''}${assignedTo ? ` · Assigned to ${escapeHtml(assignedTo)}` : ''}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}${task.priority !== 'normal' ? ` · ${escapeHtml(task.priority)}` : ''}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
-  row.querySelector('input').addEventListener('change', event => {
-    const wasCompleted = task.completed;
-    if (!wasCompleted && event.target.checked && milkingSession) {
-      event.target.checked = false;
+  if (routineType) {
+    const button = document.createElement('button');
+    button.className = 'btn primary routine-record';
+    button.textContent = task.completed ? 'Recorded' : routineButtonText(task);
+    button.disabled = task.completed;
+    row.querySelector('input').replaceWith(button);
+    button.addEventListener('click', () => {
       const existingYield = window.RegulaRusticaHousekeeping.matchingYieldForTask(data.yieldEntries, task);
       if (existingYield && (!existingYield.taskId || existingYield.taskId === task.id)) {
         existingYield.taskId = task.id;
         existingYield.updatedAt = nowIso();
         completeTask(task);
         saveData();
-      } else openMilkingYield(task);
-      return;
-    }
+      } else openRoutineYield(task);
+    });
+  }
+  row.querySelector('input')?.addEventListener('change', event => {
+    const wasCompleted = task.completed;
     task.completed = event.target.checked;
     task.status = task.completed ? 'completed' : 'open';
     task.completedAt = task.completed ? nowIso() : null;
@@ -636,7 +648,7 @@ function taskRow(task) {
     if (!wasCompleted && task.completed && task.recurrenceRule && !window.RegulaRusticaSync?.isInitialized?.()) createNextLocalOccurrence(task);
     saveData();
   });
-  row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
+  row.querySelector('.edit').addEventListener('click', () => openModal(routineType ? 'routine' : 'task', task.id, task.recordId));
   row.querySelector('.del').addEventListener('click', () => {
     if (confirm('Delete this task?')) {
       task.deletedAt = nowIso();
@@ -710,6 +722,7 @@ function renderRecord() {
   const purpose = (record.identity?.purpose || '').toLowerCase();
   $('#recordMilk').classList.toggle('hidden', record.type !== 'Animal' || !purpose.includes('dairy'));
   $('#recordEggs').classList.toggle('hidden', record.type !== 'Animal' || !purpose.includes('egg'));
+  $('#recordAddRoutine').classList.toggle('hidden', routineOptions(record).length === 0);
 
   const taskPanel = $('#panelTasks');
   taskPanel.innerHTML = '';
@@ -717,7 +730,7 @@ function renderRecord() {
     .filter(task => !task.deletedAt && task.recordId === record.id)
     .sort((a, b) => Number(a.completed) - Number(b.completed) || (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'))
     .forEach(task => taskPanel.appendChild(taskRow(task)));
-  if (!taskPanel.children.length) taskPanel.innerHTML = '<p class="empty">No linked tasks.</p>';
+  if (!taskPanel.children.length) taskPanel.innerHTML = '<p class="empty">No linked tasks or routines.</p>';
 
   const chroniclePanel = $('#panelChronicle');
   chroniclePanel.innerHTML = '';
@@ -1058,26 +1071,25 @@ function addRecurrenceFields(root, recurrenceRule) {
   toggle();
 }
 
-function addCompletionActionField(root, task = {}) {
-  const label = field('Completion action', 'completionAction', 'select', task.recurrenceRule?.completionAction || '', ['', 'milk_morning', 'milk_evening']);
-  const select = label.querySelector('select');
-  select.querySelector('option[value=""]').textContent = 'None';
-  select.querySelector('option[value=milk_morning]').textContent = 'Record Morning Milk';
-  select.querySelector('option[value=milk_evening]').textContent = 'Record Evening Milk';
-  root.append(label);
+function addRoutineFields(root, task = {}, record) {
+  const currentType = window.RegulaRusticaHousekeeping.routineType(task);
+  const options = [...new Set([...routineOptions(record), currentType].filter(Boolean))];
+  const routine = field('Routine', 'routineType', 'select', currentType || options[0], options);
+  const labels = { milk_morning: 'Morning Milking', milk_evening: 'Evening Milking', egg_collection: 'Egg Collection' };
+  routine.querySelectorAll('option').forEach(option => { option.textContent = labels[option.value] || option.value; });
+  root.append(routine);
+  root.append(field('First date', 'dueDate', 'date', task.dueDate || today()));
+  const rule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule(task.recurrenceRule);
+  root.append(field('Repeat', 'recurrenceFrequency', 'select', rule?.frequency || 'daily', ['daily', 'weekly', 'monthly']));
+  const interval = field('Repeat every', 'recurrenceInterval', 'number', rule?.interval || 1);
+  interval.querySelector('input').min = '1';
+  interval.querySelector('input').step = '1';
+  root.append(interval);
+  addPersonSelect(root, assignmentForTask(task.id)?.personId || '');
   const help = document.createElement('p');
   help.className = 'muted';
-  help.textContent = 'Available for recurring tasks linked to an active dairy Animal.';
+  help.textContent = 'Recording the yield completes this occurrence and creates the next one.';
   root.append(help);
-  const update = () => {
-    const enabled = Boolean(root.querySelector('[name=recurrenceFrequency]')?.value)
-      && isDairyAnimal(root.querySelector('[name=recordId]')?.value);
-    select.disabled = !enabled;
-    if (!enabled) select.value = '';
-  };
-  root.querySelector('[name=recurrenceFrequency]')?.addEventListener('change', update);
-  root.querySelector('[name=recordId]')?.addEventListener('change', update);
-  update();
 }
 
 function addYieldAnimalSelect(root, type, selected = '') {
@@ -1167,14 +1179,14 @@ function appendRecordFields(root, record, type) {
 }
 
 function openModal(nextMode, id = null, recordId = null, defaultType = '', defaultDate = null) {
-  milkingTaskId = null;
+  routineTaskId = null;
   modalMode = nextMode;
   editId = id;
   contextRecordId = recordId || null;
   calendarDefaultDate = defaultDate;
   const root = $('#modalFields');
   root.innerHTML = '';
-  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'Record', note: 'Add note', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit yield entry' : (defaultType === 'eggs' ? 'Record eggs' : 'Record milk') };
+  const titles = { task: id ? 'Edit task' : 'Add task', routine: id ? 'Edit routine' : 'Add routine', record: id ? 'Edit record' : 'Add record', event: 'Record', note: 'Add note', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit yield entry' : (defaultType === 'eggs' ? 'Record eggs' : 'Record milk') };
   $('#modalTitle').textContent = titles[nextMode];
   $('#modalDelete').classList.toggle('hidden', !(id && ['calendar', 'yield'].includes(nextMode)));
   $('#modalCompleteWithoutYield').classList.add('hidden');
@@ -1191,7 +1203,12 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     root.append(field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']));
     addPersonSelect(root, assignment?.personId || personForAssignment(assignment)?.id);
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || task.recordId);
-    addCompletionActionField(root, task);
+  }
+  if (nextMode === 'routine') {
+    const task = data.tasks.find(item => item.id === id) || {};
+    const record = recordById(recordId || task.recordId);
+    contextRecordId = record?.id || null;
+    addRoutineFields(root, task, record);
   }
   if (nextMode === 'note') root.append(field('What should I remember?', 'text', 'textarea'));
   if (nextMode === 'ledger') {
@@ -1293,14 +1310,46 @@ $('#modalForm').addEventListener('submit', event => {
     const recurrenceRule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule({
       frequency: form.recurrenceFrequency,
       mode: form.recurrenceMode,
-      interval: form.recurrenceInterval,
-      completionAction: form.completionAction
+      interval: form.recurrenceInterval
     });
-    if (form.completionAction && (!recurrenceRule || !isDairyAnimal(form.recordId) || !(form.dueDate || form.availableFrom))) {
-      alert('A milking completion action needs a recurring task, an active dairy Animal, and a task date.');
+    const values = { title: form.title.trim(), description: form.description.trim(), availableFrom: form.availableFrom || '', dueDate: form.dueDate || '', priority: form.priority || 'normal', recordId: form.recordId || null, recurrenceRule };
+    let taskId;
+    if (existing) {
+      Object.assign(existing, values, { updatedAt: nowIso() });
+      taskId = existing.id;
+    } else {
+      const created = { id: uid(), ...values, completed: false, status: 'open', createdAt: nowIso(), updatedAt: nowIso(), completedAt: null, deletedAt: null };
+      data.tasks.push(created);
+      taskId = created.id;
+    }
+    setTaskAssignee(taskId, form.personId || '');
+  }
+  if (modalMode === 'routine') {
+    const record = recordById(contextRecordId);
+    const existing = data.tasks.find(task => task.id === editId);
+    const allowed = [...new Set([...routineOptions(record), window.RegulaRusticaHousekeeping.routineType(existing || {})].filter(Boolean))];
+    if (!record || !allowed.includes(form.routineType) || !form.dueDate) {
+      alert('Choose an available routine and its first date.');
       return;
     }
-    const values = { title: form.title.trim(), description: form.description.trim(), availableFrom: form.availableFrom || '', dueDate: form.dueDate || '', priority: form.priority || 'normal', recordId: form.recordId || null, recurrenceRule };
+    const duplicate = data.tasks.find(task => task.id !== existing?.id && !task.deletedAt && !task.completed
+      && task.status !== 'completed' && task.recordId === record.id
+      && window.RegulaRusticaHousekeeping.routineType(task) === form.routineType);
+    if (duplicate) {
+      alert(`This Animal already has an active ${window.RegulaRusticaHousekeeping.routineLabel(duplicate)} Routine.`);
+      return;
+    }
+    const recurrenceRule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule({
+      frequency: form.recurrenceFrequency,
+      mode: 'fixed_schedule',
+      interval: form.recurrenceInterval,
+      routineType: form.routineType
+    });
+    const labels = { milk_morning: 'Morning Milking', milk_evening: 'Evening Milking', egg_collection: 'Egg Collection' };
+    const values = {
+      title: labels[form.routineType], description: '', availableFrom: '', dueDate: form.dueDate,
+      priority: 'normal', recordId: record.id, recurrenceRule
+    };
     let taskId;
     if (existing) {
       Object.assign(existing, values, { updatedAt: nowIso() });
@@ -1354,14 +1403,14 @@ $('#modalForm').addEventListener('submit', event => {
     const values = {
       recordId: form.recordId, type: form.yieldType, occurredAt: new Date(form.occurredAt).toISOString(),
       session: form.session, quantity, unit: form.unit, unusableQuantity, details: form.details.trim(),
-      taskId: existing?.taskId || milkingTaskId || null
+      taskId: existing?.taskId || routineTaskId || null
     };
-    const launchedTask = milkingTaskId ? data.tasks.find(task => task.id === milkingTaskId) : null;
-    if (launchedTask && !window.RegulaRusticaHousekeeping.matchingMilkingTasks([launchedTask], values).length) {
-      alert('The Animal, date, and session must match this milking Task.');
+    const launchedTask = routineTaskId ? data.tasks.find(task => task.id === routineTaskId) : null;
+    if (launchedTask && !window.RegulaRusticaHousekeeping.matchingRoutineTasks([launchedTask], values).length) {
+      alert('The Animal, yield type, date, and session must match this Routine.');
       return;
     }
-    const matchedTask = !existing && !values.taskId ? chooseMatchingMilkingTask(values) : data.tasks.find(task => task.id === values.taskId);
+    const matchedTask = !existing && !values.taskId ? chooseMatchingRoutineTask(values) : data.tasks.find(task => task.id === values.taskId);
     if (matchedTask) values.taskId = matchedTask.id;
     if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
     else data.yieldEntries.unshift(normalizeYieldEntry({ id: matchedTask?.id || uid(), ...values, createdAt: nowIso() }));
@@ -1414,6 +1463,7 @@ $('#addEggYield').addEventListener('click', () => openModal('yield', null, null,
 $('#recordEvent').addEventListener('click', () => openModal('event', null, currentRecordId));
 $('#recordMilk').addEventListener('click', () => openModal('yield', null, currentRecordId, 'milk'));
 $('#recordEggs').addEventListener('click', () => openModal('yield', null, currentRecordId, 'eggs'));
+$('#recordAddRoutine').addEventListener('click', () => openModal('routine', null, currentRecordId));
 $('#recordAddTask').addEventListener('click', () => openModal('task', null, currentRecordId));
 $('#recordAddNote').addEventListener('click', () => openModal('note', null, currentRecordId));
 $('#recordAddLedger').addEventListener('click', () => openModal('ledger', null, currentRecordId));
@@ -1422,7 +1472,7 @@ $('#backToList').addEventListener('click', () => showView(priorView));
 $('#modalClose').addEventListener('click', () => $('#modal').close());
 $('#modalCancel').addEventListener('click', () => $('#modal').close());
 $('#modalCompleteWithoutYield').addEventListener('click', () => {
-  const task = data.tasks.find(item => item.id === milkingTaskId);
+  const task = data.tasks.find(item => item.id === routineTaskId);
   if (task) {
     completeTask(task);
     saveData();

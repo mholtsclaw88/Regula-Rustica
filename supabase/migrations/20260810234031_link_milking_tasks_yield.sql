@@ -1,5 +1,5 @@
--- Explicitly link recurring milking Tasks to their canonical Milk Yield.
--- The completion action remains part of the structured recurrence rule so it
+-- Explicitly link record-specific Routines to their canonical Yield.
+-- The Routine type remains part of the structured recurrence rule so it
 -- is inherited by the next occurrence through the existing recurrence path.
 
 alter table public.yield_entries
@@ -8,25 +8,33 @@ alter table public.yield_entries
 alter table public.yield_entries
   add constraint yield_entries_one_per_task unique (task_id);
 
-create or replace function private.validate_milking_task_configuration()
+create unique index tasks_one_active_routine_per_animal
+  on public.tasks (homestead_id, record_id, (recurrence_rule ->> 'routineType'))
+  where deleted_at is null and status in ('open', 'in_progress')
+    and recurrence_rule ->> 'routineType' in ('milk_morning', 'milk_evening', 'egg_collection');
+
+create or replace function private.validate_routine_task_configuration()
 returns trigger language plpgsql set search_path = '' as $$
 declare
-  action text := new.recurrence_rule ->> 'completionAction';
+  routine_type text := new.recurrence_rule ->> 'routineType';
   linked_record public.records%rowtype;
 begin
-  if action is null then return new; end if;
-  if action not in ('milk_morning', 'milk_evening') then
-    raise exception 'Unsupported task completion action' using errcode = '23514';
+  if routine_type is null then return new; end if;
+  if routine_type not in ('milk_morning', 'milk_evening', 'egg_collection') then
+    raise exception 'Unsupported Routine type' using errcode = '23514';
   end if;
   if new.recurrence_rule is null or new.record_id is null or coalesce(new.due_date, new.available_from) is null then
-    raise exception 'Milking completion actions require a recurring task, dairy Animal, and task date' using errcode = '23514';
+    raise exception 'Routines require a recurring task, eligible Animal, and task date' using errcode = '23514';
   end if;
   select * into linked_record from public.records where id = new.record_id;
   if not found or linked_record.homestead_id is distinct from new.homestead_id
      or linked_record.type <> 'animal'
-     or lower(coalesce(linked_record.identity ->> 'purpose', '')) <> 'dairy'
      or linked_record.deleted_at is not null then
-    raise exception 'Milking completion actions require an active dairy Animal in this Homestead' using errcode = '23514';
+    raise exception 'Routines require an active Animal in this Homestead' using errcode = '23514';
+  end if;
+  if (routine_type in ('milk_morning', 'milk_evening') and lower(coalesce(linked_record.identity ->> 'purpose', '')) <> 'dairy')
+     or (routine_type = 'egg_collection' and lower(coalesce(linked_record.identity ->> 'purpose', '')) <> 'eggs') then
+    raise exception 'Routine type does not match the Animal purpose' using errcode = '23514';
   end if;
   return new;
 end $$;
@@ -36,7 +44,7 @@ returns trigger language plpgsql set search_path = '' as $$
 declare
   linked_task public.tasks%rowtype;
   homestead_timezone text;
-  action text;
+  routine_type text;
   yield_date date;
 begin
   -- The established housekeeping RPC carries new fields inside details.
@@ -55,15 +63,16 @@ begin
   if not found or linked_task.homestead_id is distinct from new.homestead_id then
     raise exception 'Task belongs to another Homestead' using errcode = '23503';
   end if;
-  action := linked_task.recurrence_rule ->> 'completionAction';
+  routine_type := linked_task.recurrence_rule ->> 'routineType';
   select h.timezone into homestead_timezone from public.homesteads h where h.id = new.homestead_id;
   yield_date := (new.occurred_at at time zone coalesce(homestead_timezone, 'America/New_York'))::date;
-  if new.yield_type <> 'milk' or linked_task.record_id is distinct from new.record_id
+  if linked_task.record_id is distinct from new.record_id
      or coalesce(linked_task.due_date, linked_task.available_from) is distinct from yield_date
-     or (action = 'milk_morning' and new.session <> 'morning')
-     or (action = 'milk_evening' and new.session <> 'evening')
-     or action is null or action not in ('milk_morning', 'milk_evening') then
-    raise exception 'Yield does not match the linked milking Task' using errcode = '23514';
+     or (routine_type = 'milk_morning' and (new.yield_type <> 'milk' or new.session <> 'morning'))
+     or (routine_type = 'milk_evening' and (new.yield_type <> 'milk' or new.session <> 'evening'))
+     or (routine_type = 'egg_collection' and (new.yield_type <> 'eggs' or new.session <> 'other'))
+     or routine_type is null or routine_type not in ('milk_morning', 'milk_evening', 'egg_collection') then
+    raise exception 'Yield does not match the linked Routine' using errcode = '23514';
   end if;
   return new;
 end $$;
@@ -120,9 +129,9 @@ begin
   return new;
 end $$;
 
-create trigger validate_milking_task_configuration
+create trigger validate_routine_task_configuration
   before insert or update on public.tasks
-  for each row execute function private.validate_milking_task_configuration();
+  for each row execute function private.validate_routine_task_configuration();
 
 -- This trigger is created after the existing Homestead validator so the
 -- canonical task_id is available to completion and auditing triggers.
@@ -134,6 +143,6 @@ create trigger complete_task_from_yield
   after insert on public.yield_entries
   for each row execute function private.complete_task_from_yield();
 
-revoke execute on function private.validate_milking_task_configuration() from public, anon, authenticated;
+revoke execute on function private.validate_routine_task_configuration() from public, anon, authenticated;
 revoke execute on function private.validate_yield_task_link() from public, anon, authenticated;
 revoke execute on function private.complete_task_from_yield() from public, anon, authenticated;

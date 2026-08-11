@@ -33,22 +33,40 @@
     const frequency = ['daily', 'weekly', 'monthly'].includes(rule?.frequency) ? rule.frequency : '';
     if (!frequency) return null;
     const candidateInterval = Math.floor(Number(rule?.interval) || 1);
-    const completionAction = ['milk_morning', 'milk_evening'].includes(rule?.completionAction || rule?.completion_action)
-      ? (rule.completionAction || rule.completion_action)
+    const configuredRoutine = rule?.routineType || rule?.routine_type || rule?.completionAction || rule?.completion_action;
+    const routineType = ['milk_morning', 'milk_evening', 'egg_collection'].includes(configuredRoutine)
+      ? configuredRoutine
       : null;
     return {
       mode: rule?.mode === 'after_completion' ? 'after_completion' : 'fixed_schedule',
       frequency,
       interval: Number.isFinite(candidateInterval) ? Math.max(1, candidateInterval) : 1,
-      ...(completionAction ? { completionAction } : {})
+      ...(routineType ? { routineType } : {})
     };
   }
 
-  function milkingSession(task = {}) {
-    const action = normalizeRecurrenceRule(task.recurrenceRule)?.completionAction;
-    if (action === 'milk_morning') return 'morning';
-    if (action === 'milk_evening') return 'evening';
+  function routineType(task = {}) {
+    return normalizeRecurrenceRule(task.recurrenceRule)?.routineType || null;
+  }
+
+  function routineYieldType(task = {}) {
+    return routineType(task) === 'egg_collection' ? 'eggs' : routineType(task) ? 'milk' : null;
+  }
+
+  function routineSession(task = {}) {
+    const type = routineType(task);
+    if (type === 'milk_morning') return 'morning';
+    if (type === 'milk_evening') return 'evening';
+    if (type === 'egg_collection') return 'other';
     return null;
+  }
+
+  function routineLabel(task = {}) {
+    const type = routineType(task);
+    if (type === 'milk_morning') return 'Morning Milking';
+    if (type === 'milk_evening') return 'Evening Milking';
+    if (type === 'egg_collection') return 'Egg Collection';
+    return '';
   }
 
   function taskWorkDate(task = {}) {
@@ -62,25 +80,27 @@
     return local.toISOString().slice(0, 10);
   }
 
-  function matchesMilkingTask(task = {}, yieldEntry = {}) {
-    const session = milkingSession(task);
+  function matchesRoutineTask(task = {}, yieldEntry = {}) {
+    const session = routineSession(task);
+    const yieldType = routineYieldType(task);
     return Boolean(
       !task.deletedAt && !task.completed && task.status !== 'completed'
-      && session && yieldEntry.type === 'milk'
+      && session && yieldEntry.type === yieldType
       && task.recordId && task.recordId === yieldEntry.recordId
       && session === yieldEntry.session
       && taskWorkDate(task) === localDate(yieldEntry.occurredAt)
     );
   }
 
-  function matchingMilkingTasks(tasks = [], yieldEntry = {}) {
-    return tasks.filter(task => matchesMilkingTask(task, yieldEntry));
+  function matchingRoutineTasks(tasks = [], yieldEntry = {}) {
+    return tasks.filter(task => matchesRoutineTask(task, yieldEntry));
   }
 
   function matchingYieldForTask(entries = [], task = {}) {
-    const session = milkingSession(task);
+    const session = routineSession(task);
+    const yieldType = routineYieldType(task);
     if (!session) return null;
-    return entries.find(entry => !entry.deletedAt && entry.type === 'milk'
+    return entries.find(entry => !entry.deletedAt && entry.type === yieldType
       && entry.recordId === task.recordId && entry.session === session
       && localDate(entry.occurredAt) === taskWorkDate(task)) || null;
   }
@@ -121,6 +141,7 @@
 
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
-    milkingSession, taskWorkDate, matchingMilkingTasks, matchingYieldForTask
+    routineType, routineYieldType, routineSession, routineLabel, taskWorkDate,
+    matchingRoutineTasks, matchingYieldForTask
   };
 }));

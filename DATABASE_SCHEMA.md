@@ -474,10 +474,12 @@ Recurrence example:
 }
 ```
 
-For recurring milking Tasks, `recurrence_rule.completionAction` may be
-`milk_morning` or `milk_evening`. This is explicit workflow metadata; Task
-titles are never interpreted to infer milking behavior. A milking action also
-requires a linked active dairy Animal and a work date.
+Record-specific Routines use recurring Tasks underneath. Their
+`recurrence_rule.routineType` may be `milk_morning`, `milk_evening`, or
+`egg_collection`. This metadata is explicit; Task titles are never interpreted
+to infer Routine behavior. Milking Routines require an active dairy Animal,
+Egg Collection requires an active laying Animal, and every Routine requires a
+work date. Only one open Routine of each type may exist for an Animal.
 
 Supported initial modes:
 
