@@ -621,7 +621,15 @@ function taskRow(task) {
   const assignedTo = assigneeName(task.id);
   const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
   const routineType = window.RegulaRusticaHousekeeping.routineType(task);
-  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta">${escapeHtml(taskDateText(task))}${recurrence ? ` · ${escapeHtml(recurrence)}` : ''}${assignedTo ? ` · Assigned to ${escapeHtml(assignedTo)}` : ''}${task.recordId ? ` · ${escapeHtml(recordName(task.recordId))}` : ''}${task.priority !== 'normal' ? ` · ${escapeHtml(task.priority)}` : ''}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
+  const dueClass = !task.completed && task.dueDate && task.dueDate < today() ? ' overdue' : '';
+  const meta = [
+    `<span class="meta-pill${dueClass}">${escapeHtml(taskDateText(task))}</span>`,
+    recurrence ? `<span class="meta-pill recurrence">${escapeHtml(recurrence)}</span>` : '',
+    assignedTo ? `<span class="meta-pill assignee">${escapeHtml(assignedTo)}</span>` : '',
+    task.recordId ? `<span class="meta-pill linked-record">${escapeHtml(recordName(task.recordId))}</span>` : '',
+    task.priority !== 'normal' ? `<span class="meta-pill priority">${escapeHtml(task.priority)}</span>` : ''
+  ].filter(Boolean).join('');
+  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta-pills">${meta}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
   if (routineType) {
     const button = document.createElement('button');
     button.className = 'btn primary routine-record';
@@ -679,24 +687,32 @@ function renderToday() {
 function renderRecords() {
   const root = $('#recordGroups');
   root.innerHTML = '';
-  RECORD_TYPES.forEach(type => {
-    const records = data.records.filter(record => !record.deletedAt && record.type === type && record.status !== 'Archived');
-    if (!records.length) return;
-    const block = document.createElement('div');
-    block.className = 'type-block';
-    block.innerHTML = `<div class="row"><h3>${RECORD_CONFIG[type].plural}</h3><button class="btn ghost add-type">+ Add</button></div><div class="type-grid"></div>`;
-    block.querySelector('.add-type').addEventListener('click', () => openModal('record', null, null, type));
-    records.forEach(record => {
-      const nextTask = data.tasks.find(task => !task.deletedAt && task.recordId === record.id && !task.completed);
+  const selectedType = document.querySelector('[name="recordTypeFilter"]:checked')?.value || 'all';
+  const grid = document.createElement('div');
+  grid.className = 'records-grid';
+  data.records
+    .filter(record => !record.deletedAt && record.status !== 'Archived' && (selectedType === 'all' || record.type === selectedType))
+    .sort((a, b) => RECORD_TYPES.indexOf(a.type) - RECORD_TYPES.indexOf(b.type) || a.name.localeCompare(b.name))
+    .forEach(record => {
+      const nextTask = data.tasks
+        .filter(task => !task.deletedAt && task.recordId === record.id && !task.completed)
+        .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'))[0];
       const card = document.createElement('article');
       card.className = 'record-card';
-      card.innerHTML = `<div class="row"><div><span class="label">${escapeHtml(record.type)}</span><h3>${escapeHtml(record.name)}</h3></div><span class="pill">${escapeHtml(record.status)}</span></div><div class="meta">${escapeHtml(identityText(record))}</div><p>${nextTask ? `Next: ${escapeHtml(nextTask.title)}` : 'No open task'}</p>`;
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.innerHTML = `<div class="row"><div><span class="label">${escapeHtml(record.type)}</span><h3>${escapeHtml(record.name)}</h3></div><span class="pill">${escapeHtml(record.status)}</span></div><div class="meta">${escapeHtml(identityText(record))}</div><p class="record-next">${nextTask ? `Next: ${escapeHtml(nextTask.title)}` : 'No open task'}</p>`;
       card.addEventListener('click', () => openRecord(record.id));
-      block.querySelector('.type-grid').appendChild(card);
+      card.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openRecord(record.id);
+        }
+      });
+      grid.appendChild(card);
     });
-    root.appendChild(block);
-  });
-  if (!root.children.length) root.innerHTML = '<p class="empty">No records yet.</p>';
+  if (grid.children.length) root.appendChild(grid);
+  else root.innerHTML = '<div class="empty-panel">No records match this filter.</div>';
 }
 
 function eventChoices(record) {
@@ -717,6 +733,7 @@ function renderRecord() {
 
   $('#recordTypeLabel').textContent = record.type;
   $('#recordTitle').textContent = record.name;
+  $('#recordStatus').textContent = record.status;
   $('#recordIdentity').textContent = identityText(record);
   $('#recordStewardship').innerHTML = `<span class="label">Stewardship</span><div>${escapeHtml(stewardshipText(record))}</div>`;
   const purpose = (record.identity?.purpose || '').toLowerCase();
@@ -730,7 +747,7 @@ function renderRecord() {
     .filter(task => !task.deletedAt && task.recordId === record.id)
     .sort((a, b) => Number(a.completed) - Number(b.completed) || (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'))
     .forEach(task => taskPanel.appendChild(taskRow(task)));
-  if (!taskPanel.children.length) taskPanel.innerHTML = '<p class="empty">No linked tasks or routines.</p>';
+  if (!taskPanel.children.length) taskPanel.innerHTML = '<div class="empty-panel">No linked tasks or routines.</div>';
 
   const chroniclePanel = $('#panelChronicle');
   chroniclePanel.innerHTML = '';
@@ -759,7 +776,7 @@ function renderRecord() {
       item.innerHTML = `<div class="row"><strong>${entry.type === 'milk' ? 'Milk' : 'Egg collection'}</strong><span class="meta">${new Date(entry.occurredAt).toLocaleString()}</span></div><div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong> · ${escapeHtml(entry.session)}</div>${entry.unusableQuantity ? `<div class="meta">${escapeHtml(entry.unusableQuantity)} unusable</div>` : ''}${entry.details ? `<p>${escapeHtml(entry.details)}</p>` : ''}`;
       chroniclePanel.appendChild(item);
     });
-  if (!chroniclePanel.children.length) chroniclePanel.innerHTML = '<p class="empty">The Chronicle will grow as events are recorded.</p>';
+  if (!chroniclePanel.children.length) chroniclePanel.innerHTML = '<div class="empty-panel">The Chronicle will grow as events are recorded.</div>';
 
   const notesPanel = $('#panelNotes');
   notesPanel.innerHTML = '';
@@ -779,7 +796,7 @@ function renderRecord() {
       });
       notesPanel.appendChild(item);
     });
-  if (!notesPanel.children.length) notesPanel.innerHTML = '<p class="empty">No enduring notes.</p>';
+  if (!notesPanel.children.length) notesPanel.innerHTML = '<div class="empty-panel">No enduring notes.</div>';
 
   const ledgerPanel = $('#panelLedger');
   ledgerPanel.innerHTML = '';
@@ -787,7 +804,7 @@ function renderRecord() {
     .filter(entry => !entry.deletedAt && entry.recordId === record.id)
     .sort((a, b) => b.date.localeCompare(a.date))
     .forEach(entry => ledgerPanel.appendChild(ledgerRow(entry)));
-  if (!ledgerPanel.children.length) ledgerPanel.innerHTML = '<p class="empty">No linked ledger entries.</p>';
+  if (!ledgerPanel.children.length) ledgerPanel.innerHTML = '<div class="empty-panel">No linked ledger entries.</div>';
 }
 
 function renderTasks() {
@@ -807,9 +824,9 @@ function renderTasks() {
   if ([...assigneeFilter.options].some(option => option.value === selectedAssignee)) assigneeFilter.value = selectedAssignee;
 
   let tasks = data.tasks.filter(task => !task.deletedAt);
-  const status = $('#taskStatusFilter').value;
+  const status = document.querySelector('[name="taskStatusFilter"]:checked')?.value || 'open';
   const linkedRecord = recordFilter.value;
-  const timing = $('#taskTimingFilter').value;
+  const timing = document.querySelector('[name="taskTimingFilter"]:checked')?.value || 'all';
   const assignedPerson = assigneeFilter.value;
   const sort = $('#taskSort').value;
   tasks = tasks.filter(task => status === 'all' || (status === 'open' ? !task.completed : task.completed));
@@ -827,7 +844,7 @@ function renderTasks() {
   if (sort === 'created') tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   root.innerHTML = '';
   tasks.forEach(task => root.appendChild(taskRow(task)));
-  if (!tasks.length) root.innerHTML = '<p class="empty">No tasks match these filters.</p>';
+  if (!tasks.length) root.innerHTML = '<div class="empty-panel">No tasks match these filters.</div>';
 }
 
 function renderPeople() {
@@ -1009,8 +1026,9 @@ function renderYield() {
   $('#todayEggYield').textContent = summarizeYield(todayEntries.filter(entry => entry.type === 'eggs'));
   const root = $('#yieldList');
   root.innerHTML = '';
-  active.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 30).forEach(entry => root.appendChild(yieldRow(entry)));
-  if (!root.children.length) root.innerHTML = '<p class="empty">No yield has been recorded yet.</p>';
+  const filter = document.querySelector('[name="yieldTypeFilter"]:checked')?.value || 'all';
+  active.filter(entry => filter === 'all' || entry.type === filter).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 30).forEach(entry => root.appendChild(yieldRow(entry)));
+  if (!root.children.length) root.innerHTML = '<div class="empty-panel">No yield matches this filter.</div>';
 }
 
 function ledgerRow(entry) {
@@ -1031,8 +1049,9 @@ function ledgerRow(entry) {
 function renderLedger() {
   const root = $('#ledgerList');
   root.innerHTML = '';
-  data.ledger.filter(entry => !entry.deletedAt).sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => root.appendChild(ledgerRow(entry)));
-  if (!root.children.length) root.innerHTML = '<p class="empty">No ledger entries yet.</p>';
+  const filter = document.querySelector('[name="ledgerTypeFilter"]:checked')?.value || 'all';
+  data.ledger.filter(entry => !entry.deletedAt && (filter === 'all' || entry.type === filter)).sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => root.appendChild(ledgerRow(entry)));
+  if (!root.children.length) root.innerHTML = '<div class="empty-panel">No ledger entries match this filter.</div>';
   const expenses = data.ledger.filter(entry => !entry.deletedAt && entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0);
   const income = data.ledger.filter(entry => !entry.deletedAt && entry.type === 'income').reduce((sum, entry) => sum + entry.amount, 0);
   $('#expenseTotal').textContent = formatMoney(expenses);
@@ -1570,7 +1589,16 @@ $$('.tabs-mini button').forEach(button => button.addEventListener('click', () =>
   button.classList.add('active');
   $(`#panel${button.dataset.panel.charAt(0).toUpperCase()}${button.dataset.panel.slice(1)}`).classList.add('active');
 }));
-['taskStatusFilter', 'taskRecordFilter', 'taskAssigneeFilter', 'taskTimingFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
+['taskRecordFilter', 'taskAssigneeFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
+$$('[name="taskStatusFilter"], [name="taskTimingFilter"]').forEach(input => input.addEventListener('change', renderTasks));
+$$('[name="recordTypeFilter"]').forEach(input => input.addEventListener('change', renderRecords));
+$$('[name="yieldTypeFilter"]').forEach(input => input.addEventListener('change', renderYield));
+$$('[name="ledgerTypeFilter"]').forEach(input => input.addEventListener('change', renderLedger));
+$$('[data-settings-target]').forEach(button => button.addEventListener('click', () => {
+  $$('[data-settings-target]').forEach(item => item.classList.toggle('active', item === button));
+  $(`#${button.dataset.settingsTarget}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+}));
+if (window.matchMedia('(max-width: 520px)').matches) $('#taskAdvancedFilters').removeAttribute('open');
 ['#calendarShowTasks', '#calendarShowRoutines', '#calendarShowEvents', '#calendarShowCompleted']
   .forEach(selector => $(selector).addEventListener('change', renderCalendar));
 $('#calendarPrevious').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1); renderCalendar(); });
