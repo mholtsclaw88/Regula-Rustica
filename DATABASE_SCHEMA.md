@@ -366,7 +366,6 @@ Stewardship example:
 {
   "location": "East Pasture",
   "assigned_member_id": "uuid",
-  "current_workflow": "Lactation",
   "current_stage": "Active"
 }
 ```
@@ -972,8 +971,6 @@ Photos may remain a placeholder until private storage and offline upload behavio
 
 Potential later additions:
 
-- `workflow_templates`
-- `workflow_steps`
 - `recurrence_exceptions`
 - `task_watchers`
 - `notifications`

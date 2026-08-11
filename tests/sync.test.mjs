@@ -263,6 +263,24 @@ test('recurrence summary describes cadence and scheduling mode', () => {
   assert.equal(housekeepingData.recurrenceSummary({ frequency: 'weekly', interval: 2, mode: 'after_completion' }), 'Repeats every 2 weeks after completion');
 });
 
+test('calendar displays a Task from its start date through its due date', () => {
+  const task = { availableFrom: '2026-08-10', dueDate: '2026-08-13' };
+  assert.deepEqual(housekeepingData.taskCalendarBounds(task), { start: '2026-08-10', end: '2026-08-13' });
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-09'), null);
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-10'), 'start');
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-11'), 'middle');
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-13'), 'end');
+  assert.equal(housekeepingData.taskCalendarSegment(task, '2026-08-14'), null);
+});
+
+test('calendar keeps single-date and malformed legacy Tasks safe', () => {
+  assert.equal(housekeepingData.taskCalendarSegment({ dueDate: '2026-08-12' }, '2026-08-12'), 'single');
+  assert.deepEqual(housekeepingData.taskCalendarBounds({ availableFrom: '2026-08-13', dueDate: '2026-08-10' }), {
+    start: '2026-08-10', end: '2026-08-13'
+  });
+  assert.equal(housekeepingData.taskCalendarSegment({}, '2026-08-12'), null);
+});
+
 test('child profiles and task assignments retain their canonical person link', () => {
   const state = new LocalSyncState(new MemoryStorage());
   const child = { id: 'child-one', personType: 'child', displayName: 'Clare', createdAt: '2026-08-10T12:00:00Z' };

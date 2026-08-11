@@ -565,7 +565,7 @@ function stewardshipText(record) {
     serviceInterval: 'Service', condition: 'Condition', stage: 'Stage', blockedBy: 'Blocked by'
   };
   return Object.entries(stewardship)
-    .filter(([, value]) => displayValue(value))
+    .filter(([key, value]) => displayValue(value) && !(record.type === 'Animal' && key === 'stage'))
     .map(([key, value]) => `${labels[key] || key}: ${value}`)
     .join(' · ') || 'No current stewardship details.';
 }
@@ -881,7 +881,10 @@ function renderCalendar() {
     heading.textContent = day;
     root.appendChild(heading);
   });
-  const filter = $('#calendarFilter').value;
+  const showTasks = $('#calendarShowTasks').checked;
+  const showRoutines = $('#calendarShowRoutines').checked;
+  const showEvents = $('#calendarShowEvents').checked;
+  const showCompleted = $('#calendarShowCompleted').checked;
   const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1 - calendarMonth.getDay());
   for (let offset = 0; offset < 42; offset += 1) {
     const date = new Date(first.getFullYear(), first.getMonth(), first.getDate() + offset);
@@ -892,17 +895,36 @@ function renderCalendar() {
     cell.innerHTML = `<span class="calendar-date">${date.getDate()}</span><span class="calendar-items"></span>`;
     cell.addEventListener('click', () => openModal('calendar', null, null, '', dateKey));
     const items = cell.querySelector('.calendar-items');
-    if (filter !== 'events') {
-      data.tasks.filter(task => !task.deletedAt && !task.completed && (task.dueDate || task.availableFrom) === dateKey).forEach(task => {
-        const item = document.createElement('span');
-        item.className = 'calendar-item task-item';
-        item.textContent = task.title;
-        item.title = taskDateText(task);
-        item.addEventListener('click', event => { event.stopPropagation(); openModal('task', task.id, task.recordId); });
-        items.appendChild(item);
-      });
+    if (showTasks || showRoutines) {
+      data.tasks
+        .filter(task => {
+          if (task.deletedAt || (task.completed && !showCompleted)) return false;
+          const isRoutine = Boolean(window.RegulaRusticaHousekeeping.routineType(task));
+          return (isRoutine ? showRoutines : showTasks)
+            && Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey));
+        })
+        .sort((a, b) => {
+          const aBounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(a);
+          const bBounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(b);
+          return aBounds.start.localeCompare(bBounds.start) || a.title.localeCompare(b.title);
+        })
+        .forEach(task => {
+          const routineType = window.RegulaRusticaHousekeeping.routineType(task);
+          const segment = window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey);
+          const assignedTo = assigneeName(task.id);
+          const recurringMark = task.recurrenceRule ? '↻ ' : '';
+          const item = document.createElement('span');
+          item.className = `calendar-item ${routineType ? 'routine-item' : 'task-item'} range-${segment}${task.completed ? ' completed-item' : ''}`;
+          item.textContent = `${recurringMark}${task.title}${assignedTo ? ` · ${assignedTo}` : ''}`;
+          item.title = `${taskDateText(task)}${assignedTo ? ` · Assigned to ${assignedTo}` : ''}${task.recurrenceRule ? ' · Recurring' : ''}`;
+          item.addEventListener('click', event => {
+            event.stopPropagation();
+            openModal(routineType ? 'routine' : 'task', task.id, task.recordId);
+          });
+          items.appendChild(item);
+        });
     }
-    if (filter !== 'tasks') {
+    if (showEvents) {
       data.calendarEvents.filter(event => !event.deletedAt && event.startDate <= dateKey && event.endDate >= dateKey).forEach(event => {
         const item = document.createElement('span');
         item.className = 'calendar-item event-item';
@@ -1154,7 +1176,6 @@ function appendRecordFields(root, record, type) {
   if (type === 'Animal') {
     root.append(field('Current location', 'location', 'text', stewardship.location));
     root.append(field('Responsible person (optional)', 'responsible', 'text', stewardship.responsible));
-    root.append(field('Current workflow (optional)', 'stage', 'text', stewardship.stage));
   }
   if (type === 'Land') {
     root.append(field('Current use', 'currentUse', 'text', stewardship.currentUse));
@@ -1197,8 +1218,8 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     const assignment = assignmentForTask(task.id);
     root.append(field('Task', 'title', 'text', task.title));
     root.append(field('Details (optional)', 'description', 'textarea', task.description));
-    root.append(field('When can this work begin? (optional)', 'availableFrom', 'date', task.availableFrom));
-    root.append(field('When should it be completed? (optional)', 'dueDate', 'date', task.dueDate));
+    root.append(field('Start date (optional)', 'availableFrom', 'date', task.availableFrom));
+    root.append(field('Due date (optional)', 'dueDate', 'date', task.dueDate));
     addRecurrenceFields(root, task.recurrenceRule);
     root.append(field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']));
     addPersonSelect(root, assignment?.personId || personForAssignment(assignment)?.id);
@@ -1506,7 +1527,8 @@ $$('.tabs-mini button').forEach(button => button.addEventListener('click', () =>
   $(`#panel${button.dataset.panel.charAt(0).toUpperCase()}${button.dataset.panel.slice(1)}`).classList.add('active');
 }));
 ['taskStatusFilter', 'taskRecordFilter', 'taskAssigneeFilter', 'taskTimingFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
-$('#calendarFilter').addEventListener('change', renderCalendar);
+['#calendarShowTasks', '#calendarShowRoutines', '#calendarShowEvents', '#calendarShowCompleted']
+  .forEach(selector => $(selector).addEventListener('change', renderCalendar));
 $('#calendarPrevious').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1); renderCalendar(); });
 $('#calendarNext').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1); renderCalendar(); });
 $('#calendarToday').addEventListener('click', () => { calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderCalendar(); });

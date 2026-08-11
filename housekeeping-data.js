@@ -105,6 +105,22 @@
       && localDate(entry.occurredAt) === taskWorkDate(task)) || null;
   }
 
+  function taskCalendarBounds(task = {}) {
+    const start = task.availableFrom || task.dueDate || '';
+    const end = task.dueDate || task.availableFrom || '';
+    if (!start || !end) return null;
+    return start <= end ? { start, end } : { start: end, end: start };
+  }
+
+  function taskCalendarSegment(task = {}, date = '') {
+    const bounds = taskCalendarBounds(task);
+    if (!bounds || date < bounds.start || date > bounds.end) return null;
+    if (bounds.start === bounds.end) return 'single';
+    if (date === bounds.start) return 'start';
+    if (date === bounds.end) return 'end';
+    return 'middle';
+  }
+
   function dateParts(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
     if (!match) return null;
@@ -142,6 +158,6 @@
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
     routineType, routineYieldType, routineSession, routineLabel, taskWorkDate,
-    matchingRoutineTasks, matchingYieldForTask
+    matchingRoutineTasks, matchingYieldForTask, taskCalendarBounds, taskCalendarSegment
   };
 }));
