@@ -617,10 +617,10 @@ function chooseMatchingRoutineTask(yieldEntry) {
 
 function taskRow(task) {
   const row = document.createElement('div');
-  row.className = `task${task.completed ? ' done' : ''}`;
+  const routineType = window.RegulaRusticaHousekeeping.routineType(task);
+  row.className = `task task-entry${routineType ? ' routine-task' : ''}${task.completed ? ' done' : ''}`;
   const assignedTo = assigneeName(task.id);
   const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
-  const routineType = window.RegulaRusticaHousekeeping.routineType(task);
   const dueClass = !task.completed && task.dueDate && task.dueDate < today() ? ' overdue' : '';
   const meta = [
     `<span class="meta-pill${dueClass}">${escapeHtml(taskDateText(task))}</span>`,
@@ -629,14 +629,17 @@ function taskRow(task) {
     task.recordId ? `<span class="meta-pill linked-record">${escapeHtml(recordName(task.recordId))}</span>` : '',
     task.priority !== 'normal' ? `<span class="meta-pill priority">${escapeHtml(task.priority)}</span>` : ''
   ].filter(Boolean).join('');
-  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta-pills">${meta}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
-  if (routineType) {
-    const button = document.createElement('button');
-    button.className = 'btn primary routine-record';
-    button.textContent = task.completed ? 'Recorded' : routineButtonText(task);
-    button.disabled = task.completed;
-    row.querySelector('input').replaceWith(button);
-    button.addEventListener('click', () => {
+  const routineIcon = routineType === 'egg_collection' ? 'egg' : 'milk';
+  const statusControl = routineType
+    ? `<span class="task-status-icon ${task.completed ? 'completed' : routineIcon}" role="img" aria-label="${task.completed ? 'Routine recorded' : `${routineIcon} routine`}"><svg><use href="#icon-${task.completed ? 'check' : routineIcon}"/></svg></span>`
+    : `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task">`;
+  const routineAction = routineType
+    ? task.completed
+      ? '<span class="routine-recorded">Recorded</span>'
+      : `<button class="btn primary routine-record" type="button">${escapeHtml(routineButtonText(task))}</button>`
+    : '';
+  row.innerHTML = `<div class="task-status">${statusControl}</div><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta-pills">${meta}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions task-actions">${routineAction}<button class="btn ghost edit" type="button">Edit</button><details class="task-menu"><summary aria-label="More task actions">•••</summary><button class="btn ghost del" type="button">Delete</button></details></div>`;
+  row.querySelector('.routine-record')?.addEventListener('click', () => {
       const existingYield = window.RegulaRusticaHousekeeping.matchingYieldForTask(data.yieldEntries, task);
       if (existingYield && (!existingYield.taskId || existingYield.taskId === task.id)) {
         existingYield.taskId = task.id;
@@ -644,8 +647,7 @@ function taskRow(task) {
         completeTask(task);
         saveData();
       } else openRoutineYield(task);
-    });
-  }
+  });
   row.querySelector('input')?.addEventListener('change', event => {
     const wasCompleted = task.completed;
     task.completed = event.target.checked;

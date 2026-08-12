@@ -1,8 +1,8 @@
-const CACHE = 'regula-rustica-theme-pass-1';
+const CACHE = 'regula-rustica-notebook-1';
 const ASSETS = [
-  './', './index.html', './styles.css', './housekeeping.css?v=theme-pass-1', './cloud-auth.css', './housekeeping-data.js?v=theme-pass-1', './app.js?v=theme-pass-1', './cloud-auth.js',
+  './', './index.html', './styles.css', './housekeeping.css?v=notebook-1', './cloud-auth.css', './housekeeping-data.js?v=notebook-1', './app.js?v=notebook-1', './cloud-auth.js',
   './cloud-invitations.mjs',
-  './sync/runtime.mjs?v=theme-pass-1', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
+  './sync/runtime.mjs?v=notebook-1', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
 ];
 const OPTIONAL_ASSETS = [
