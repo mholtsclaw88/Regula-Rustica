@@ -9,14 +9,15 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css?v=notebook-calendar-4">
+  <link rel="stylesheet" href="housekeeping.css?v=records-v2-1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=notebook-calendar-4" defer></script>
-  <script src="app.js?v=notebook-calendar-4" defer></script>
+  <script src="housekeeping-data.js?v=records-v2-1" defer></script>
+  <script src="records-v2-data.js?v=records-v2-1" defer></script>
+  <script src="app.js?v=records-v2-1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=notebook-calendar-4" type="module"></script>
+  <script src="sync/runtime.mjs?v=records-v2-1" type="module"></script>
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true">
@@ -376,6 +377,17 @@
           </div>
         </div>
         <div id="recordStewardship" class="steward-box"></div>
+        <section id="recordRelationships" class="record-context hidden" aria-labelledby="recordRelationshipsTitle">
+          <span class="label">Relationships</span>
+          <h3 id="recordRelationshipsTitle">Connected records</h3>
+          <div id="recordRelationshipList"></div>
+        </section>
+        <section id="recordSuggestedRoutines" class="record-context hidden" aria-labelledby="recordSuggestedRoutinesTitle">
+          <span class="label">Suggested routines</span>
+          <h3 id="recordSuggestedRoutinesTitle">Recurring stewardship</h3>
+          <p class="muted">Optional starting points. Choose the timing that fits your Homestead; these are not professional care recommendations.</p>
+          <div id="recordRoutineSuggestions" class="routine-suggestions"></div>
+        </section>
         <div class="tabs-mini" role="tablist" aria-label="Record details">
           <button class="active" data-panel="tasks">Tasks</button>
           <button data-panel="chronicle">Chronicle</button>

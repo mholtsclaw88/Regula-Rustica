@@ -152,6 +152,37 @@ textarea {
   background: linear-gradient(145deg, #e0e6d4, #d4ddc9);
 }
 
+.record-context {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(246,237,217,.82), rgba(232,218,189,.62));
+  box-shadow: inset 0 1px rgba(255,255,255,.45);
+}
+.record-context h3 { margin: 3px 0 8px; }
+.record-context p { margin: 6px 0; }
+.routine-suggestions { display: grid; gap: 10px; margin-top: 12px; }
+.routine-suggestion {
+  padding: 13px;
+  border: 1px solid #cfbea0;
+  border-radius: 11px;
+  background: rgba(245,235,214,.88);
+  box-shadow: 0 3px 9px rgba(60,45,27,.06);
+}
+.routine-suggestion-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.routine-toggle { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--forest); }
+.routine-toggle input { width: 20px; height: 20px; accent-color: var(--forest2); }
+.routine-config {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr)) auto;
+  align-items: end;
+  gap: 9px;
+  margin-top: 11px;
+}
+.routine-config label { margin: 0; }
+.relationship-history { border-left: 3px solid var(--blue); }
+
 .tabs-mini button {
   border-color: #cfb98f;
   background: linear-gradient(180deg, var(--paper-light), #eadcc2);
@@ -656,6 +687,8 @@ summary:focus-visible {
   .calendar-day { min-height: 92px; }
   .calendar-period-column .calendar-day { min-height: 235px; }
   .records-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .routine-config { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .routine-config .btn { grid-column: 1 / -1; width: 100%; }
 }
 
 @media (max-width: 520px) {
@@ -669,6 +702,9 @@ summary:focus-visible {
   .calendar-nav { justify-content: center; }
   .calendar-filters { grid-column: auto; }
   .records-grid { grid-template-columns: 1fr; }
+  .record-context { padding: 13px; }
+  .routine-config { grid-template-columns: 1fr; }
+  .routine-config .btn { grid-column: auto; }
   .advanced-filters summary { display: block; }
   .advanced-filters[open] summary { margin-bottom: 12px; }
   .advanced-filters .filters { grid-template-columns: 1fr; }

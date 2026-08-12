@@ -1,4 +1,4 @@
-export const DOMAIN_ORDER = ['records', 'homestead_people', 'tasks', 'record_relationships', 'task_assignments', 'chronicle_entries', 'calendar_events', 'yield_entries', 'notes', 'ledger_entries'];
+export const DOMAIN_ORDER = ['homestead_people', 'records', 'tasks', 'record_relationships', 'task_assignments', 'chronicle_entries', 'calendar_events', 'yield_entries', 'notes', 'ledger_entries'];
 
 export const COLLECTIONS = {
   records: 'records',
@@ -19,7 +19,11 @@ const localId = (state, table, value) => value ? state.localIdForCloud(table, va
 
 export function toCloud(table, row, state, source = 'manual') {
   const common = { id: cloudId(state, table, row.id), client_updated_at: iso(row.updatedAt || row.createdAt), source };
-  if (table === 'records') return { ...common, type: row.type.toLowerCase(), name: row.name, status: row.status, identity: row.identity || {}, stewardship: row.stewardship || {} };
+  if (table === 'records') {
+    const stewardship = { ...(row.stewardship || {}) };
+    if (stewardship.responsiblePersonId) stewardship.responsiblePersonId = cloudId(state, 'homestead_people', stewardship.responsiblePersonId);
+    return { ...common, type: row.type.toLowerCase(), name: row.name, status: row.status, identity: row.identity || {}, stewardship };
+  }
   if (table === 'homestead_people') return { ...common, person_type: row.personType || 'child', display_name: row.displayName, member_id: row.memberId || null };
   if (table === 'tasks') return { ...common, record_id: cloudId(state, 'records', row.recordId), title: row.title, description: row.description || null, status: row.completed ? 'completed' : (row.status || 'open'), priority: row.priority || 'normal', due_date: row.dueDate || null, available_from: row.availableFrom || null, completed_at: row.completedAt || null, recurrence_rule: row.recurrenceRule || null, parent_task_id: cloudId(state, 'tasks', row.parentTaskId) };
   if (table === 'record_relationships') return { ...common, source_record_id: cloudId(state, 'records', row.sourceRecordId), target_record_id: cloudId(state, 'records', row.targetRecordId), relationship_type: row.relationshipType, started_at: row.startedAt || null, ended_at: row.endedAt || null, details: row.details || {} };
@@ -37,7 +41,11 @@ export function toCloud(table, row, state, source = 'manual') {
 
 export function fromCloud(table, row, state) {
   const common = { id: localId(state, table, row.id), createdAt: row.created_at || row.assigned_at, updatedAt: row.updated_at || row.assigned_at, deletedAt: row.deleted_at || row.removed_at || null };
-  if (table === 'records') return { ...common, type: row.type[0].toUpperCase() + row.type.slice(1), name: row.name, status: row.status, identity: row.identity || {}, stewardship: row.stewardship || {} };
+  if (table === 'records') {
+    const stewardship = { ...(row.stewardship || {}) };
+    if (stewardship.responsiblePersonId) stewardship.responsiblePersonId = localId(state, 'homestead_people', stewardship.responsiblePersonId);
+    return { ...common, type: row.type[0].toUpperCase() + row.type.slice(1), name: row.name, status: row.status, identity: row.identity || {}, stewardship };
+  }
   if (table === 'homestead_people') return { ...common, personType: row.person_type, displayName: row.display_name, memberId: row.member_id || null };
   if (table === 'tasks') return { ...common, recordId: localId(state, 'records', row.record_id), title: row.title, description: row.description || '', status: row.status, completed: row.status === 'completed', dueDate: row.due_date || '', availableFrom: row.available_from || '', completedAt: row.completed_at, priority: row.priority, recurrenceRule: row.recurrence_rule, parentTaskId: localId(state, 'tasks', row.parent_task_id) };
   if (table === 'record_relationships') return { ...common, sourceRecordId: localId(state, 'records', row.source_record_id), targetRecordId: localId(state, 'records', row.target_record_id), relationshipType: row.relationship_type, startedAt: row.started_at, endedAt: row.ended_at, details: row.details || {} };

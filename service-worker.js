@@ -1,8 +1,8 @@
-const CACHE = 'regula-rustica-notebook-calendar-4';
+const CACHE = 'regula-rustica-records-v2-1';
 const ASSETS = [
-  './', './index.html', './styles.css', './housekeeping.css?v=notebook-calendar-4', './cloud-auth.css', './housekeeping-data.js?v=notebook-calendar-4', './app.js?v=notebook-calendar-4', './cloud-auth.js',
+  './', './index.html', './styles.css', './housekeeping.css?v=records-v2-1', './cloud-auth.css', './housekeeping-data.js?v=records-v2-1', './records-v2-data.js?v=records-v2-1', './app.js?v=records-v2-1', './cloud-auth.js',
   './cloud-invitations.mjs',
-  './sync/runtime.mjs?v=notebook-calendar-4', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
+  './sync/runtime.mjs?v=records-v2-1', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
 ];
 const OPTIONAL_ASSETS = [

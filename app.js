@@ -144,7 +144,7 @@ function createNextLocalOccurrence(task) {
   const dueDate = window.RegulaRusticaHousekeeping.nextRecurringDueDate(task, today());
   if (!dueDate) return;
   const timestamp = nowIso();
-  data.tasks.push(normalizeTask({
+  const next = normalizeTask({
     id: uid(),
     title: task.title,
     description: task.description,
@@ -155,7 +155,10 @@ function createNextLocalOccurrence(task) {
     parentTaskId: task.id,
     createdAt: timestamp,
     updatedAt: timestamp
-  }));
+  });
+  data.tasks.push(next);
+  const assignment = assignmentForTask(task.id);
+  if (assignment?.personId) setTaskAssignee(next.id, assignment.personId);
 }
 
 function normalizeEvent(event = {}) {
@@ -247,10 +250,11 @@ function historicalYield(event) {
 }
 
 function normalizeData(source = {}) {
+  const sourceVersion = Number(source.schemaVersion || source.version || 0);
   const events = asArray(source.events).map(normalizeEvent);
   const yieldEntries = asArray(source.yieldEntries).map(normalizeYieldEntry);
   const people = asArray(source.people).map(normalizePerson);
-  if (Number(source.schemaVersion || source.version || 0) < 6) {
+  if (sourceVersion < 6) {
     const migratedIds = new Set(yieldEntries.map(entry => entry.legacyEventId).filter(Boolean));
     events.forEach(event => {
       if (migratedIds.has(event.id)) return;
@@ -258,13 +262,16 @@ function normalizeData(source = {}) {
       if (migrated) yieldEntries.push(migrated);
     });
   }
+  const records = asArray(source.records).map(normalizeRecord);
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
-    records: asArray(source.records).map(normalizeRecord),
+    records,
     tasks: asArray(source.tasks).map(normalizeTask),
     people,
-    relationships: asArray(source.relationships),
+    relationships: window.RegulaRusticaRecordsV2.upgradeRelationships(
+      records, asArray(source.relationships), sourceVersion, uid, nowIso()
+    ),
     assignments: asArray(source.assignments).map(assignment => normalizeAssignment(assignment, people)),
     events,
     notes: asArray(source.notes).map(normalizeNote),
@@ -350,7 +357,7 @@ function migrateData(source = {}, sourceKey = 'imported legacy data') {
 }
 
 function isSupportedData(value) {
-  return [5, 6, 7, 8].includes(value?.schemaVersion) || [5, 6, 7, 8].includes(value?.version);
+  return [5, 6, 7, 8, 9].includes(value?.schemaVersion) || [5, 6, 7, 8, 9].includes(value?.version);
 }
 
 function prepareImportedData(value, sourceName = 'backup') {
@@ -371,9 +378,9 @@ function loadData() {
   if (currentRaw) {
     try {
       const current = JSON.parse(currentRaw);
-      const beforeMigration = normalizeData({ ...current, schemaVersion: 8 });
+      const beforeMigration = normalizeData({ ...current, schemaVersion: 9 });
       const normalized = isSupportedData(current) ? normalizeData(current) : migrateData(current, STORAGE_KEY);
-      if (current.schemaVersion !== 8) {
+      if (current.schemaVersion !== 9) {
         safelyStoreBackup(MIGRATION_BACKUP_KEY, currentRaw);
         startupMigrationBefore = beforeMigration;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
@@ -413,7 +420,7 @@ function saveData(nextData = data, source = 'user') {
 function exportData() {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-  link.download = `regula-rustica-v8-${today()}.json`;
+  link.download = `regula-rustica-v9-${today()}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -434,7 +441,7 @@ async function importData(file) {
 
 const seedTimestamp = nowIso();
 const SEED_DATA = {
-  schemaVersion: 8,
+  schemaVersion: 9,
   settings: { homesteadName: 'Wood Thief Homestead' },
   records: [
     { id: 'daisy', type: 'Animal', name: 'Daisy', status: 'Active', identity: { managedAs: 'Individual', species: 'Cattle', breed: 'Jersey', purpose: 'Dairy' }, stewardship: { location: 'Barn and east pasture', responsible: '', currentUse: 'Milk cow', stage: '' }, createdAt: seedTimestamp, updatedAt: seedTimestamp },
@@ -449,7 +456,8 @@ const SEED_DATA = {
   notes: [],
   ledger: [],
   calendarEvents: [],
-  yieldEntries: []
+  yieldEntries: [],
+  relationships: []
 };
 
 let data = loadData();
@@ -510,6 +518,34 @@ function setTaskAssignee(taskId, personId) {
   }, data.people));
 }
 
+function personName(personId, legacyText = '') {
+  if (!personId) return legacyText || '';
+  return data.people.find(person => person.id === personId)?.displayName || 'Former household person';
+}
+
+function currentLocationRelationship(recordId) {
+  return window.RegulaRusticaRecordsV2.currentLocation(data.relationships, recordId);
+}
+
+function setRecordRelationship(sourceRecordId, relationshipType, targetRecordId, details = {}) {
+  return window.RegulaRusticaRecordsV2.replaceRelationship(data.relationships, {
+    sourceRecordId, relationshipType, targetRecordId: targetRecordId || null, details, now: nowIso(), makeId: uid
+  });
+}
+
+function setParentRelationship(animalId, parentRole, parentId) {
+  const existing = data.relationships.filter(item => window.RegulaRusticaRecordsV2.isActive(item)
+    && item.relationshipType === 'parent_of' && item.targetRecordId === animalId && item.details?.parentRole === parentRole);
+  if (existing.length === 1 && existing[0].sourceRecordId === parentId) return;
+  const timestamp = nowIso();
+  existing.forEach(item => { item.endedAt = timestamp; item.updatedAt = timestamp; });
+  if (!parentId) return;
+  data.relationships.push(window.RegulaRusticaRecordsV2.normalizeRelationship({
+    id: uid(), sourceRecordId: parentId, targetRecordId: animalId, relationshipType: 'parent_of',
+    startedAt: timestamp, details: { parentRole }, createdAt: timestamp, updatedAt: timestamp
+  }));
+}
+
 function addEvent(recordId, eventType, details = '', options = {}) {
   data.events.unshift(normalizeEvent({
     id: uid(),
@@ -550,7 +586,7 @@ function identityParts(record) {
   if (record.type === 'Animal') return [identity.managedAs, identity.species, identity.breed, identity.purpose, identity.quantity ? `Quantity: ${identity.quantity}` : ''];
   if (record.type === 'Land') return [identity.landType, identity.size];
   if (record.type === 'Equipment') return [identity.equipmentType, identity.make, identity.model];
-  if (record.type === 'Structure') return [identity.structureType, identity.location];
+  if (record.type === 'Structure') return [identity.structureType];
   if (record.type === 'Work') return [identity.workType, identity.targetDate ? `Target: ${formatDate(identity.targetDate)}` : '', identity.linkedRecordId ? `Linked to: ${recordName(identity.linkedRecordId)}` : ''];
   return [];
 }
@@ -561,22 +597,28 @@ function identityText(record) {
 
 function stewardshipText(record) {
   const stewardship = record.stewardship || {};
+  const location = currentLocationRelationship(record.id);
+  const responsible = personName(stewardship.responsiblePersonId, stewardship.responsible);
   const labels = {
     location: 'Location', currentUse: 'Use', currentOccupants: 'Occupants', rotationStage: 'Rotation', responsible: 'Responsible',
     serviceInterval: 'Service', condition: 'Condition', stage: 'Stage', blockedBy: 'Blocked by'
   };
-  return Object.entries(stewardship)
+  const visible = { ...stewardship };
+  delete visible.responsiblePersonId;
+  if (['Animal', 'Equipment'].includes(record.type)) {
+    visible.location = location ? `${recordName(location.targetRecordId)} (${recordById(location.targetRecordId)?.type || 'Record'})` : stewardship.location;
+  }
+  if (['Animal', 'Equipment', 'Structure', 'Work'].includes(record.type)) visible.responsible = responsible;
+  if (record.type === 'Land') delete visible.currentOccupants;
+  if (record.type === 'Equipment') delete visible.serviceInterval;
+  return Object.entries(visible)
     .filter(([key, value]) => displayValue(value) && !(record.type === 'Animal' && key === 'stage'))
     .map(([key, value]) => `${labels[key] || key}: ${value}`)
     .join(' · ') || 'No current stewardship details.';
 }
 
 function routineOptions(record) {
-  if (!record || record.type !== 'Animal' || record.status === 'Archived') return [];
-  const purpose = String(record.identity?.purpose || '').toLowerCase();
-  if (purpose === 'dairy') return ['milk_morning', 'milk_evening'];
-  if (purpose === 'eggs') return ['egg_collection'];
-  return [];
+  return window.RegulaRusticaRecordsV2.suggestionsFor(record).map(item => item.type);
 }
 
 function routineButtonText(task) {
@@ -630,11 +672,12 @@ function taskRow(task) {
     task.recordId ? `<span class="meta-pill linked-record">${escapeHtml(recordName(task.recordId))}</span>` : '',
     task.priority !== 'normal' ? `<span class="meta-pill priority">${escapeHtml(task.priority)}</span>` : ''
   ].filter(Boolean).join('');
+  const yieldRoutine = window.RegulaRusticaRecordsV2.isYieldRoutine(routineType);
   const routineIcon = routineType === 'egg_collection' ? 'egg' : 'milk';
-  const statusControl = routineType
+  const statusControl = yieldRoutine
     ? `<span class="task-status-icon ${task.completed ? 'completed' : routineIcon}" role="img" aria-label="${task.completed ? 'Routine recorded' : `${routineIcon} routine`}"><svg><use href="#icon-${task.completed ? 'check' : routineIcon}"/></svg></span>`
     : `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task">`;
-  const routineAction = routineType
+  const routineAction = yieldRoutine
     ? task.completed
       ? '<span class="routine-recorded">Recorded</span>'
       : `<button class="btn primary routine-record" type="button">${escapeHtml(routineButtonText(task))}</button>`
@@ -659,7 +702,13 @@ function taskRow(task) {
     if (!wasCompleted && task.completed && task.recurrenceRule && !window.RegulaRusticaSync?.isInitialized?.()) createNextLocalOccurrence(task);
     saveData();
   });
-  row.querySelector('.edit').addEventListener('click', () => openModal(routineType ? 'routine' : 'task', task.id, task.recordId));
+  const editButton = row.querySelector('.edit');
+  if (routineType && !yieldRoutine) {
+    editButton.textContent = 'Configure';
+    editButton.addEventListener('click', () => openRecord(task.recordId));
+  } else {
+    editButton.addEventListener('click', () => openModal(yieldRoutine ? 'routine' : 'task', task.id, task.recordId));
+  }
   row.querySelector('.del').addEventListener('click', () => {
     if (confirm('Delete this task?')) {
       task.deletedAt = nowIso();
@@ -730,6 +779,96 @@ function eventChoices(record) {
   return [...new Set([...specialized, ...standard])].slice(0, 9).concat('Other');
 }
 
+function renderRecordRelationships(record) {
+  const section = $('#recordRelationships');
+  const root = $('#recordRelationshipList');
+  root.innerHTML = '';
+  const lines = [];
+  const location = currentLocationRelationship(record.id);
+  if (location) lines.push(`<strong>Current location:</strong> ${escapeHtml(recordName(location.targetRecordId))} <span class="meta">${escapeHtml(recordById(location.targetRecordId)?.type || '')}</span>`);
+  if (['Land', 'Structure'].includes(record.type)) {
+    const contents = window.RegulaRusticaRecordsV2.reverseLocationContents(data.records, data.relationships, record.id);
+    const animals = contents.filter(item => item.type === 'Animal');
+    const equipment = contents.filter(item => item.type === 'Equipment');
+    if (animals.length) lines.push(`<strong>Current occupants:</strong> ${animals.map(item => escapeHtml(item.name)).join(', ')}`);
+    if (equipment.length) lines.push(`<strong>Equipment stored here:</strong> ${equipment.map(item => escapeHtml(item.name)).join(', ')}`);
+  }
+  if (record.type === 'Animal') {
+    const parents = window.RegulaRusticaRecordsV2.parentsFor(data.relationships, record.id);
+    if (parents.dam) lines.push(`<strong>Dam:</strong> ${escapeHtml(recordName(parents.dam))}`);
+    if (parents.sire) lines.push(`<strong>Sire:</strong> ${escapeHtml(recordName(parents.sire))}`);
+    const offspring = window.RegulaRusticaRecordsV2.offspringFor(data.relationships, record.id)
+      .map(item => recordById(item.recordId)).filter(Boolean);
+    if (offspring.length) lines.push(`<strong>Offspring:</strong> ${offspring.map(item => escapeHtml(item.name)).join(', ')}`);
+  }
+  const relatedTargets = data.relationships.filter(item => window.RegulaRusticaRecordsV2.isActive(item)
+    && item.sourceRecordId === record.id && item.relationshipType === 'related_to')
+    .map(item => recordById(item.targetRecordId)).filter(Boolean);
+  if (relatedTargets.length) lines.push(`<strong>Related records:</strong> ${relatedTargets.map(item => escapeHtml(item.name)).join(', ')}`);
+  const relatedWork = data.relationships.filter(item => window.RegulaRusticaRecordsV2.isActive(item)
+    && item.targetRecordId === record.id && item.relationshipType === 'related_to')
+    .map(item => recordById(item.sourceRecordId)).filter(item => item?.type === 'Work');
+  if (relatedWork.length) lines.push(`<strong>Related Work:</strong> ${relatedWork.map(item => escapeHtml(item.name)).join(', ')}`);
+  root.innerHTML = lines.map(line => `<p>${line}</p>`).join('');
+  section.classList.toggle('hidden', !lines.length);
+}
+
+function activeRoutineTask(recordId, routineType) {
+  return data.tasks.find(task => !task.deletedAt && !task.completed && task.status !== 'completed'
+    && task.recordId === recordId && window.RegulaRusticaHousekeeping.routineType(task) === routineType);
+}
+
+function renderSuggestedRoutines(record) {
+  const section = $('#recordSuggestedRoutines');
+  const root = $('#recordRoutineSuggestions');
+  const suggestions = window.RegulaRusticaRecordsV2.suggestionsFor(record);
+  root.innerHTML = '';
+  suggestions.forEach(suggestion => {
+    const task = activeRoutineTask(record.id, suggestion.type);
+    const rule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule(task?.recurrenceRule);
+    const form = document.createElement('form');
+    form.className = 'routine-suggestion';
+    form.innerHTML = `<div class="routine-suggestion-head"><div><strong>${escapeHtml(suggestion.label)}</strong><div class="meta">Optional recurring Task</div></div><label class="routine-toggle"><input name="enabled" type="checkbox" ${task ? 'checked' : ''}><span>${task ? 'On' : 'Off'}</span></label></div><div class="routine-config"><label>Frequency<select name="frequency"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label><label>Every<input name="interval" type="number" min="1" step="1" value="${rule?.interval || 1}"></label><label>First date<input name="firstDate" type="date" value="${escapeHtml(task?.dueDate || today())}"></label><label>Assigned to<select name="personId"><option value="">Unassigned</option></select></label><button class="btn secondary" type="submit">Save</button></div>`;
+    form.elements.frequency.value = rule?.frequency || suggestion.frequency;
+    const personSelect = form.elements.personId;
+    activePeople().forEach(person => personSelect.add(new Option(`${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
+    personSelect.value = assignmentForTask(task?.id)?.personId || '';
+    const updateToggleText = () => { form.querySelector('.routine-toggle span').textContent = form.elements.enabled.checked ? 'On' : 'Off'; };
+    form.elements.enabled.addEventListener('change', updateToggleText);
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const existing = activeRoutineTask(record.id, suggestion.type);
+      if (!form.elements.enabled.checked) {
+        if (existing) {
+          existing.deletedAt = nowIso();
+          existing.updatedAt = existing.deletedAt;
+        }
+        saveData();
+        return;
+      }
+      const recurrenceRule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule({
+        frequency: form.elements.frequency.value, interval: form.elements.interval.value,
+        mode: 'fixed_schedule', routineType: suggestion.type
+      });
+      const values = { title: suggestion.label, description: '', availableFrom: '', dueDate: form.elements.firstDate.value,
+        priority: 'normal', recordId: record.id, recurrenceRule };
+      let taskId;
+      if (existing) {
+        Object.assign(existing, values, { updatedAt: nowIso() });
+        taskId = existing.id;
+      } else {
+        const created = normalizeTask({ id: uid(), ...values, createdAt: nowIso() });
+        data.tasks.push(created);
+        taskId = created.id;
+      }
+      setTaskAssignee(taskId, form.elements.personId.value);
+      saveData();
+    });
+    root.appendChild(form);
+  });
+  section.classList.toggle('hidden', !suggestions.length);
+}
+
 function renderRecord() {
   const record = recordById(currentRecordId);
   if (!record) return showView(priorView);
@@ -742,7 +881,9 @@ function renderRecord() {
   const purpose = (record.identity?.purpose || '').toLowerCase();
   $('#recordMilk').classList.toggle('hidden', record.type !== 'Animal' || !purpose.includes('dairy'));
   $('#recordEggs').classList.toggle('hidden', record.type !== 'Animal' || !purpose.includes('egg'));
-  $('#recordAddRoutine').classList.toggle('hidden', routineOptions(record).length === 0);
+  $('#recordAddRoutine').classList.add('hidden');
+  renderRecordRelationships(record);
+  renderSuggestedRoutines(record);
 
   const taskPanel = $('#panelTasks');
   taskPanel.innerHTML = '';
@@ -778,6 +919,17 @@ function renderRecord() {
       item.className = 'chronicle-item yield-chronicle';
       item.innerHTML = `<div class="row"><strong>${entry.type === 'milk' ? 'Milk' : 'Egg collection'}</strong><span class="meta">${new Date(entry.occurredAt).toLocaleString()}</span></div><div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong> · ${escapeHtml(entry.session)}</div>${entry.unusableQuantity ? `<div class="meta">${escapeHtml(entry.unusableQuantity)} unusable</div>` : ''}${entry.details ? `<p>${escapeHtml(entry.details)}</p>` : ''}`;
       chroniclePanel.appendChild(item);
+    });
+  data.relationships
+    .filter(item => item.sourceRecordId === record.id && item.relationshipType === 'located_on' && item.endedAt && !item.deletedAt)
+    .sort((a, b) => b.endedAt.localeCompare(a.endedAt))
+    .forEach(item => {
+      const replacement = data.relationships.find(candidate => candidate.sourceRecordId === record.id
+        && candidate.relationshipType === 'located_on' && candidate.startedAt === item.endedAt && !candidate.deletedAt);
+      const chronicle = document.createElement('div');
+      chronicle.className = 'chronicle-item relationship-history';
+      chronicle.innerHTML = `<div class="row"><strong>Moved</strong><span class="meta">${new Date(item.endedAt).toLocaleDateString()}</span></div><p>${escapeHtml(recordName(item.targetRecordId) || 'Other / Unspecified')} â†’ ${escapeHtml(replacement ? recordName(replacement.targetRecordId) : 'Other / Unspecified')}</p>`;
+      chroniclePanel.appendChild(chronicle);
     });
   if (!chroniclePanel.children.length) chroniclePanel.innerHTML = '<div class="empty-panel">The Chronicle will grow as events are recorded.</div>';
 
@@ -1198,6 +1350,52 @@ function addPersonSelect(root, selected = '') {
   root.appendChild(label);
 }
 
+function addResponsiblePersonSelect(root, selected = '', legacyText = '') {
+  const label = document.createElement('label');
+  label.textContent = 'Responsible person (optional)';
+  const select = document.createElement('select');
+  select.name = 'responsiblePersonId';
+  select.add(new Option(legacyText ? `Not selected â€” legacy: ${legacyText}` : 'Not selected', ''));
+  activePeople().forEach(person => select.add(new Option(
+    `${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`,
+    person.id
+  )));
+  select.value = activePeople().some(person => person.id === selected) ? selected : '';
+  label.appendChild(select);
+  root.appendChild(label);
+}
+
+function addLocationSelect(root, recordId, selected = '') {
+  const label = document.createElement('label');
+  label.textContent = 'Current location';
+  const select = document.createElement('select');
+  select.name = 'currentLocationRecordId';
+  select.add(new Option('Other / Unspecified', ''));
+  data.records.filter(record => !record.deletedAt && record.status !== 'Archived' && record.id !== recordId
+    && ['Land', 'Structure'].includes(record.type))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(record => select.add(new Option(`${record.name} â€” ${record.type}`, record.id)));
+  select.value = selected || '';
+  label.appendChild(select);
+  root.appendChild(label);
+}
+
+function addParentSelect(root, animalId, role, selected = '') {
+  const label = document.createElement('label');
+  label.className = 'animal-individual-field';
+  label.textContent = role === 'dam' ? 'Dam (optional)' : 'Sire (optional)';
+  const select = document.createElement('select');
+  select.name = `${role}RecordId`;
+  select.add(new Option('Not recorded', ''));
+  data.records.filter(record => !record.deletedAt && record.type === 'Animal' && record.id !== animalId
+    && String(record.identity?.managedAs || 'Individual').toLowerCase() === 'individual')
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(record => select.add(new Option(record.name, record.id)));
+  select.value = selected || '';
+  label.appendChild(select);
+  root.appendChild(label);
+}
+
 function addRecurrenceFields(root, recurrenceRule) {
   const rule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule(recurrenceRule);
   const repeat = field('Repeat', 'recurrenceFrequency', 'select', rule?.frequency || '', ['', 'daily', 'weekly', 'monthly']);
@@ -1224,7 +1422,7 @@ function addRecurrenceFields(root, recurrenceRule) {
 
 function addRoutineFields(root, task = {}, record) {
   const currentType = window.RegulaRusticaHousekeeping.routineType(task);
-  const options = [...new Set([...routineOptions(record), currentType].filter(Boolean))];
+  const options = currentType ? [currentType] : routineOptions(record).filter(type => window.RegulaRusticaRecordsV2.isYieldRoutine(type));
   const routine = field('Routine', 'routineType', 'select', currentType || options[0], options);
   const labels = { milk_morning: 'Morning Milking', milk_evening: 'Evening Milking', egg_collection: 'Egg Collection' };
   routine.querySelectorAll('option').forEach(option => { option.textContent = labels[option.value] || option.value; });
@@ -1261,22 +1459,41 @@ function addYieldAnimalSelect(root, type, selected = '') {
 function appendRecordFields(root, record, type) {
   const identity = record.identity || {};
   const stewardship = record.stewardship || {};
+  const location = currentLocationRelationship(record.id)?.targetRecordId || '';
+  const parents = window.RegulaRusticaRecordsV2.parentsFor(data.relationships, record.id);
   root.append(formSection('Identity'));
   const status = RECORD_CONFIG[type].statuses.includes(record.status) ? record.status : RECORD_CONFIG[type].statuses[0];
   root.append(field('Status', 'status', 'select', status, RECORD_CONFIG[type].statuses));
 
   if (type === 'Animal') {
-    root.append(field('Managed as', 'managedAs', 'select', identity.managedAs || 'Individual', ['Individual', 'Group']));
+    const managedAs = field('Managed as', 'managedAs', 'select', identity.managedAs || 'Individual', ['Individual', 'Group']);
+    root.append(managedAs);
     root.append(field('Species', 'species', 'text', identity.species));
     root.append(field('Breed', 'breed', 'text', identity.breed));
     root.append(field('Purpose', 'purpose', 'select', identity.purpose || 'Mixed', ['Dairy', 'Meat', 'Breeding', 'Eggs', 'Honey', 'Fiber', 'Draft', 'Companion', 'Mixed']));
-    root.append(field('Sex (individual, optional)', 'sex', 'text', identity.sex));
-    root.append(field('Birth date (optional)', 'birthDate', 'date', identity.birthDate));
-    root.append(field('Tag, band, or ID (optional)', 'identifier', 'text', identity.identifier));
-    root.append(field('Quantity (groups)', 'quantity', 'number', identity.quantity));
-    root.append(field('Acquisition or hatch date (optional)', 'acquisitionDate', 'date', identity.acquisitionDate));
-    root.append(field('Planned end or processing date (optional)', 'plannedEndDate', 'date', identity.plannedEndDate));
-    root.append(field('Average weight (groups, optional)', 'averageWeight', 'text', identity.averageWeight));
+    const individualFields = [
+      field('Sex (optional)', 'sex', 'text', identity.sex),
+      field('Birth date (optional)', 'birthDate', 'date', identity.birthDate),
+      field('Tag, band, or ID (optional)', 'identifier', 'text', identity.identifier),
+      field('Acquisition date (optional)', 'acquisitionDate', 'date', identity.acquisitionDate)
+    ];
+    individualFields.forEach(item => { item.classList.add('animal-individual-field'); root.append(item); });
+    const groupFields = [
+      field('Quantity', 'quantity', 'number', identity.quantity),
+      field('Acquisition or hatch date (optional)', 'groupAcquisitionDate', 'date', identity.acquisitionDate),
+      field('Planned end or processing date (optional)', 'plannedEndDate', 'date', identity.plannedEndDate),
+      field('Average weight (optional)', 'averageWeight', 'text', identity.averageWeight)
+    ];
+    groupFields.forEach(item => { item.classList.add('animal-group-field'); root.append(item); });
+    addParentSelect(root, record.id, 'dam', parents.dam);
+    addParentSelect(root, record.id, 'sire', parents.sire);
+    const updateAnimalFields = () => {
+      const individual = managedAs.querySelector('select').value === 'Individual';
+      root.querySelectorAll('.animal-individual-field').forEach(item => item.classList.toggle('hidden', !individual));
+      root.querySelectorAll('.animal-group-field').forEach(item => item.classList.toggle('hidden', individual));
+    };
+    managedAs.querySelector('select').addEventListener('change', updateAnimalFields);
+    queueMicrotask(updateAnimalFields);
   }
   if (type === 'Land') {
     root.append(field('Land type', 'landType', 'select', identity.landType || 'Pasture', ['Pasture', 'Garden Plot', 'Orchard', 'Hay Field', 'Woodlot', 'Pond', 'Wetland', 'Other']));
@@ -1291,7 +1508,6 @@ function appendRecordFields(root, record, type) {
   }
   if (type === 'Structure') {
     root.append(field('Structure type', 'structureType', 'text', identity.structureType));
-    root.append(field('Location (optional)', 'structureLocation', 'text', identity.location));
   }
   if (type === 'Work') {
     root.append(field('Work type', 'workType', 'text', identity.workType));
@@ -1303,26 +1519,24 @@ function appendRecordFields(root, record, type) {
 
   root.append(formSection('Stewardship'));
   if (type === 'Animal') {
-    root.append(field('Current location', 'location', 'text', stewardship.location));
-    root.append(field('Responsible person (optional)', 'responsible', 'text', stewardship.responsible));
+    addLocationSelect(root, record.id, location);
+    addResponsiblePersonSelect(root, stewardship.responsiblePersonId, stewardship.responsible);
   }
   if (type === 'Land') {
     root.append(field('Current use', 'currentUse', 'text', stewardship.currentUse));
-    root.append(field('Current occupants (optional)', 'currentOccupants', 'text', stewardship.currentOccupants));
     root.append(field('Rotation or rest stage (optional)', 'rotationStage', 'text', stewardship.rotationStage));
   }
   if (type === 'Equipment') {
-    root.append(field('Current location', 'location', 'text', stewardship.location));
-    root.append(field('Assigned household member (optional)', 'responsible', 'text', stewardship.responsible));
-    root.append(field('Service interval (optional)', 'serviceInterval', 'text', stewardship.serviceInterval));
+    addLocationSelect(root, record.id, location);
+    addResponsiblePersonSelect(root, stewardship.responsiblePersonId, stewardship.responsible);
   }
   if (type === 'Structure') {
     root.append(field('Current use', 'currentUse', 'text', stewardship.currentUse));
-    root.append(field('Responsible household member (optional)', 'responsible', 'text', stewardship.responsible));
+    addResponsiblePersonSelect(root, stewardship.responsiblePersonId, stewardship.responsible);
     root.append(field('Current condition (optional)', 'condition', 'text', stewardship.condition));
   }
   if (type === 'Work') {
-    root.append(field('Responsible person (optional)', 'responsible', 'text', stewardship.responsible));
+    addResponsiblePersonSelect(root, stewardship.responsiblePersonId, stewardship.responsible);
     root.append(field('Current stage (optional)', 'stage', 'text', stewardship.stage));
     root.append(field('Blocked by (optional)', 'blockedBy', 'text', stewardship.blockedBy));
   }
@@ -1431,19 +1645,19 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
 }
 
 function recordIdentityFromForm(type, form) {
-  if (type === 'Animal') return { managedAs: form.managedAs, species: form.species, breed: form.breed, purpose: form.purpose, sex: form.sex, birthDate: form.birthDate, identifier: form.identifier, quantity: form.quantity ? Number(form.quantity) : '', acquisitionDate: form.acquisitionDate, plannedEndDate: form.plannedEndDate, averageWeight: form.averageWeight };
+  if (type === 'Animal') return { managedAs: form.managedAs, species: form.species, breed: form.breed, purpose: form.purpose, sex: form.sex || '', birthDate: form.birthDate || '', identifier: form.identifier || '', quantity: form.quantity ? Number(form.quantity) : '', acquisitionDate: form.managedAs === 'Group' ? (form.groupAcquisitionDate || '') : (form.acquisitionDate || ''), plannedEndDate: form.plannedEndDate || '', averageWeight: form.averageWeight || '' };
   if (type === 'Land') return { landType: form.landType, size: form.size };
   if (type === 'Equipment') return { equipmentType: form.equipmentType, make: form.make, model: form.model, serialNumber: form.serialNumber, purchaseDate: form.purchaseDate };
-  if (type === 'Structure') return { structureType: form.structureType, location: form.structureLocation };
+  if (type === 'Structure') return { structureType: form.structureType };
   return { workType: form.workType, startDate: form.startDate, targetDate: form.targetDate, linkedRecordId: form.linkedRecordId || '' };
 }
 
 function recordStewardshipFromForm(type, form) {
-  if (type === 'Animal') return { location: form.location, responsible: form.responsible, stage: form.stage };
-  if (type === 'Land') return { currentUse: form.currentUse, currentOccupants: form.currentOccupants, rotationStage: form.rotationStage };
-  if (type === 'Equipment') return { location: form.location, responsible: form.responsible, serviceInterval: form.serviceInterval };
-  if (type === 'Structure') return { currentUse: form.currentUse, responsible: form.responsible, condition: form.condition };
-  return { responsible: form.responsible, stage: form.stage, blockedBy: form.blockedBy };
+  if (type === 'Animal') return { responsiblePersonId: form.responsiblePersonId || '' };
+  if (type === 'Land') return { currentUse: form.currentUse, rotationStage: form.rotationStage };
+  if (type === 'Equipment') return { responsiblePersonId: form.responsiblePersonId || '' };
+  if (type === 'Structure') return { currentUse: form.currentUse, responsiblePersonId: form.responsiblePersonId || '', condition: form.condition };
+  return { responsiblePersonId: form.responsiblePersonId || '', stage: form.stage, blockedBy: form.blockedBy };
 }
 
 $('#modalForm').addEventListener('submit', event => {
@@ -1581,18 +1795,32 @@ $('#modalForm').addEventListener('submit', event => {
       type: form.type,
       name: form.name.trim(),
       status: form.status,
-      identity: recordIdentityFromForm(form.type, form),
-      stewardship: recordStewardshipFromForm(form.type, form),
+      identity: { ...(existing?.identity || {}), ...recordIdentityFromForm(form.type, form) },
+      stewardship: { ...(existing?.stewardship || {}), ...recordStewardshipFromForm(form.type, form) },
       updatedAt: timestamp
     };
+    let savedRecord;
     if (existing) {
       const previousStatus = existing.status;
       Object.assign(existing, values, { updatedAt: nowIso() });
+      savedRecord = existing;
       if (previousStatus !== existing.status) addEvent(existing.id, 'Status changed', `${previousStatus} → ${existing.status}`);
     } else {
       const created = { id: uid(), ...values, createdAt: timestamp };
       data.records.push(created);
+      savedRecord = created;
       addEvent(created.id, 'Record created', `${created.type} record created`);
+    }
+    if (['Animal', 'Equipment'].includes(savedRecord.type)) {
+      setRecordRelationship(savedRecord.id, 'located_on', form.currentLocationRecordId || null, { purpose: 'current_location' });
+    }
+    if (savedRecord.type === 'Work') {
+      setRecordRelationship(savedRecord.id, 'related_to', form.linkedRecordId || null, { purpose: 'work_link' });
+    }
+    if (savedRecord.type === 'Animal') {
+      const individual = savedRecord.identity.managedAs === 'Individual';
+      setParentRelationship(savedRecord.id, 'dam', individual ? (form.damRecordId || null) : null);
+      setParentRelationship(savedRecord.id, 'sire', individual ? (form.sireRecordId || null) : null);
     }
   }
 

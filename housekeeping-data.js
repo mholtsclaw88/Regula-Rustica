@@ -34,7 +34,17 @@
     if (!frequency) return null;
     const candidateInterval = Math.floor(Number(rule?.interval) || 1);
     const configuredRoutine = rule?.routineType || rule?.routine_type || rule?.completionAction || rule?.completion_action;
-    const routineType = ['milk_morning', 'milk_evening', 'egg_collection'].includes(configuredRoutine)
+    const supportedRoutines = [
+      'milk_morning', 'milk_evening', 'egg_collection',
+      'animal_condition_check', 'animal_hoof_check', 'animal_health_check',
+      'pasture_boundary_inspection', 'pasture_condition_check', 'pasture_mow',
+      'garden_inspection', 'garden_weed', 'garden_water_check',
+      'orchard_inspection', 'orchard_ground_maintenance', 'orchard_tree_check',
+      'field_inspection', 'field_access_readiness', 'woodlot_inspection', 'water_condition_observation',
+      'equipment_inspect', 'equipment_service', 'equipment_storage',
+      'structure_inspect', 'structure_clean', 'structure_seasonal_check'
+    ];
+    const routineType = supportedRoutines.includes(configuredRoutine)
       ? configuredRoutine
       : null;
     return {
@@ -50,7 +60,8 @@
   }
 
   function routineYieldType(task = {}) {
-    return routineType(task) === 'egg_collection' ? 'eggs' : routineType(task) ? 'milk' : null;
+    const type = routineType(task);
+    return type === 'egg_collection' ? 'eggs' : ['milk_morning', 'milk_evening'].includes(type) ? 'milk' : null;
   }
 
   function routineSession(task = {}) {

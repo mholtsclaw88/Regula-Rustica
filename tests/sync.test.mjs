@@ -4,6 +4,7 @@ import { SyncEngine } from '../sync/engine.mjs';
 import { LocalSyncState } from '../sync/local-state.mjs';
 import { DOMAIN_ORDER, fromCloud, hasMeaningfulData, operationOrder, toCloud } from '../sync/entities.mjs';
 import housekeepingData from '../housekeeping-data.js';
+import recordsV2 from '../records-v2-data.js';
 
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
 
@@ -13,7 +14,7 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-const blank = () => ({ schemaVersion: 8, settings: { homesteadName: 'Test' }, records: [], people: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
+const blank = () => ({ schemaVersion: 9, settings: { homesteadName: 'Test' }, records: [], people: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
 const record = (id = crypto.randomUUID()) => ({ id, type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', deletedAt: null });
 
 class MockCloud {
@@ -92,6 +93,89 @@ test('recurrence normalization preserves explicit record Routine metadata', () =
   });
   assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', routineType: 'guess_from_title' }).routineType, undefined);
   assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', routineType: 'egg_collection' }).routineType, 'egg_collection');
+  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'monthly', routineType: 'equipment_service' }).routineType, 'equipment_service');
+});
+
+test('Record responsibility uses the stable Person mapping in both sync directions', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const person = state.entity('homestead_people', 'child-clare');
+  const localRecord = { ...record('cow'), stewardship: { responsiblePersonId: 'child-clare' } };
+  const cloud = toCloud('records', localRecord, state);
+  assert.equal(cloud.stewardship.responsiblePersonId, person.cloudId);
+  assert.equal(fromCloud('records', { ...cloud, created_at: localRecord.createdAt, updated_at: localRecord.updatedAt }, state).stewardship.responsiblePersonId, 'child-clare');
+});
+
+test('schema v9 migration creates only unambiguous Work relationships and preserves legacy fields', () => {
+  const records = [
+    { id: 'barn', type: 'Structure', name: 'Barn' },
+    { id: 'repair', type: 'Work', name: 'Repair roof', identity: { linkedRecordId: 'barn', legacySummary: 'Old roof note' } },
+    { id: 'unknown', type: 'Work', name: 'Unknown target', identity: { linkedRecordId: 'missing' } }
+  ];
+  const upgraded = recordsV2.upgradeRelationships(records, [], 8, () => 'relationship-id', '2026-08-12T12:00:00.000Z');
+  assert.equal(upgraded.length, 1);
+  assert.deepEqual({ source: upgraded[0].sourceRecordId, target: upgraded[0].targetRecordId, type: upgraded[0].relationshipType }, { source: 'repair', target: 'barn', type: 'related_to' });
+  assert.equal(records[1].identity.legacySummary, 'Old roof note');
+});
+
+test('changing a current location ends history and leaves one active relationship', () => {
+  const relationships = [recordsV2.normalizeRelationship({ id: 'old', sourceRecordId: 'cow', targetRecordId: 'barn', relationshipType: 'located_on', startedAt: '2026-08-01T00:00:00Z' })];
+  recordsV2.replaceRelationship(relationships, { sourceRecordId: 'cow', relationshipType: 'located_on', targetRecordId: 'pasture', details: { purpose: 'current_location' }, now: '2026-08-12T12:00:00Z', makeId: () => 'new' });
+  assert.equal(relationships[0].endedAt, '2026-08-12T12:00:00Z');
+  assert.equal(recordsV2.currentLocation(relationships, 'cow').targetRecordId, 'pasture');
+  assert.equal(recordsV2.activeRelationships(relationships, 'cow', 'located_on').length, 1);
+});
+
+test('reverse location views derive occupants and stored Equipment', () => {
+  const records = [record('cow'), { ...record('tractor'), type: 'Equipment', name: 'Tractor' }, { ...record('barn'), type: 'Structure', name: 'Barn' }];
+  const relationships = [
+    recordsV2.normalizeRelationship({ sourceRecordId: 'cow', targetRecordId: 'barn', relationshipType: 'located_on' }),
+    recordsV2.normalizeRelationship({ sourceRecordId: 'tractor', targetRecordId: 'barn', relationshipType: 'located_on' })
+  ];
+  assert.deepEqual(recordsV2.reverseLocationContents(records, relationships, 'barn').map(item => item.id), ['cow', 'tractor']);
+});
+
+test('parentage remains optional, role-specific, and reversible', () => {
+  const relationships = [
+    recordsV2.normalizeRelationship({ sourceRecordId: 'dam', targetRecordId: 'calf', relationshipType: 'parent_of', details: { parentRole: 'dam' } }),
+    recordsV2.normalizeRelationship({ sourceRecordId: 'sire', targetRecordId: 'calf', relationshipType: 'parent_of', details: { parentRole: 'sire' } })
+  ];
+  assert.deepEqual(recordsV2.parentsFor(relationships, 'calf'), { dam: 'dam', sire: 'sire' });
+  assert.deepEqual(recordsV2.offspringFor(relationships, 'dam'), [{ recordId: 'calf', parentRole: 'dam' }]);
+  assert.deepEqual(recordsV2.parentsFor([], 'group'), { dam: null, sire: null });
+});
+
+test('suggested routines are contextual, limited, and never created merely by viewing suggestions', () => {
+  const dairy = { type: 'Animal', status: 'Active', identity: { purpose: 'Dairy', species: 'Cattle' } };
+  const pasture = { type: 'Land', status: 'Active', identity: { landType: 'Pasture' } };
+  const work = { type: 'Work', status: 'Active', identity: {} };
+  const tasks = [];
+  assert.deepEqual(recordsV2.suggestionsFor(dairy).slice(0, 2).map(item => item.type), ['milk_morning', 'milk_evening']);
+  assert.deepEqual(recordsV2.suggestionsFor(pasture).map(item => item.type), ['pasture_boundary_inspection', 'pasture_condition_check', 'pasture_mow']);
+  assert.deepEqual(recordsV2.suggestionsFor(work), []);
+  assert.equal(tasks.length, 0);
+  assert.ok(recordsV2.suggestionsFor(dairy).length <= 5);
+});
+
+test('record relationship conversion preserves stable local Record identities', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const relationship = recordsV2.normalizeRelationship({ id: 'move-one', sourceRecordId: 'cow', targetRecordId: 'pasture', relationshipType: 'located_on', details: { purpose: 'current_location' } });
+  const cloud = toCloud('record_relationships', relationship, state);
+  assert.equal(cloud.source_record_id, state.entity('records', 'cow').cloudId);
+  assert.equal(cloud.target_record_id, state.entity('records', 'pasture').cloudId);
+  assert.equal(fromCloud('record_relationships', { ...cloud, id: cloud.id, created_at: relationship.createdAt, updated_at: relationship.updatedAt }, state).sourceRecordId, 'cow');
+});
+
+test('offline location changes queue and reconnect through the existing sync engine', async () => {
+  const before = blank(); before.records.push(record('cow'), { ...record('pasture'), type: 'Land' });
+  const setup = harness(before); setup.state.bind(crypto.randomUUID()); setup.state.state.initialSyncCompleted = true;
+  setup.state.entity('records', 'cow').cloudVersion = 1; setup.state.entity('records', 'pasture').cloudVersion = 1;
+  const after = structuredClone(before);
+  after.relationships.push(recordsV2.normalizeRelationship({ id: 'move-one', sourceRecordId: 'cow', targetRecordId: 'pasture', relationshipType: 'located_on' }));
+  setup.engine.queueLocalChanges(before, after);
+  assert.equal(setup.state.state.outbox.find(item => item.table === 'record_relationships').type, 'create');
+  await setup.engine.sync();
+  assert.equal(setup.cloud.rows.record_relationships.length, 1);
+  assert.equal(setup.state.state.outbox.length, 0);
 });
 
 test('Routine matching uses yield type, record, work date, session, and explicit metadata', () => {
@@ -370,6 +454,11 @@ test('push uses dependency-safe domain order', async () => {
   const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
   for (const table of [...DOMAIN_ORDER].reverse()) h.state.enqueue({ table, localId: crypto.randomUUID(), type: 'create', payload: { id: crypto.randomUUID() } });
   await h.engine.push(); assert.deepEqual(h.cloud.calls.map(item => item.table), DOMAIN_ORDER);
+});
+
+test('People upload before responsible Records and delete after them', () => {
+  assert.ok(DOMAIN_ORDER.indexOf('homestead_people') < DOMAIN_ORDER.indexOf('records'));
+  assert.ok(operationOrder({ table: 'records', type: 'soft_delete' }) < operationOrder({ table: 'homestead_people', type: 'soft_delete' }));
 });
 
 test('successful idempotent retry cannot duplicate a row', async () => {
