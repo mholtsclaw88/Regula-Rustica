@@ -196,6 +196,9 @@ body { background: var(--cream); }
   margin-bottom: 14px;
 }
 
+.calendar-view-switch { margin-bottom: 13px; }
+.calendar-view-switch .choice-pills { justify-content: center; }
+
 .calendar-filters {
   border: 0;
   padding: 0;
@@ -276,6 +279,33 @@ body { background: var(--cream); }
   background: var(--line);
   gap: 1px;
 }
+
+.calendar-week-view { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.calendar-today-view { grid-template-columns: minmax(0, 1fr); }
+
+.calendar-period-column {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  background: var(--line);
+}
+
+.calendar-period-column .calendar-day {
+  width: 100%;
+  height: 100%;
+  min-height: 310px;
+}
+
+.calendar-period-heading {
+  display: grid;
+  gap: 2px;
+}
+.calendar-period-heading span { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; }
+.calendar-period-heading strong { font-family: Georgia, 'Times New Roman', serif; font-size: .9rem; }
+.calendar-today-view .calendar-period-column .calendar-day { min-height: 360px; padding: 18px; }
+.calendar-today-view .calendar-items { gap: 8px; max-width: 760px; }
+.calendar-today-view .calendar-item { padding: 10px 12px; font-size: .83rem; border-radius: 8px; }
+.calendar-today-view .calendar-date { display: none; }
 
 .calendar-weekday {
   background: #f3ead9;
@@ -542,6 +572,7 @@ summary:focus-visible {
   .calendar-filters legend { text-align: left; }
   .calendar-filter-pills { justify-content: flex-start; }
   .calendar-day { min-height: 92px; }
+  .calendar-period-column .calendar-day { min-height: 235px; }
   .records-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -577,4 +608,20 @@ summary:focus-visible {
   .task-entry .routine-record { flex: 1; }
   .nav button { min-width: 72px; padding: 10px 9px; }
   .nav-icon { width: 18px; height: 18px; }
+  .calendar-view-switch .choice-pills { justify-content: stretch; }
+  .calendar-view-switch label { flex: 1; justify-content: center; }
+  .calendar-week-view { grid-template-columns: 1fr; }
+  .calendar-week-view .calendar-period-column {
+    grid-template-columns: 78px minmax(0, 1fr);
+    grid-template-rows: 1fr;
+  }
+  .calendar-week-view .calendar-period-heading {
+    align-content: start;
+    text-align: left;
+    padding: 12px 8px;
+  }
+  .calendar-period-column .calendar-day,
+  .calendar-today-view .calendar-period-column .calendar-day { min-height: 112px; padding: 10px; }
+  .calendar-week-view .calendar-date { display: none; }
+  .calendar-today-view .calendar-item { padding: 8px 9px; font-size: .75rem; }
 }

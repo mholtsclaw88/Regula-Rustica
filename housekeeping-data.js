@@ -129,6 +129,45 @@
     return { starts, ends, showLabel: starts };
   }
 
+  function calendarViewDates(focusDate = '', view = 'month') {
+    const parts = dateParts(focusDate);
+    if (!parts) return [];
+    const focus = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+    let first = focus;
+    let count = 1;
+    if (view === 'week') {
+      first = new Date(Date.UTC(parts.year, parts.month - 1, parts.day - focus.getUTCDay()));
+      count = 7;
+    } else if (view === 'month') {
+      const monthFirst = new Date(Date.UTC(parts.year, parts.month - 1, 1));
+      first = new Date(Date.UTC(parts.year, parts.month - 1, 1 - monthFirst.getUTCDay()));
+      count = 42;
+    }
+    return Array.from({ length: count }, (_, offset) => {
+      const date = new Date(first.getTime() + offset * 86400000);
+      return formatDateParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+    });
+  }
+
+  function shiftCalendarFocus(focusDate = '', view = 'month', direction = 1) {
+    const parts = dateParts(focusDate);
+    if (!parts) return focusDate;
+    const step = direction < 0 ? -1 : 1;
+    if (view === 'today') {
+      const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + step));
+      return formatDateParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+    }
+    if (view === 'week') {
+      const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + step * 7));
+      return formatDateParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+    }
+    const monthIndex = parts.month - 1 + step;
+    const year = parts.year + Math.floor(monthIndex / 12);
+    const month = ((monthIndex % 12) + 12) % 12;
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    return formatDateParts(year, month + 1, Math.min(parts.day, lastDay));
+  }
+
   function dateParts(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
     if (!match) return null;
@@ -166,6 +205,7 @@
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
     routineType, routineYieldType, routineSession, routineLabel, taskWorkDate,
-    matchingRoutineTasks, matchingYieldForTask, taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment
+    matchingRoutineTasks, matchingYieldForTask, taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment,
+    calendarViewDates, shiftCalendarFocus
   };
 }));

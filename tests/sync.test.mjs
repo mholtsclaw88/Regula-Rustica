@@ -282,6 +282,24 @@ test('calendar range bars restart cleanly when they cross a week', () => {
   assert.equal(housekeepingData.taskCalendarBarSegment({ dueDate: '2026-08-10' }, '2026-08-10', 1), null);
 });
 
+test('calendar view dates cover today, week, and the six-row month grid', () => {
+  assert.deepEqual(housekeepingData.calendarViewDates('2026-08-11', 'today'), ['2026-08-11']);
+  assert.deepEqual(housekeepingData.calendarViewDates('2026-08-11', 'week'), [
+    '2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15'
+  ]);
+  const month = housekeepingData.calendarViewDates('2026-08-11', 'month');
+  assert.equal(month.length, 42);
+  assert.equal(month[0], '2026-07-26');
+  assert.equal(month[41], '2026-09-05');
+});
+
+test('calendar navigation advances by the active view without skipping dates', () => {
+  assert.equal(housekeepingData.shiftCalendarFocus('2026-08-11', 'today', 1), '2026-08-12');
+  assert.equal(housekeepingData.shiftCalendarFocus('2026-08-11', 'week', -1), '2026-08-04');
+  assert.equal(housekeepingData.shiftCalendarFocus('2027-01-31', 'month', 1), '2027-02-28');
+  assert.equal(housekeepingData.shiftCalendarFocus('2026-01-10', 'month', -1), '2025-12-10');
+});
+
 test('calendar keeps single-date and malformed legacy Tasks safe', () => {
   assert.equal(housekeepingData.taskCalendarSegment({ dueDate: '2026-08-12' }, '2026-08-12'), 'single');
   assert.deepEqual(housekeepingData.taskCalendarBounds({ availableFrom: '2026-08-13', dueDate: '2026-08-10' }), {
