@@ -88,11 +88,12 @@ The local data object should use an explicit schema version.
 
 ```json
 {
-  "schemaVersion": 7,
+  "schemaVersion": 9,
   "settings": {},
   "records": [],
   "people": [],
   "tasks": [],
+  "relationships": [],
   "assignments": [],
   "events": [],
   "calendarEvents": [],
@@ -148,13 +149,15 @@ Tasks represent future work.
 }
 ```
 
-`availableFrom` and `dueDate` are independently optional. Schema version 6 adds distinct local collections for shared calendar events and canonical Milk/Egg yield entries. Schema version 7 adds an assignable Homestead people directory and normalized task assignments. Older schema-version 5 and 6 backups remain importable.
+`availableFrom` and `dueDate` are independently optional. Schema version 6 adds distinct local collections for shared calendar events and canonical Milk/Egg yield entries. Schema version 7 adds an assignable Homestead people directory and normalized task assignments. Schema version 9 makes Record relationships and contextual Routine metadata canonical while retaining safe import support for schema versions 5 through 8.
 
 Optional recurrence metadata uses a daily, weekly, or monthly frequency, a positive interval, and either a fixed schedule based on the prior due date or a schedule based on completion. Completing a recurring task creates only its next occurrence. A Homestead that has never initialized cloud synchronization generates that occurrence locally; after cloud initialization, the idempotent database completion path owns generation and the client receives the next occurrence through synchronization.
 
 ### Homestead People and Task Assignments
 
 `people` is the local-first assignee directory. Account-backed entries have `personType: "member"` and a membership link supplied by the cloud; `personType: "child"` entries have no account, role, membership, or access. Tasks reference people through the separate `assignments` collection so assignment history is not duplicated on the task. The first UI exposes one active assignee while the underlying model continues to support multiple assignments.
+
+Record stewardship may reference a responsible Person by `responsiblePersonId`. That identifier is mapped through the same local/cloud Person identity table during synchronization and does not grant permissions. Current Animal and Equipment locations, Animal parentage, and unambiguous Work links use the `relationships` collection rather than free-text canonical fields.
 
 Completing a linked task may create a Chronicle event automatically.
 

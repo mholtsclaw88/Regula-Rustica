@@ -59,6 +59,8 @@ May include:
 
 Stewardship should remain short and practical.
 
+Current location and responsibility are structured references. Animal and Equipment locations point to active Land or Structure Records. Responsibility points to an active Homestead Person and never changes that person's permissions. A changed location ends the prior relationship so its history remains available.
+
 ### 3. Tasks
 
 Answers: **What needs to happen?**
@@ -70,6 +72,8 @@ Tasks may be:
 - Generated as the next occurrence of a Routine
 
 A task created from inside a record should automatically link to that record.
+
+Suggested Routines are optional contextual templates displayed on a Record. Turning one on creates an ordinary recurring Task; merely viewing a suggestion creates nothing. Turning it off stops the current or future occurrence without erasing completed Task or Chronicle history.
 
 A task should contain:
 

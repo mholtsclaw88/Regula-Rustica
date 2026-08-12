@@ -422,6 +422,9 @@ Rules:
 - A record cannot relate to itself.
 - Both records must belong to the same Homestead.
 - Duplicate active relationships of the same type should be prevented where practical.
+- An Animal or Equipment Record has at most one active `located_on` relationship, whose target must be active Land or Structure in the same Homestead.
+- `parent_of` connects Animal Records. The child must be managed individually and may have at most one active `dam` and one active `sire` role.
+- Reverse views such as occupants, stored Equipment, and offspring are derived from these relationships rather than stored as duplicate lists.
 
 ---
 
@@ -473,12 +476,18 @@ Recurrence example:
 }
 ```
 
-Record-specific Routines use recurring Tasks underneath. Their
-`recurrence_rule.routineType` may be `milk_morning`, `milk_evening`, or
-`egg_collection`. This metadata is explicit; Task titles are never interpreted
-to infer Routine behavior. Milking Routines require an active dairy Animal,
-Egg Collection requires an active laying Animal, and every Routine requires a
-work date. Only one open Routine of each type may exist for an Animal.
+Record-specific Routines use recurring Tasks underneath. Their explicit
+`recurrence_rule.routineType` identifies a known Animal, Land, Equipment, or
+Structure template; Task titles are never interpreted to infer Routine behavior.
+The database verifies that each Routine matches the linked Record type and any
+required subtype, and only one open occurrence of each Routine type may exist
+per Record. Completing a recurring occurrence copies its active assignment to
+the next occurrence. Milk and Egg Routines retain their Task-linked Yield flow;
+all other Routine completions use normal Task completion.
+
+When `records.stewardship.responsiblePersonId` is present, it must be the UUID of
+an active `homestead_people` row in the same Homestead. This reference is
+descriptive stewardship metadata and is never an authorization grant.
 
 Supported initial modes:
 

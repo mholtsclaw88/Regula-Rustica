@@ -233,13 +233,16 @@ Parent objects must be uploaded before dependent objects.
 The implementation should use a deterministic dependency-safe order approximately as follows:
 
 1. Homestead/membership context is already established by Cloud Foundation
-2. Records
-3. Tasks
-4. Record relationships
-5. Task assignments
-6. Chronicle entries
-7. Notes
-8. Ledger entries
+2. Homestead people
+3. Records
+4. Tasks
+5. Record relationships
+6. Task assignments
+7. Chronicle entries
+8. Calendar events
+9. Yield entries
+10. Notes
+11. Ledger entries
 
 If implementation discovers additional foreign-key dependencies, the exact order may be adjusted without changing this principle.
 
@@ -756,3 +759,19 @@ the database enforces one Yield per Task. The Task update remains earlier in
 dependency order; a protected Yield insert also completes an open authorized
 Task so concurrent or reordered delivery converges on one completion and one
 next occurrence. Yield edits and soft deletion never reverse Task completion.
+
+### Records v2 extension
+
+Local schema version 9 synchronizes `record_relationships` as the canonical
+source for current Animal or Equipment location, Animal parentage, and explicit
+Work links. Relationship history is retained by ending the previous row rather
+than overwriting it. Legacy Work `identity.linkedRecordId` values are converted
+only when they point to an exact existing Record; ambiguous or missing links are
+left untouched.
+
+Record responsibility remains inside stewardship JSON but stores a stable
+Person identifier. The sync converter maps that identifier through
+`homestead_people` in both directions, and the database rejects missing,
+removed, or cross-Homestead Persons. Contextual suggestions create no sync data
+until enabled; enabled suggestions synchronize as ordinary recurring Tasks with
+an explicit known `routineType`.
