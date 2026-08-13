@@ -46,3 +46,14 @@ test('suggestions stay conservative and record-specific', () => {
   assert.deepEqual(routines.suggestedTypes({ type: 'Animal', status: 'Active', identity: { purpose: 'Eggs' } }), ['egg_collection']);
   assert.deepEqual(routines.suggestedTypes({ type: 'Equipment', status: 'Active', identity: {} }), []);
 });
+
+test('an enabled migrated Routine with only completed history regains one pending occurrence', () => {
+  const migrated = routines.migrateTaskBacked({
+    schemaVersion: 9,
+    routines: [{ id: 'evening', recordId: 'daisy', name: 'Evening Milking', routineType: 'milk_evening', enabled: true, frequency: 'daily', interval: 1, firstDate: '2026-08-11', nextDate: '2026-08-11' }],
+    routineOccurrences: [{ id: 'done', routineId: 'evening', occurrenceDate: '2026-08-11', status: 'completed', completionMethod: 'migration', completedAt: '2026-08-11T22:00:00Z' }]
+  }, { now: '2026-08-12T00:00:00Z', makeId: () => 'next-evening' });
+  assert.equal(migrated.occurrences.filter(item => item.status === 'pending').length, 1);
+  assert.equal(migrated.occurrences.find(item => item.status === 'pending').occurrenceDate, '2026-08-12');
+  assert.equal(migrated.routines[0].nextDate, '2026-08-12');
+});

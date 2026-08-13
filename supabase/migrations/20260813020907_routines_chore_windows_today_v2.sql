@@ -198,6 +198,28 @@ from public.tasks t join public.routines r on r.homestead_id = t.homestead_id an
  and r.routine_type = t.recurrence_rule ->> 'routineType'
 where t.recurrence_rule ->> 'routineType' in ('milk_morning','milk_evening','egg_collection') on conflict do nothing;
 
+-- A legacy definition whose imported history is entirely complete still needs
+-- one actionable next occurrence. This is deliberately limited to migrated
+-- definitions and creates no duplicate when an open Task already supplied one.
+with latest as (
+  select distinct on (o.routine_id) o.routine_id,o.occurrence_date
+  from public.routine_occurrences o order by o.routine_id,o.occurrence_date desc
+)
+insert into public.routine_occurrences(homestead_id,routine_id,occurrence_date,created_by,updated_by,source)
+select r.homestead_id,r.id,
+  case r.frequency when 'daily' then l.occurrence_date + r.interval
+    when 'weekly' then l.occurrence_date + (7 * r.interval)
+    when 'monthly' then (l.occurrence_date + make_interval(months => r.interval))::date end,
+  r.created_by,r.updated_by,'migration'::public.entry_source
+from public.routines r join latest l on l.routine_id=r.id
+where r.source='migration' and r.enabled and not exists (
+  select 1 from public.routine_occurrences pending where pending.routine_id=r.id and pending.status='pending' and pending.deleted_at is null
+) on conflict do nothing;
+
+update public.routines r set next_date=p.occurrence_date
+from public.routine_occurrences p
+where p.routine_id=r.id and p.status='pending' and p.deleted_at is null and r.source='migration';
+
 update public.tasks t set recurrence_rule = jsonb_set(t.recurrence_rule, '{migratedToRoutineId}', to_jsonb(o.routine_id::text), true)
 from public.routine_occurrences o where o.legacy_task_id = t.id;
 

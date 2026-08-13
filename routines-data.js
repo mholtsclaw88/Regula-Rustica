@@ -131,7 +131,21 @@
     const routines = (source.routines || []).map(normalizeRoutine);
     const occurrences = (source.routineOccurrences || []).map(normalizeOccurrence);
     const tasks = source.tasks || [];
-    if (Number(source.schemaVersion || source.version || 0) >= 9) return { windows, routines, occurrences, tasks };
+    const ensurePendingOccurrence = routine => {
+      if (!active(routine) || !routine.enabled || occurrences.some(item => active(item) && item.routineId === routine.id && item.status === 'pending')) return;
+      const latest = occurrences.filter(item => active(item) && item.routineId === routine.id)
+        .sort((a, b) => b.occurrenceDate.localeCompare(a.occurrenceDate))[0];
+      const occurrenceDate = latest
+        ? addDate(latest.occurrenceDate, routine.frequency, routine.interval)
+        : routine.nextDate || routine.firstDate;
+      if (!occurrenceDate || occurrences.some(item => active(item) && item.routineId === routine.id && item.occurrenceDate === occurrenceDate)) return;
+      routine.nextDate = occurrenceDate;
+      occurrences.push(normalizeOccurrence({ id: makeId(), routineId: routine.id, occurrenceDate, createdAt: timestamp, updatedAt: timestamp }));
+    };
+    if (Number(source.schemaVersion || source.version || 0) >= 9) {
+      routines.forEach(ensurePendingOccurrence);
+      return { windows, routines, occurrences, tasks };
+    }
 
     const structured = tasks.filter(task => TYPES[task.recurrenceRule?.routineType]);
     const groups = new Map();
@@ -187,6 +201,7 @@
         if (occurrence) entry.routineOccurrenceId = occurrence.id;
       }
     });
+    routines.forEach(ensurePendingOccurrence);
     return { windows, routines, occurrences, tasks };
   }
 
