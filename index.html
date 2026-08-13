@@ -9,14 +9,15 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css?v=theme-pass-1">
+  <link rel="stylesheet" href="housekeeping.css?v=routines-v3">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=theme-pass-1" defer></script>
-  <script src="app.js?v=theme-pass-1" defer></script>
+  <script src="housekeeping-data.js?v=routines-v3" defer></script>
+  <script src="routines-data.js?v=routines-v3" defer></script>
+  <script src="app.js?v=routines-v3" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=theme-pass-1" type="module"></script>
+  <script src="sync/runtime.mjs?v=routines-v3" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -40,12 +41,14 @@
 
   <main>
     <section id="today" class="view active">
+      <div id="todayChoreWindows" class="today-sections"></div>
       <div class="grid2">
         <article class="card">
-          <span class="label">Today’s Rule</span>
+          <span class="label">Today's Work</span>
           <h2 id="todayDate"></h2>
           <div id="todayTasks" class="stack"></div>
           <p id="todayEmpty" class="empty">Nothing is due. Add the next useful task.</p>
+          <span id="todayTaskCount" class="pill">0</span>
         </article>
         <aside class="card">
           <span class="label">At a glance</span>
@@ -59,6 +62,10 @@
             <button class="btn secondary" id="todayAddRecord">Add record</button>
           </div>
         </aside>
+        <article class="card today-section">
+          <span class="label">Shared time</span><h3>Today's Events</h3><span id="todayEventCount" class="pill">0</span>
+          <div id="todayEvents" class="stack"></div><p id="todayEventsEmpty" class="empty">No Calendar Events today.</p>
+        </article>
       </div>
     </section>
 
@@ -147,6 +154,11 @@
             <button class="btn secondary" id="calendarNext" type="button" aria-label="Next month">→</button>
           </div>
           <h3 id="calendarMonthLabel"></h3>
+          <div class="choice-pills calendar-view-pills" aria-label="Calendar view">
+            <label><input type="radio" name="calendarView" value="today">Today</label>
+            <label><input type="radio" name="calendarView" value="week">Week</label>
+            <label><input type="radio" name="calendarView" value="month" checked>Month</label>
+          </div>
           <fieldset class="calendar-filters">
             <legend>Show on calendar</legend>
             <div class="calendar-filter-pills">
@@ -222,6 +234,7 @@
         <button class="active" type="button" data-settings-target="settingIdentity">Homestead</button>
         <button type="button" data-settings-target="settingBackup">Backup</button>
         <button type="button" data-settings-target="settingPeople">People</button>
+        <button type="button" data-settings-target="settingChoreWindows">Chore Windows</button>
         <button type="button" data-settings-target="settingCloud">Cloud</button>
       </nav>
       <div class="grid2">
@@ -254,6 +267,12 @@
           <div id="childList" class="stack"></div>
           <p id="childEmpty" class="empty">No children have been added.</p>
           <p class="muted">Kiosk access is planned for a later sprint.</p>
+        </article>
+        <article class="card settings-section" id="settingChoreWindows">
+          <span class="label">Daily rhythm</span><h2>Chore Windows</h2>
+          <p class="muted">Group Routines into practical parts of the day. These are not appointments.</p>
+          <form id="choreWindowForm" class="form-grid"><label>Window name<input id="choreWindowName" maxlength="80" required></label><button class="btn primary" type="submit">Add window</button></form>
+          <div id="choreWindowList" class="stack"></div>
         </article>
         <article class="card cloud-card settings-section" id="settingCloud">
           <span class="label">Cloud foundation</span>
@@ -348,14 +367,15 @@
             <button class="btn primary" id="recordEvent">Record</button>
             <button class="btn secondary hidden" id="recordMilk">Milk</button>
             <button class="btn secondary hidden" id="recordEggs">Eggs</button>
-            <button class="btn secondary hidden" id="recordAddRoutine">+ Routine</button>
+            <button class="btn secondary" id="recordAddRoutine">+ Custom Routine</button>
             <button class="btn secondary" id="recordAddTask">+ Task</button>
             <button class="btn secondary" id="recordAddNote">+ Note</button>
             <button class="btn secondary" id="recordAddLedger">+ Ledger</button>
             <button class="btn ghost" id="recordEdit">Edit</button>
           </div>
         </div>
-        <div id="recordStewardship" class="steward-box"></div>
+        <details class="record-context" open><summary><strong>Stewardship</strong></summary><div id="recordStewardship" class="steward-box"></div></details>
+        <details class="record-context" open><summary><strong>Routines</strong></summary><div id="recordRoutines" class="stack"></div></details>
         <div class="tabs-mini" role="tablist" aria-label="Record details">
           <button class="active" data-panel="tasks">Tasks</button>
           <button data-panel="chronicle">Chronicle</button>

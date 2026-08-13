@@ -4,18 +4,21 @@ const migrationPath = new URL('../supabase/migrations/20260806034255_cloud_found
 const invitationMigrationPath = new URL('../supabase/migrations/20260809204827_member_invitations.sql', import.meta.url);
 const housekeepingMigrationPath = new URL('../supabase/migrations/20260810031921_housekeeping_tasks_calendar_yield.sql', import.meta.url);
 const peopleMigrationPath = new URL('../supabase/migrations/20260810112308_homestead_people_task_assignment.sql', import.meta.url);
-const [migration, invitationMigration, housekeepingMigration, peopleMigration, config, html, worker, tests, invitationTests, housekeepingTests, peopleTests] = await Promise.all([
+const routineMigrationPath = new URL('../supabase/migrations/20260813020907_routines_chore_windows_today_v2.sql', import.meta.url);
+const [migration, invitationMigration, housekeepingMigration, peopleMigration, routineMigration, config, html, worker, tests, invitationTests, housekeepingTests, peopleTests, routineTests] = await Promise.all([
   readFile(migrationPath, 'utf8'),
   readFile(invitationMigrationPath, 'utf8'),
   readFile(housekeepingMigrationPath, 'utf8'),
   readFile(peopleMigrationPath, 'utf8'),
+  readFile(routineMigrationPath, 'utf8'),
   readFile(new URL('../supabase/config.toml', import.meta.url), 'utf8'),
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
   readFile(new URL('../service-worker.js', import.meta.url), 'utf8'),
   readFile(new URL('../supabase/tests/database/cloud_foundation.test.sql', import.meta.url), 'utf8'),
   readFile(new URL('../supabase/tests/database/member_invitations.test.sql', import.meta.url), 'utf8'),
   readFile(new URL('../supabase/tests/database/housekeeping.test.sql', import.meta.url), 'utf8'),
-  readFile(new URL('../supabase/tests/database/homestead_people.test.sql', import.meta.url), 'utf8')
+  readFile(new URL('../supabase/tests/database/homestead_people.test.sql', import.meta.url), 'utf8'),
+  readFile(new URL('../supabase/tests/database/routines_chore_windows.test.sql', import.meta.url), 'utf8')
 ]);
 
 const tables = [
@@ -25,6 +28,7 @@ const tables = [
 ];
 const housekeepingTables = ['calendar_events', 'yield_entries'];
 const peopleTables = ['homestead_people'];
+const routineTables = ['chore_windows', 'routines', 'routine_occurrences'];
 const functions = [
   'create_homestead', 'accept_invitation', 'current_homestead_id',
   'current_member_role', 'has_capability', 'protect_final_steward',
@@ -33,6 +37,7 @@ const functions = [
 const invitationFunctions = ['create_invitation', 'list_invitations', 'revoke_invitation'];
 const housekeepingFunctions = ['apply_housekeeping_sync_operation'];
 const peopleFunctions = ['apply_people_sync_operation'];
+const routineFunctions = ['apply_routine_sync_operation', 'can_complete_routine'];
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -54,6 +59,11 @@ for (const table of peopleTables) {
   assert(new RegExp(`alter table public\\.${table} enable row level security`, 'i').test(peopleMigration), `RLS not enabled: ${table}`);
   assert(peopleTests.includes(`'${table}'`), `People tests do not name table: ${table}`);
 }
+for (const table of routineTables) {
+  assert(new RegExp(`create table public\\.${table}\\b`, 'i').test(routineMigration), `Missing table: ${table}`);
+  assert(new RegExp(`alter table public\\.${table} enable row level security`, 'i').test(routineMigration), `RLS not enabled: ${table}`);
+  assert(routineTests.includes(`'${table}'`), `Routine tests do not name table: ${table}`);
+}
 
 for (const fn of functions) {
   assert(new RegExp(`function public\\.${fn}\\b`, 'i').test(migration), `Missing function: ${fn}`);
@@ -67,9 +77,10 @@ for (const fn of housekeepingFunctions) {
 for (const fn of peopleFunctions) {
   assert(new RegExp(`function public\\.${fn}\\b`, 'i').test(peopleMigration), `Missing people function: ${fn}`);
 }
+for (const fn of routineFunctions) assert(new RegExp(`function public\\.${fn}\\b`, 'i').test(routineMigration), `Missing Routine function: ${fn}`);
 
 assert(!/create table public\.photos\b/i.test(migration), 'Photos must remain deferred.');
-const allMigrations = [migration, invitationMigration, housekeepingMigration, peopleMigration].join('\n');
+const allMigrations = [migration, invitationMigration, housekeepingMigration, peopleMigration, routineMigration].join('\n');
 assert(!/grant\s+.+\s+to\s+anon\b/i.test(allMigrations), 'The anon role must receive no grants.');
 assert(!/security definer(?!\s+set search_path\s*=\s*'')/i.test(allMigrations), 'Every SECURITY DEFINER function must set an empty search_path.');
 assert(/enable_anonymous_sign_ins\s*=\s*false/.test(config), 'Anonymous sign-in must be disabled.');
@@ -79,6 +90,7 @@ assert(/select plan\(48\)/.test(tests), 'pgTAP plan must match the test suite.')
 assert(/select plan\(21\)/.test(invitationTests), 'Invitation pgTAP plan must match the test suite.');
 assert(/select plan\(39\)/.test(housekeepingTests), 'Housekeeping pgTAP plan must match the test suite.');
 assert(/select plan\(37\)/.test(peopleTests), 'Homestead people pgTAP plan must match the test suite.');
+assert(/select plan\(35\)/.test(routineTests), 'Routine pgTAP plan must match the test suite.');
 assert(/drop constraint if exists invitations_role_check/i.test(invitationMigration), 'Steward invitations must be permitted.');
 assert(/revoke select, insert, update on public\.invitations from authenticated/i.test(invitationMigration), 'Direct invitation table access must be revoked.');
 assert(/id="cloudMemberManagement"/.test(html) && /id="cloudInvitationForm"/.test(html), 'Steward invitation UI is incomplete.');
@@ -88,4 +100,4 @@ assert(assetMatch, 'Service worker asset list is missing.');
 const assets = [...assetMatch[1].matchAll(/'\.\/(.*?)'/g)].map(match => match[1]).filter(Boolean);
 for (const asset of assets) await access(new URL(`../${asset}`, import.meta.url));
 
-console.log(`Cloud foundation checks passed (${tables.length + housekeepingTables.length + peopleTables.length} RLS tables, ${functions.length + invitationFunctions.length + housekeepingFunctions.length + peopleFunctions.length} required functions, ${assets.length} cached assets).`);
+console.log(`Cloud foundation checks passed (${tables.length + housekeepingTables.length + peopleTables.length + routineTables.length} RLS tables, ${functions.length + invitationFunctions.length + housekeepingFunctions.length + peopleFunctions.length + routineFunctions.length} required functions, ${assets.length} cached assets).`);
