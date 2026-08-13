@@ -473,12 +473,11 @@ Recurrence example:
 }
 ```
 
-Record-specific Routines use recurring Tasks underneath. Their
-`recurrence_rule.routineType` may be `milk_morning`, `milk_evening`, or
-`egg_collection`. This metadata is explicit; Task titles are never interpreted
-to infer Routine behavior. Milking Routines require an active dairy Animal,
-Egg Collection requires an active laying Animal, and every Routine requires a
-work date. Only one open Routine of each type may exist for an Animal.
+Generic recurring Tasks remain supported. Record-specific daily stewardship is
+modeled separately with `routines` and `routine_occurrences`; Task titles are
+never interpreted to infer Routine behavior. Older Tasks whose structured
+`recurrence_rule.routineType` is `milk_morning`, `milk_evening`, or
+`egg_collection` migrate conservatively and remain as hidden historical anchors.
 
 Supported initial modes:
 
@@ -486,6 +485,18 @@ Supported initial modes:
 - `after_completion`
 
 Only the next occurrence is generated.
+
+## `chore_windows`, `routines`, and `routine_occurrences`
+
+Chore Windows are ordered Homestead-defined parts of the working day, not
+appointments. Every new Homestead receives Morning and Evening defaults.
+
+A Routine is a durable definition linked to one Record, with an optional Chore
+Window and assignee, a simple daily/weekly/monthly interval, enabled state, and
+next date. A Routine occurrence is the dated unit of work. It is pending,
+completed, or skipped and records its completion method. Completing an
+occurrence creates at most one next occurrence. Milk and Egg Yield may link to
+one occurrence and complete it atomically.
 
 ## `task_assignments`
 

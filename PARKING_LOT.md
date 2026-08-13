@@ -13,6 +13,8 @@ This document captures worthwhile ideas that are intentionally deferred. Recordi
 - Task watchers
 - Child kiosk mode for viewing assigned tasks and marking permitted work complete
 - Advanced recurring task exceptions
+- Routine exception dates, seasonal schedules, reminders, and notifications
+- Child kiosk completion of assigned Routines
 
 ## Records
 - Custom record types

@@ -246,10 +246,17 @@ Answers: **What requires attention now?**
 
 Displays:
 
-- Due and overdue tasks
+- Morning, Evening, and custom Chore Windows with due Routine occurrences
+- Due and overdue ordinary Tasks
+- Today's Calendar Events
 - Quick add task
 - Quick add record
 - Basic counts
+
+Routines are first-class synchronized definitions, distinct from generic Tasks.
+Only their dated occurrences appear in Today and Calendar. Completed Chore
+Windows collapse quietly, and yield-backed occurrences can record Yield without
+requiring a second completion action. The Tasks page excludes Routine noise.
 
 ### Records
 
