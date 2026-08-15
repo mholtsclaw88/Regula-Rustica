@@ -80,9 +80,7 @@
     const result = { dam: null, sire: null };
     relationships.filter(item => isActive(item) && item.relationshipType === 'parent_of' && item.targetRecordId === animalId)
       .forEach(item => {
-        if (item.details?.parentRole === 'dam' || item.details?.parentRole === 'sire') {
-          result[item.details.parentRole] = item.sourceRecordId;
-        }
+        if (item.details?.parentRole === 'dam' || item.details?.parentRole === 'sire') result[item.details.parentRole] = item.sourceRecordId;
       });
     return result;
   }
@@ -198,7 +196,7 @@
         root.append(parentWrap);
         const managed = root.querySelector('[name=managedAs]');
         const update = () => parentWrap.classList.toggle('hidden', managed?.value === 'Group');
-        managed?.addEventListener('change', update, { once: true });
+        managed?.addEventListener('change', update);
         update();
       }
 
@@ -370,7 +368,7 @@
         delete record.stewardship.responsible;
       }
       if (record.type === 'Land') delete record.stewardship.currentOccupants;
-      if (record.type === 'Structure') delete record.identity?.location;
+      if (record.type === 'Structure' && record.identity) delete record.identity.location;
       if (record.type === 'Animal') {
         const individual = pending.managedAs !== 'Group';
         setParent(data.relationships, record.id, 'dam', individual ? pending.damId || null : null, timestamp);
