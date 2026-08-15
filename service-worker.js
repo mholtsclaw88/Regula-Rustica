@@ -1,6 +1,6 @@
 const CACHE = 'regula-rustica-routines-v8';
 const ASSETS = [
-  './', './index.html', './styles.css', './housekeeping.css?v=routines-v4', './cloud-auth.css', './housekeeping-data.js?v=routines-v4', './routines-data.js?v=routines-v4', './records-relationships.js', './ui-refinements.js?v=ledger-receipts-v1', './app.js?v=routines-v4', './cloud-auth.js',
+  './', './index.html', './styles.css', './housekeeping.css?v=routines-v4', './cloud-auth.css', './housekeeping-data.js?v=routines-v4', './routines-data.js?v=routines-v4', './records-relationships.js', './ui-refinements.js?v=ledger-receipts-v1', './ui-refinements-core.js?v=ledger-receipts-v2', './ledger-receipt-modal.js?v=ledger-receipts-v2', './app.js?v=routines-v4', './cloud-auth.js',
   './cloud-invitations.mjs',
   './sync/runtime.mjs?v=routines-v4', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
