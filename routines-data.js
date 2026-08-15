@@ -211,9 +211,17 @@
   };
 }));
 
-if (typeof document !== 'undefined' && !document.querySelector('script[data-ui-refinements]')) {
-  const script = document.createElement('script');
-  script.src = 'ui-refinements.js?v=ledger-receipts-v1';
-  script.dataset.uiRefinements = 'true';
-  document.head.appendChild(script);
+if (typeof document !== 'undefined') {
+  if (!document.querySelector('script[data-ui-refinements]')) {
+    const script = document.createElement('script');
+    script.src = 'ui-refinements.js?v=ledger-receipts-v1';
+    script.dataset.uiRefinements = 'true';
+    document.head.appendChild(script);
+  }
+  if (!document.querySelector('script[data-ledger-receipt-modal]')) {
+    const script = document.createElement('script');
+    script.src = 'ledger-receipt-modal.js?v=ledger-receipts-v3';
+    script.dataset.ledgerReceiptModal = 'true';
+    document.head.appendChild(script);
+  }
 }
