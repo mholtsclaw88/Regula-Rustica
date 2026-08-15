@@ -210,3 +210,10 @@
     isYieldBacked, routineWindow, matchingYield, completeOccurrence, suggestedTypes, migrateTaskBacked, addDate
   };
 }));
+
+if (typeof document !== 'undefined' && !document.querySelector('script[data-ui-refinements]')) {
+  const script = document.createElement('script');
+  script.src = 'ui-refinements.js?v=record-nav-v1';
+  script.dataset.uiRefinements = 'true';
+  document.head.appendChild(script);
+}
