@@ -1,3 +1,5 @@
+import '../records-relationships.js';
+
 export const DOMAIN_ORDER = ['homestead_people', 'records', 'chore_windows', 'routines', 'tasks', 'routine_occurrences', 'record_relationships', 'task_assignments', 'chronicle_entries', 'calendar_events', 'yield_entries', 'notes', 'ledger_entries'];
 
 export const COLLECTIONS = {
