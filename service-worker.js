@@ -1,4 +1,4 @@
-const CACHE = 'regula-rustica-routines-v8';
+const CACHE = 'regula-rustica-routines-v9';
 const ASSETS = [
   './', './index.html', './styles.css', './housekeeping.css?v=routines-v4', './cloud-auth.css', './housekeeping-data.js?v=routines-v4', './routines-data.js?v=routines-v4', './records-relationships.js', './ui-refinements.js?v=ledger-receipts-v1', './ui-refinements-core.js?v=ledger-receipts-v2', './ledger-receipt-modal.js?v=ledger-receipts-v2', './app.js?v=routines-v4', './cloud-auth.js',
   './cloud-invitations.mjs',
