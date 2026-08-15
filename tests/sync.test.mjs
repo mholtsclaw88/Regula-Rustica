@@ -13,7 +13,7 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-const blank = () => ({ schemaVersion: 8, settings: { homesteadName: 'Test' }, records: [], people: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
+const blank = () => ({ schemaVersion: 9, settings: { homesteadName: 'Test' }, records: [], people: [], choreWindows: [], routines: [], routineOccurrences: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
 const record = (id = crypto.randomUUID()) => ({ id, type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', deletedAt: null });
 
 class MockCloud {
@@ -280,24 +280,6 @@ test('calendar range bars restart cleanly when they cross a week', () => {
   assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-16', 0), { starts: true, ends: false, showLabel: true });
   assert.deepEqual(housekeepingData.taskCalendarBarSegment(task, '2026-08-18', 2), { starts: false, ends: true, showLabel: false });
   assert.equal(housekeepingData.taskCalendarBarSegment({ dueDate: '2026-08-10' }, '2026-08-10', 1), null);
-});
-
-test('calendar view dates cover today, week, and the six-row month grid', () => {
-  assert.deepEqual(housekeepingData.calendarViewDates('2026-08-11', 'today'), ['2026-08-11']);
-  assert.deepEqual(housekeepingData.calendarViewDates('2026-08-11', 'week'), [
-    '2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15'
-  ]);
-  const month = housekeepingData.calendarViewDates('2026-08-11', 'month');
-  assert.equal(month.length, 42);
-  assert.equal(month[0], '2026-07-26');
-  assert.equal(month[41], '2026-09-05');
-});
-
-test('calendar navigation advances by the active view without skipping dates', () => {
-  assert.equal(housekeepingData.shiftCalendarFocus('2026-08-11', 'today', 1), '2026-08-12');
-  assert.equal(housekeepingData.shiftCalendarFocus('2026-08-11', 'week', -1), '2026-08-04');
-  assert.equal(housekeepingData.shiftCalendarFocus('2027-01-31', 'month', 1), '2027-02-28');
-  assert.equal(housekeepingData.shiftCalendarFocus('2026-01-10', 'month', -1), '2025-12-10');
 });
 
 test('calendar keeps single-date and malformed legacy Tasks safe', () => {

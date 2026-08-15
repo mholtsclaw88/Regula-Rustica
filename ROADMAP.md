@@ -37,6 +37,7 @@
 - Seasonal recommendations
 
 ## Phase V — Stewardship
+- First-class Routines, Chore Windows, and Today v2 — complete
 - Filtering and sorting
 - Reports and dashboards
 - Photos

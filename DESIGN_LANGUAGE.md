@@ -128,6 +128,10 @@ The application should provide quiet, immediate feedback when work is saved, syn
 
 Routine successful actions should use brief confirmation rather than modal interruptions.
 
+Routine work should follow the Homestead's daily rhythm. Today groups dated
+occurrences under calm Chore Window headings; completed windows collapse instead
+of competing for attention. Chore Windows are never styled as appointments.
+
 Consequential actions should use clear confirmation proportional to their risk.
 
 Examples:

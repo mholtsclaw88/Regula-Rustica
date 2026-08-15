@@ -77,6 +77,7 @@ The foundation migration creates:
 - `homestead_people`, containing assignable members and account-free children
 - `chronicle_entries`, `notes`, and `ledger_entries`
 - `calendar_events` and canonical `yield_entries`
+- `chore_windows`, `routines`, and dated `routine_occurrences`
 - append-only `audit_entries`
 - idempotent `sync_operations`
 
@@ -100,6 +101,7 @@ The protected RPC surface is:
 - `apply_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
 - `apply_housekeeping_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
 - `apply_people_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
+- `apply_routine_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
 
 `create_invitation` generates a cryptographically random token on the server and returns the raw token once so the Steward can share the resulting link through a private channel. Only its lowercase SHA-256 hash is stored. Tokens are single-use, revocable, and expire after seven days by default. Notification delivery is deliberately deferred; Regula Rustica does not email invitation links automatically.
 
@@ -116,7 +118,7 @@ supabase test db supabase/tests/database
 supabase db lint --local --level warning
 ```
 
-The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The 21-assertion member-invitation suite covers Steward-only access, tenant isolation, Steward-role invitations, server-generated token hashing, expiration, revocation, audit entries, and acceptance. The additive Sync v1 suite adds 21 assertions. The 39-assertion Housekeeping suite covers task date-window constraints, Calendar and Yield RLS, two-Homestead isolation, all four roles, tenant-safe links, idempotency, audit, validation, and soft deletion/restoration. The 37-assertion Homestead people suite covers automatic member-directory entries, account-free children, all four roles, account and child task assignment, tenant isolation, idempotency, soft deletion, audit behavior, and RLS. The Record Routine/Yield link suite adds 33 assertions for explicit Milk and Egg linkage, validation, automatic completion, recurrence, active-Routine uniqueness, idempotency, role enforcement, and non-reopening deletion behavior. The database total is 199 assertions. Client suites cover invitation-link behavior, first-sync cases, recovery, durable queuing, ordering, conflicts, legacy-ID mapping, assignable people, linked Routine behavior, and the synchronized domains.
+The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The 21-assertion member-invitation suite covers invitation lifecycle and Steward-only access. Sync v1 adds 21 assertions; Housekeeping adds 39; Homestead people adds 37; and the 33-assertion Task/Yield suite remains as migration compatibility coverage. The first-class Routine suite adds 35 assertions for defaults, definition/occurrence separation, assignment-aware completion, Yield completion, recurrence idempotency, tenant isolation, all four roles, soft deletion, auditing, and RLS. The database total is 234 assertions. Client suites cover conservative Task-backed migration, recurrence, matching, synchronization, recovery, and conflicts.
 
 ## Deliberately deferred
 
