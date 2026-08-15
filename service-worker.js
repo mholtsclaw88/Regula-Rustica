@@ -1,4 +1,4 @@
-const CACHE = 'regula-rustica-routines-v5';
+const CACHE = 'regula-rustica-routines-v6';
 const ASSETS = [
   './', './index.html', './styles.css', './housekeeping.css?v=routines-v4', './cloud-auth.css', './housekeeping-data.js?v=routines-v4', './routines-data.js?v=routines-v4', './records-relationships.js', './app.js?v=routines-v4', './cloud-auth.js',
   './cloud-invitations.mjs',
