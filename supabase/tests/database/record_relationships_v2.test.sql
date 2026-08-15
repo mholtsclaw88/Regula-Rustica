@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(17);
 
 select has_index('public', 'record_relationships', 'record_relationships_one_current_location_idx', 'one canonical current location index exists');
 select has_index('public', 'record_relationships', 'record_relationships_one_parent_role_idx', 'one Dam or Sire relationship index exists');
