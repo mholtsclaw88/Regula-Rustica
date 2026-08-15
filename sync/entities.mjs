@@ -1,4 +1,4 @@
-export const DOMAIN_ORDER = ['records', 'homestead_people', 'chore_windows', 'routines', 'tasks', 'routine_occurrences', 'record_relationships', 'task_assignments', 'chronicle_entries', 'calendar_events', 'yield_entries', 'notes', 'ledger_entries'];
+export const DOMAIN_ORDER = ['homestead_people', 'records', 'chore_windows', 'routines', 'tasks', 'routine_occurrences', 'record_relationships', 'task_assignments', 'chronicle_entries', 'calendar_events', 'yield_entries', 'notes', 'ledger_entries'];
 
 export const COLLECTIONS = {
   records: 'records',
@@ -22,7 +22,11 @@ const localId = (state, table, value) => value ? state.localIdForCloud(table, va
 
 export function toCloud(table, row, state, source = 'manual') {
   const common = { id: cloudId(state, table, row.id), client_updated_at: iso(row.updatedAt || row.createdAt), source };
-  if (table === 'records') return { ...common, type: row.type.toLowerCase(), name: row.name, status: row.status, identity: row.identity || {}, stewardship: row.stewardship || {} };
+  if (table === 'records') {
+    const stewardship = { ...(row.stewardship || {}) };
+    if (stewardship.responsiblePersonId) stewardship.responsiblePersonId = cloudId(state, 'homestead_people', stewardship.responsiblePersonId);
+    return { ...common, type: row.type.toLowerCase(), name: row.name, status: row.status, identity: row.identity || {}, stewardship };
+  }
   if (table === 'homestead_people') return { ...common, person_type: row.personType || 'child', display_name: row.displayName, member_id: row.memberId || null };
   if (table === 'chore_windows') return { ...common, system_key: row.systemKey || null, name: row.name, display_order: Number(row.displayOrder || 0), enabled: row.enabled !== false, daypart: row.daypart || null };
   if (table === 'routines') return { ...common, record_id: cloudId(state, 'records', row.recordId), name: row.name, routine_type: row.routineType || null, enabled: row.enabled !== false, frequency: row.frequency, interval: Number(row.interval || 1), first_date: row.firstDate, next_date: row.nextDate, chore_window_id: cloudId(state, 'chore_windows', row.choreWindowId), person_id: cloudId(state, 'homestead_people', row.personId) };
@@ -48,7 +52,11 @@ export function toCloud(table, row, state, source = 'manual') {
 
 export function fromCloud(table, row, state) {
   const common = { id: localId(state, table, row.id), createdAt: row.created_at || row.assigned_at, updatedAt: row.updated_at || row.assigned_at, deletedAt: row.deleted_at || row.removed_at || null };
-  if (table === 'records') return { ...common, type: row.type[0].toUpperCase() + row.type.slice(1), name: row.name, status: row.status, identity: row.identity || {}, stewardship: row.stewardship || {} };
+  if (table === 'records') {
+    const stewardship = { ...(row.stewardship || {}) };
+    if (stewardship.responsiblePersonId) stewardship.responsiblePersonId = localId(state, 'homestead_people', stewardship.responsiblePersonId);
+    return { ...common, type: row.type[0].toUpperCase() + row.type.slice(1), name: row.name, status: row.status, identity: row.identity || {}, stewardship };
+  }
   if (table === 'homestead_people') return { ...common, personType: row.person_type, displayName: row.display_name, memberId: row.member_id || null };
   if (table === 'chore_windows') return { ...common, systemKey: row.system_key, name: row.name, displayOrder: row.display_order, enabled: row.enabled, daypart: row.daypart };
   if (table === 'routines') return { ...common, recordId: localId(state, 'records', row.record_id), name: row.name, routineType: row.routine_type, enabled: row.enabled, frequency: row.frequency, interval: row.interval, firstDate: row.first_date, nextDate: row.next_date, choreWindowId: localId(state, 'chore_windows', row.chore_window_id), personId: localId(state, 'homestead_people', row.person_id) };
