@@ -83,17 +83,13 @@
     updateSummary(root);
   }
 
-  function setSplitMode(box, linkedLabel, linkedSelect, enabled, options = {}) {
+  function setSplitMode(box, linkedSelect, enabled, options = {}) {
     const toggle = box.querySelector('.allocation-toggle');
     const panel = box.querySelector('.allocation-panel');
     toggle.checked = enabled;
     panel.hidden = !enabled;
 
-    if (linkedLabel) linkedLabel.hidden = enabled;
-    if (linkedSelect) linkedSelect.disabled = enabled;
-
-    if (!enabled) return;
-    if (box.querySelector('.ledger-allocation-row')) return;
+    if (!enabled || box.querySelector('.ledger-allocation-row')) return;
 
     const initialRecordId = options.initialRecordId || linkedSelect?.value || '';
     addRow(box, { recordId: initialRecordId });
@@ -112,17 +108,18 @@
 
     const linkedSelect = fields.querySelector('[name=recordId]');
     const linkedLabel = linkedSelect?.closest('label') || null;
-    if (linkedLabel?.firstChild) linkedLabel.firstChild.textContent = 'Linked Record (optional)';
+    if (linkedLabel?.firstChild) linkedLabel.firstChild.textContent = 'Primary Record (optional)';
+    if (linkedSelect && !linkedSelect.value && existing[0]?.recordId) linkedSelect.value = existing[0].recordId;
 
     const box = document.createElement('div');
     box.className = 'ledger-allocation-field';
     box.innerHTML = `
       <label class="allocation-toggle-row">
         <input type="checkbox" class="allocation-toggle">
-        <span>Split this entry among multiple Records</span>
+        <span>Add allocation / split this entry</span>
       </label>
       <div class="allocation-panel" hidden>
-        <p class="meta">Assign dollar amounts to the Records that share this transaction. Any remainder may stay unallocated for general Homestead costs.</p>
+        <p class="meta">Assign dollar amounts to the Records that share this transaction. The first allocation starts with the Primary Record selected above. Any remainder may stay unallocated for general Homestead costs.</p>
         <div class="allocation-rows"></div>
         <button type="button" class="btn secondary allocation-add">+ Add another Record</button>
         <div class="allocation-summary"></div>
@@ -137,8 +134,7 @@
 
     toggle.addEventListener('change', () => {
       if (toggle.checked) {
-        if (linkedSelect && !linkedSelect.dataset.preSplitValue) linkedSelect.dataset.preSplitValue = linkedSelect.value || '';
-        setSplitMode(box, linkedLabel, linkedSelect, true, { initialRecordId: linkedSelect?.value || '' });
+        setSplitMode(box, linkedSelect, true, { initialRecordId: linkedSelect?.value || '' });
         updateSummary(box);
         return;
       }
@@ -150,16 +146,12 @@
       }
 
       box.querySelector('.allocation-rows').innerHTML = '';
-      setSplitMode(box, linkedLabel, linkedSelect, false);
-      if (linkedSelect && linkedSelect.dataset.preSplitValue) linkedSelect.value = linkedSelect.dataset.preSplitValue;
+      setSplitMode(box, linkedSelect, false);
       updateSummary(box);
     });
 
     existing.forEach(item => addRow(box, item));
-    if (existing.length) {
-      if (linkedSelect) linkedSelect.dataset.preSplitValue = linkedSelect.value || '';
-      setSplitMode(box, linkedLabel, linkedSelect, true);
-    }
+    if (existing.length) setSplitMode(box, linkedSelect, true);
     updateSummary(box);
   }
 
@@ -191,7 +183,7 @@
     if (split && allocations.length === 0) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      alert('Add at least one Record and dollar amount, or turn off Split this entry.');
+      alert('Add at least one Record and dollar amount, or turn off Add allocation.');
       return;
     }
 
@@ -206,10 +198,7 @@
 
     if (split) {
       const linked = fields.querySelector('[name=recordId]');
-      if (linked) {
-        linked.disabled = false;
-        linked.value = '';
-      }
+      if (linked) linked.value = '';
     }
   }
 
@@ -265,8 +254,8 @@
     const style = document.createElement('style');
     style.id = 'ledger-allocation-styles';
     style.textContent = `
-      .ledger-allocation-field { grid-column:1/-1; margin-top:.15rem; }
-      .allocation-toggle-row { display:flex; align-items:center; gap:.6rem; padding:.6rem .1rem; font-weight:600; cursor:pointer; }
+      .ledger-allocation-field { grid-column:1/-1; margin-top:.05rem; }
+      .allocation-toggle-row { display:flex; align-items:center; gap:.6rem; padding:.35rem .1rem; font-weight:600; cursor:pointer; }
       .allocation-toggle-row input { width:1.05rem; height:1.05rem; margin:0; }
       .allocation-panel { margin-top:.3rem; padding:.8rem; border:1px solid var(--line,#cdbf9f); border-radius:10px; }
       .allocation-panel[hidden] { display:none; }
