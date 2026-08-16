@@ -1,0 +1,12 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(7);
+select has_table('public','ledger_allocations','ledger allocations table exists');
+select has_column('public','ledger_allocations','ledger_entry_id','allocation links transaction');
+select has_column('public','ledger_allocations','record_id','allocation links Record');
+select has_column('public','ledger_allocations','amount','allocation has amount');
+select ok((select relrowsecurity from pg_class where oid='public.ledger_allocations'::regclass),'ledger allocations use RLS');
+select has_function('public','apply_ledger_allocation_sync_operation',array['text','uuid','text','uuid','text','integer','timestamp with time zone','jsonb'],'allocation sync RPC exists');
+select like(pg_get_functiondef('private.validate_ledger_allocation()'::regprocedure),'%cannot exceed the transaction amount%','server prevents over-allocation');
+select * from finish();
+rollback;
