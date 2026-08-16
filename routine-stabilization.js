@@ -11,6 +11,9 @@
   const datePart = value => String(value || '').slice(0, 10);
   const active = value => Boolean(value && !value.deletedAt);
   const stamp = value => String(value || '');
+  const historicalCompletion = (occurrence, fallback) => occurrence?.occurrenceDate
+    ? `${occurrence.occurrenceDate}T23:59:59.000Z`
+    : fallback;
 
   function canonicalChoice(items = [], occurrenceCounts = new Map()) {
     return [...items].sort((a, b) => {
@@ -92,7 +95,7 @@
         occurrences.filter(occurrence => active(occurrence) && occurrence.routineId === duplicate.id && occurrence.status === 'pending').forEach(occurrence => {
           occurrence.status = 'skipped';
           occurrence.completionMethod = 'rollover';
-          occurrence.completedAt = timestamp;
+          occurrence.completedAt = historicalCompletion(occurrence, timestamp);
           occurrence.updatedAt = timestamp;
         });
         changed = true;
@@ -114,7 +117,7 @@
         && occurrence.status === 'pending' && occurrence.occurrenceDate < targetDate).forEach(occurrence => {
         occurrence.status = 'skipped';
         occurrence.completionMethod = 'rollover';
-        occurrence.completedAt = timestamp;
+        occurrence.completedAt = historicalCompletion(occurrence, timestamp);
         occurrence.updatedAt = timestamp;
         rolloverCount += 1;
         changed = true;
