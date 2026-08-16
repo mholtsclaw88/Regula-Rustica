@@ -1,17 +1,307 @@
 'use strict';
-(function(){
- let context=null,pending=null;
- const read=()=>window.RegulaRusticaLocal?.read?.();
- const write=data=>window.RegulaRusticaLocal?.write?.(data,'ledger-allocations');
- const money=n=>new Intl.NumberFormat(undefined,{style:'currency',currency:'USD'}).format(Number(n||0));
- function activeRecords(data){return(data.records||[]).filter(r=>!r.deletedAt&&r.status!=='Archived').sort((a,b)=>a.name.localeCompare(b.name));}
- function rows(root){return[...root.querySelectorAll('.ledger-allocation-row')].map(row=>({id:row.dataset.id||null,recordId:row.querySelector('select').value,amount:Number(row.querySelector('input').value||0)})).filter(x=>x.recordId&&x.amount>0);}
- function updateSummary(root){const total=Number(root.closest('form')?.querySelector('[name=amount]')?.value||0),allocated=rows(root).reduce((s,x)=>s+x.amount,0),left=total-allocated;const out=root.querySelector('.allocation-summary');out.textContent=`Allocated ${money(allocated)} · ${left>=0?'Unallocated':'Over allocated'} ${money(Math.abs(left))}`;out.classList.toggle('allocation-error',left<-.004);}
- function addRow(root,item={}){const data=read(),row=document.createElement('div');row.className='ledger-allocation-row';row.dataset.id=item.id||'';const select=document.createElement('select');select.setAttribute('aria-label','Allocated Record');select.add(new Option('Choose Record',''));activeRecords(data).forEach(r=>select.add(new Option(`${r.name} (${r.type})`,r.id)));select.value=item.recordId||'';const amount=document.createElement('input');amount.type='number';amount.step='.01';amount.min='.01';amount.placeholder='Amount';amount.value=item.amount||'';amount.setAttribute('aria-label','Allocated amount');const remove=document.createElement('button');remove.type='button';remove.className='btn ghost';remove.textContent='Remove';remove.onclick=()=>{row.remove();updateSummary(root);};select.onchange=()=>updateSummary(root);amount.oninput=()=>updateSummary(root);row.append(select,amount,remove);root.querySelector('.allocation-rows').append(row);updateSummary(root);}
- function augment(id){const fields=document.querySelector('#modalFields');if(!fields||fields.querySelector('.ledger-allocation-field'))return;const data=read();data.ledgerAllocations||=[];const entry=id?(data.ledger||[]).find(e=>e.id===id):null;const existing=entry?data.ledgerAllocations.filter(a=>!a.deletedAt&&a.ledgerEntryId===entry.id):[];const linked=fields.querySelector('[name=recordId]')?.closest('label');if(linked)linked.firstChild.textContent='Primary Record (optional)';const box=document.createElement('div');box.className='ledger-allocation-field';box.innerHTML='<strong>Cost allocation (optional)</strong><p class="meta">Split this transaction among Records. Leave any amount unallocated for general Homestead costs.</p><div class="allocation-rows"></div><button type="button" class="btn secondary allocation-add">+ Add allocation</button><div class="allocation-summary"></div>';fields.append(box);box.querySelector('.allocation-add').onclick=()=>addRow(box);existing.forEach(a=>addRow(box,a));fields.querySelector('[name=amount]')?.addEventListener('input',()=>updateSummary(box));updateSummary(box);}
- function capture(event){if(!context)return;const box=document.querySelector('.ledger-allocation-field');if(!box)return;const allocations=rows(box),total=Number(document.querySelector('#modalFields [name=amount]')?.value||0),allocated=allocations.reduce((s,x)=>s+x.amount,0);if(allocated>total+.004){event.preventDefault();event.stopImmediatePropagation();alert('Allocated amounts cannot exceed the transaction total.');return;}const f=document.querySelector('#modalFields');pending={id:context.id,allocations,description:f.querySelector('[name=description]')?.value.trim()||'',date:f.querySelector('[name=date]')?.value||'',amount:total};if(allocations.length){const primary=f.querySelector('[name=recordId]');if(primary)primary.value='';}}
- function apply(){if(!pending)return;const p=pending;pending=null;const data=read();if(!data)return;data.ledgerAllocations||=[];let entry=p.id?(data.ledger||[]).find(e=>e.id===p.id&&!e.deletedAt):null;if(!entry)entry=[...(data.ledger||[])].filter(e=>!e.deletedAt&&e.description===p.description&&e.date===p.date&&Number(e.amount)===p.amount).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0];if(!entry)return;const now=new Date().toISOString(),wanted=new Map(p.allocations.map(a=>[a.recordId,a]));data.ledgerAllocations.filter(a=>!a.deletedAt&&a.ledgerEntryId===entry.id).forEach(a=>{const next=wanted.get(a.recordId);if(next){a.amount=next.amount;a.updatedAt=now;wanted.delete(a.recordId);}else{a.deletedAt=now;a.updatedAt=now;}});wanted.forEach(a=>data.ledgerAllocations.push({id:crypto.randomUUID(),ledgerEntryId:entry.id,recordId:a.recordId,amount:a.amount,createdAt:now,updatedAt:now,deletedAt:null}));write(data);}
- function styles(){const s=document.createElement('style');s.textContent='.ledger-allocation-field{grid-column:1/-1;padding:.8rem;border:1px solid var(--line,#cdbf9f);border-radius:10px}.ledger-allocation-field>strong{display:block;margin-bottom:.25rem}.ledger-allocation-row{display:grid;grid-template-columns:minmax(0,1fr) 8rem auto;gap:.45rem;margin:.45rem 0;align-items:end}.allocation-summary{margin-top:.55rem;font-weight:600}.allocation-error{color:#8b2f2f}@media(max-width:600px){.ledger-allocation-row{grid-template-columns:1fr 7rem}.ledger-allocation-row button{grid-column:1/-1;justify-self:start}}';document.head.append(s);}
- function install(){styles();const original=window.openModal;if(typeof original==='function'&&!original.__allocWrapped){const wrapped=function(mode,id){context=mode==='ledger'?{id:id||null}:null;pending=null;const result=original.apply(this,arguments);if(mode==='ledger')queueMicrotask(()=>augment(id||null));return result;};wrapped.__allocWrapped=true;window.openModal=wrapped;}document.querySelector('#modalForm')?.addEventListener('submit',capture,true);window.addEventListener('regula-rustica:data-saved',e=>{if(e.detail?.source!=='ledger-allocations')apply();});}
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+
+(function () {
+  let context = null;
+  let pending = null;
+
+  const read = () => window.RegulaRusticaLocal?.read?.();
+  const write = data => window.RegulaRusticaLocal?.write?.(data, 'ledger-allocations');
+  const money = value => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(value || 0));
+
+  function activeRecords(data) {
+    return (data.records || [])
+      .filter(record => !record.deletedAt && record.status !== 'Archived')
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function rows(root) {
+    return [...root.querySelectorAll('.ledger-allocation-row')]
+      .map(row => ({
+        id: row.dataset.id || null,
+        recordId: row.querySelector('select').value,
+        amount: Number(row.querySelector('input').value || 0)
+      }))
+      .filter(item => item.recordId && item.amount > 0);
+  }
+
+  function updateSummary(root) {
+    const total = Number(root.closest('form')?.querySelector('[name=amount]')?.value || 0);
+    const allocated = rows(root).reduce((sum, item) => sum + item.amount, 0);
+    const remaining = total - allocated;
+    const output = root.querySelector('.allocation-summary');
+    if (!output) return;
+
+    if (Math.abs(remaining) < .005 && total > 0) {
+      output.textContent = `Allocated ${money(allocated)} · Fully allocated`;
+    } else {
+      output.textContent = `Allocated ${money(allocated)} · ${remaining >= 0 ? 'Unallocated' : 'Over allocated'} ${money(Math.abs(remaining))}`;
+    }
+    output.classList.toggle('allocation-error', remaining < -.004);
+  }
+
+  function addRow(root, item = {}) {
+    const data = read();
+    const row = document.createElement('div');
+    row.className = 'ledger-allocation-row';
+    row.dataset.id = item.id || '';
+
+    const recordWrap = document.createElement('label');
+    recordWrap.className = 'allocation-record';
+    recordWrap.append('Record');
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', 'Allocated Record');
+    select.add(new Option('Choose Record', ''));
+    activeRecords(data).forEach(record => select.add(new Option(`${record.name} (${record.type})`, record.id)));
+    select.value = item.recordId || '';
+    recordWrap.append(select);
+
+    const amountWrap = document.createElement('label');
+    amountWrap.className = 'allocation-amount';
+    amountWrap.append('Amount');
+    const amount = document.createElement('input');
+    amount.type = 'number';
+    amount.step = '.01';
+    amount.min = '.01';
+    amount.placeholder = '0.00';
+    amount.value = item.amount || '';
+    amount.setAttribute('aria-label', 'Allocated amount');
+    amountWrap.append(amount);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn ghost allocation-remove';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => {
+      row.remove();
+      updateSummary(root);
+    });
+    select.addEventListener('change', () => updateSummary(root));
+    amount.addEventListener('input', () => updateSummary(root));
+
+    row.append(recordWrap, amountWrap, remove);
+    root.querySelector('.allocation-rows').append(row);
+    updateSummary(root);
+  }
+
+  function setSplitMode(box, linkedLabel, linkedSelect, enabled, options = {}) {
+    const toggle = box.querySelector('.allocation-toggle');
+    const panel = box.querySelector('.allocation-panel');
+    toggle.checked = enabled;
+    panel.hidden = !enabled;
+
+    if (linkedLabel) linkedLabel.hidden = enabled;
+    if (linkedSelect) linkedSelect.disabled = enabled;
+
+    if (!enabled) return;
+    if (box.querySelector('.ledger-allocation-row')) return;
+
+    const initialRecordId = options.initialRecordId || linkedSelect?.value || '';
+    addRow(box, { recordId: initialRecordId });
+  }
+
+  function augment(id) {
+    const fields = document.querySelector('#modalFields');
+    if (!fields || fields.querySelector('.ledger-allocation-field')) return;
+
+    const data = read();
+    data.ledgerAllocations ||= [];
+    const entry = id ? (data.ledger || []).find(item => item.id === id) : null;
+    const existing = entry
+      ? data.ledgerAllocations.filter(item => !item.deletedAt && item.ledgerEntryId === entry.id)
+      : [];
+
+    const linkedSelect = fields.querySelector('[name=recordId]');
+    const linkedLabel = linkedSelect?.closest('label') || null;
+    if (linkedLabel?.firstChild) linkedLabel.firstChild.textContent = 'Linked Record (optional)';
+
+    const box = document.createElement('div');
+    box.className = 'ledger-allocation-field';
+    box.innerHTML = `
+      <label class="allocation-toggle-row">
+        <input type="checkbox" class="allocation-toggle">
+        <span>Split this entry among multiple Records</span>
+      </label>
+      <div class="allocation-panel" hidden>
+        <p class="meta">Assign dollar amounts to the Records that share this transaction. Any remainder may stay unallocated for general Homestead costs.</p>
+        <div class="allocation-rows"></div>
+        <button type="button" class="btn secondary allocation-add">+ Add another Record</button>
+        <div class="allocation-summary"></div>
+      </div>`;
+    fields.append(box);
+
+    const toggle = box.querySelector('.allocation-toggle');
+    const add = box.querySelector('.allocation-add');
+
+    add.addEventListener('click', () => addRow(box));
+    fields.querySelector('[name=amount]')?.addEventListener('input', () => updateSummary(box));
+
+    toggle.addEventListener('change', () => {
+      if (toggle.checked) {
+        if (linkedSelect && !linkedSelect.dataset.preSplitValue) linkedSelect.dataset.preSplitValue = linkedSelect.value || '';
+        setSplitMode(box, linkedLabel, linkedSelect, true, { initialRecordId: linkedSelect?.value || '' });
+        updateSummary(box);
+        return;
+      }
+
+      const hasAllocations = box.querySelectorAll('.ledger-allocation-row').length > 0;
+      if (hasAllocations && !confirm('Stop splitting this entry? The allocation rows will be removed when you save.')) {
+        toggle.checked = true;
+        return;
+      }
+
+      box.querySelector('.allocation-rows').innerHTML = '';
+      setSplitMode(box, linkedLabel, linkedSelect, false);
+      if (linkedSelect && linkedSelect.dataset.preSplitValue) linkedSelect.value = linkedSelect.dataset.preSplitValue;
+      updateSummary(box);
+    });
+
+    existing.forEach(item => addRow(box, item));
+    if (existing.length) {
+      if (linkedSelect) linkedSelect.dataset.preSplitValue = linkedSelect.value || '';
+      setSplitMode(box, linkedLabel, linkedSelect, true);
+    }
+    updateSummary(box);
+  }
+
+  function capture(event) {
+    if (!context) return;
+    const box = document.querySelector('.ledger-allocation-field');
+    if (!box) return;
+
+    const split = box.querySelector('.allocation-toggle')?.checked;
+    const allocations = split ? rows(box) : [];
+    const total = Number(document.querySelector('#modalFields [name=amount]')?.value || 0);
+    const allocated = allocations.reduce((sum, item) => sum + item.amount, 0);
+
+    const recordIds = allocations.map(item => item.recordId);
+    if (new Set(recordIds).size !== recordIds.length) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      alert('Each Record can appear only once in a split entry. Combine amounts for the same Record.');
+      return;
+    }
+
+    if (allocated > total + .004) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      alert('Allocated amounts cannot exceed the transaction total.');
+      return;
+    }
+
+    if (split && allocations.length === 0) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      alert('Add at least one Record and dollar amount, or turn off Split this entry.');
+      return;
+    }
+
+    const fields = document.querySelector('#modalFields');
+    pending = {
+      id: context.id,
+      allocations,
+      description: fields.querySelector('[name=description]')?.value.trim() || '',
+      date: fields.querySelector('[name=date]')?.value || '',
+      amount: total
+    };
+
+    if (split) {
+      const linked = fields.querySelector('[name=recordId]');
+      if (linked) {
+        linked.disabled = false;
+        linked.value = '';
+      }
+    }
+  }
+
+  function apply() {
+    if (!pending) return;
+    const saved = pending;
+    pending = null;
+    const data = read();
+    if (!data) return;
+
+    data.ledgerAllocations ||= [];
+    let entry = saved.id
+      ? (data.ledger || []).find(item => item.id === saved.id && !item.deletedAt)
+      : null;
+
+    if (!entry) {
+      entry = [...(data.ledger || [])]
+        .filter(item => !item.deletedAt && item.description === saved.description && item.date === saved.date && Number(item.amount) === saved.amount)
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
+    }
+    if (!entry) return;
+
+    const now = new Date().toISOString();
+    const wanted = new Map(saved.allocations.map(item => [item.recordId, item]));
+    data.ledgerAllocations
+      .filter(item => !item.deletedAt && item.ledgerEntryId === entry.id)
+      .forEach(item => {
+        const next = wanted.get(item.recordId);
+        if (next) {
+          item.amount = next.amount;
+          item.updatedAt = now;
+          wanted.delete(item.recordId);
+        } else {
+          item.deletedAt = now;
+          item.updatedAt = now;
+        }
+      });
+
+    wanted.forEach(item => data.ledgerAllocations.push({
+      id: crypto.randomUUID(),
+      ledgerEntryId: entry.id,
+      recordId: item.recordId,
+      amount: item.amount,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null
+    }));
+    write(data);
+  }
+
+  function styles() {
+    if (document.querySelector('#ledger-allocation-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'ledger-allocation-styles';
+    style.textContent = `
+      .ledger-allocation-field { grid-column:1/-1; margin-top:.15rem; }
+      .allocation-toggle-row { display:flex; align-items:center; gap:.6rem; padding:.6rem .1rem; font-weight:600; cursor:pointer; }
+      .allocation-toggle-row input { width:1.05rem; height:1.05rem; margin:0; }
+      .allocation-panel { margin-top:.3rem; padding:.8rem; border:1px solid var(--line,#cdbf9f); border-radius:10px; }
+      .allocation-panel[hidden] { display:none; }
+      .ledger-allocation-row { display:grid; grid-template-columns:minmax(0,1fr) 8rem auto; gap:.55rem; margin:.55rem 0; align-items:end; }
+      .ledger-allocation-row label { margin:0; }
+      .allocation-summary { margin-top:.6rem; font-weight:600; }
+      .allocation-error { color:#8b2f2f; }
+      @media(max-width:600px) {
+        .ledger-allocation-row { grid-template-columns:1fr 7rem; }
+        .ledger-allocation-row .allocation-remove { grid-column:1/-1; justify-self:start; }
+      }`;
+    document.head.append(style);
+  }
+
+  function install() {
+    styles();
+    const original = window.openModal;
+    if (typeof original === 'function' && !original.__allocWrapped) {
+      const wrapped = function (mode, id) {
+        context = mode === 'ledger' ? { id: id || null } : null;
+        pending = null;
+        const result = original.apply(this, arguments);
+        if (mode === 'ledger') queueMicrotask(() => augment(id || null));
+        return result;
+      };
+      wrapped.__allocWrapped = true;
+      window.openModal = wrapped;
+    }
+
+    document.querySelector('#modalForm')?.addEventListener('submit', capture, true);
+    window.addEventListener('regula-rustica:data-saved', event => {
+      if (event.detail?.source !== 'ledger-allocations') apply();
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true });
+  else install();
 }());
