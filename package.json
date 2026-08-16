@@ -4,7 +4,7 @@
   "scripts": {
     "build:cloud-config": "node scripts/generate-cloud-config.mjs",
     "test:cloud-auth": "node --test tests/cloud-invitations.test.mjs",
-    "test:sync": "node --test tests/sync.test.mjs tests/routines.test.mjs tests/records-relationships.test.mjs",
-    "check": "node --check housekeeping-data.js && node --check routines-data.js && node --check records-relationships.js && node --check ui-refinements.js && node --check app.js && node --check cloud-auth.js && node --check cloud-invitations.mjs && node --check service-worker.js && node --check sync/local-state.mjs && node --check sync/entities.mjs && node --check sync/cloud-adapter.mjs && node --check sync/engine.mjs && node --check sync/runtime.mjs && node --check scripts/generate-cloud-config.mjs && node scripts/check-cloud-foundation.mjs"
+    "test:sync": "node --test tests/sync.test.mjs tests/routines.test.mjs tests/routine-stabilization.test.mjs tests/records-relationships.test.mjs",
+    "check": "node --check housekeeping-data.js && node --check routines-data.js && node --check routine-stabilization.js && node --check records-relationships.js && node --check ui-refinements.js && node --check app.js && node --check cloud-auth.js && node --check cloud-invitations.mjs && node --check service-worker.js && node --check sync/local-state.mjs && node --check sync/entities.mjs && node --check sync/cloud-adapter.mjs && node --check sync/engine.mjs && node --check sync/runtime.mjs && node --check scripts/generate-cloud-config.mjs && node scripts/check-cloud-foundation.mjs"
   }
 }
