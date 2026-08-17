@@ -34,9 +34,10 @@
     if (Math.abs(remaining) < .005 && total > 0) {
       output.textContent = `Allocated ${money(allocated)} · Fully allocated`;
     } else {
-      output.textContent = `Allocated ${money(allocated)} · ${remaining >= 0 ? 'Unallocated' : 'Over allocated'} ${money(Math.abs(remaining))}`;
+      output.textContent = `Allocated ${money(allocated)} · Remaining ${money(Math.max(remaining, 0))}`;
     }
     output.classList.toggle('allocation-error', remaining < -.004);
+    if (remaining < -.004) output.textContent = `Allocated ${money(allocated)} · Over allocated ${money(Math.abs(remaining))}`;
   }
 
   function addRow(root, item = {}) {
@@ -84,15 +85,15 @@
   }
 
   function setSplitMode(box, linkedSelect, enabled, options = {}) {
-    const toggle = box.querySelector('.allocation-toggle');
+    const trigger = box.querySelector('.allocation-trigger');
     const panel = box.querySelector('.allocation-panel');
-    toggle.checked = enabled;
+    box.dataset.split = enabled ? 'true' : 'false';
     panel.hidden = !enabled;
+    trigger.setAttribute('aria-expanded', String(enabled));
+    trigger.textContent = enabled ? '− Stop splitting this receipt' : '+ Split this receipt';
 
     if (!enabled || box.querySelector('.ledger-allocation-row')) return;
-
-    const initialRecordId = options.initialRecordId || linkedSelect?.value || '';
-    addRow(box, { recordId: initialRecordId });
+    addRow(box, { recordId: options.initialRecordId || linkedSelect?.value || '' });
   }
 
   function augment(id) {
@@ -113,38 +114,33 @@
 
     const box = document.createElement('div');
     box.className = 'ledger-allocation-field';
+    box.dataset.split = 'false';
     box.innerHTML = `
-      <label class="allocation-toggle-row">
-        <input type="checkbox" class="allocation-toggle">
-        <span>Add allocation / split this entry</span>
-      </label>
+      <button type="button" class="allocation-trigger" aria-expanded="false">+ Split this receipt</button>
       <div class="allocation-panel" hidden>
-        <p class="meta">Assign dollar amounts to the Records that share this transaction. The first allocation starts with the Primary Record selected above. Any remainder may stay unallocated for general Homestead costs.</p>
+        <p class="meta">Allocate this transaction among multiple Records. Allocation 1 starts with the Primary Record selected above. A remainder may stay unallocated for general Homestead costs.</p>
         <div class="allocation-rows"></div>
         <button type="button" class="btn secondary allocation-add">+ Add another Record</button>
         <div class="allocation-summary"></div>
       </div>`;
     fields.append(box);
 
-    const toggle = box.querySelector('.allocation-toggle');
+    const trigger = box.querySelector('.allocation-trigger');
     const add = box.querySelector('.allocation-add');
 
     add.addEventListener('click', () => addRow(box));
     fields.querySelector('[name=amount]')?.addEventListener('input', () => updateSummary(box));
 
-    toggle.addEventListener('change', () => {
-      if (toggle.checked) {
+    trigger.addEventListener('click', () => {
+      const split = box.dataset.split === 'true';
+      if (!split) {
         setSplitMode(box, linkedSelect, true, { initialRecordId: linkedSelect?.value || '' });
         updateSummary(box);
         return;
       }
 
       const hasAllocations = box.querySelectorAll('.ledger-allocation-row').length > 0;
-      if (hasAllocations && !confirm('Stop splitting this entry? The allocation rows will be removed when you save.')) {
-        toggle.checked = true;
-        return;
-      }
-
+      if (hasAllocations && !confirm('Stop splitting this receipt? The allocation rows will be removed when you save.')) return;
       box.querySelector('.allocation-rows').innerHTML = '';
       setSplitMode(box, linkedSelect, false);
       updateSummary(box);
@@ -160,7 +156,7 @@
     const box = document.querySelector('.ledger-allocation-field');
     if (!box) return;
 
-    const split = box.querySelector('.allocation-toggle')?.checked;
+    const split = box.dataset.split === 'true';
     const allocations = split ? rows(box) : [];
     const total = Number(document.querySelector('#modalFields [name=amount]')?.value || 0);
     const allocated = allocations.reduce((sum, item) => sum + item.amount, 0);
@@ -169,7 +165,7 @@
     if (new Set(recordIds).size !== recordIds.length) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      alert('Each Record can appear only once in a split entry. Combine amounts for the same Record.');
+      alert('Each Record can appear only once in a split receipt. Combine amounts for the same Record.');
       return;
     }
 
@@ -183,7 +179,7 @@
     if (split && allocations.length === 0) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      alert('Add at least one Record and dollar amount, or turn off Add allocation.');
+      alert('Add at least one Record and dollar amount, or stop splitting this receipt.');
       return;
     }
 
@@ -255,8 +251,8 @@
     style.id = 'ledger-allocation-styles';
     style.textContent = `
       .ledger-allocation-field { grid-column:1/-1; margin-top:.05rem; }
-      .allocation-toggle-row { display:flex; align-items:center; gap:.6rem; padding:.35rem .1rem; font-weight:600; cursor:pointer; }
-      .allocation-toggle-row input { width:1.05rem; height:1.05rem; margin:0; }
+      .allocation-trigger { border:0; background:transparent; color:var(--accent,#284536); padding:.35rem .1rem; font:inherit; font-weight:650; cursor:pointer; text-align:left; }
+      .allocation-trigger:hover { text-decoration:underline; }
       .allocation-panel { margin-top:.3rem; padding:.8rem; border:1px solid var(--line,#cdbf9f); border-radius:10px; }
       .allocation-panel[hidden] { display:none; }
       .ledger-allocation-row { display:grid; grid-template-columns:minmax(0,1fr) 8rem auto; gap:.55rem; margin:.55rem 0; align-items:end; }
