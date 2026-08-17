@@ -168,4 +168,9 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
   else queueMicrotask(apply);
+
+  window.addEventListener('regula-rustica:data-saved', event => {
+    if (event.detail?.source === 'sample-fixtures') return;
+    queueMicrotask(apply);
+  });
 }());
