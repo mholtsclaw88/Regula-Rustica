@@ -93,7 +93,9 @@
     trigger.textContent = enabled ? '− Stop splitting this receipt' : '+ Split this receipt';
 
     if (!enabled || box.querySelector('.ledger-allocation-row')) return;
+
     addRow(box, { recordId: options.initialRecordId || linkedSelect?.value || '' });
+    if (options.openSecondRow) addRow(box);
   }
 
   function augment(id) {
@@ -134,7 +136,10 @@
     trigger.addEventListener('click', () => {
       const split = box.dataset.split === 'true';
       if (!split) {
-        setSplitMode(box, linkedSelect, true, { initialRecordId: linkedSelect?.value || '' });
+        setSplitMode(box, linkedSelect, true, {
+          initialRecordId: linkedSelect?.value || '',
+          openSecondRow: true
+        });
         updateSummary(box);
         return;
       }
