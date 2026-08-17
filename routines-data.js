@@ -230,4 +230,10 @@ if (typeof document !== 'undefined') {
     script.dataset.routineStabilization = 'true';
     document.head.appendChild(script);
   }
+  if (!document.querySelector('script[data-sample-data-enhancements]')) {
+    const script = document.createElement('script');
+    script.src = 'sample-data-enhancements.js?v=sample-fixtures-v1';
+    script.dataset.sampleDataEnhancements = 'true';
+    document.head.appendChild(script);
+  }
 }
