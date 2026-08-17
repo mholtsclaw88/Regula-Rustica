@@ -39,10 +39,6 @@
 
       .settings-nav { display:flex; flex-direction:column; align-items:stretch; gap:.3rem; padding:.45rem; border:1px solid var(--line, #cdbf9f); border-radius:12px; background:rgba(255,255,255,.26); }
       .settings-nav button { width:100%; text-align:left; justify-content:flex-start; }
-      #settings > .grid2 { grid-template-columns:170px minmax(0,1fr); align-items:start; }
-      #settings > .settings-nav { grid-column:1; grid-row:2; }
-      #settings > .grid2 { display:grid; }
-      #settings .settings-section { grid-column:2; }
 
       #today .today-section,
       #today > .grid2 > .card { width:100%; }
@@ -58,21 +54,18 @@
       @media (min-width: 721px) {
         #settings { display:grid; grid-template-columns:170px minmax(0,1fr); column-gap:1rem; }
         #settings > .section-head { grid-column:1 / -1; }
-        #settings > .settings-nav { grid-column:1; align-self:start; position:sticky; top:1rem; }
+        #settings > .settings-nav { grid-column:1; align-self:start; position:sticky; top:4rem; }
         #settings > .grid2 { grid-column:2; display:block; }
         #settings .settings-section { width:100%; }
       }
 
       @media (max-width: 720px) {
-        .top { gap:.7rem; }
-        .top #globalAddTask { flex:0 0 auto; }
         .nav { overflow:visible; }
         .nav > button[data-view="yield"],
         .nav > button[data-view="ledger"],
         .nav > button[data-view="settings"] { display:none; }
         .nav-more-wrap { display:block; margin-left:auto; }
         .nav-more-wrap > button { height:100%; }
-        .nav-more-menu { position:fixed; right:.75rem; top:auto; bottom:4.25rem; }
 
         .section-head { gap:.65rem; }
         .section-head .btn.primary { flex:0 0 auto; }
@@ -103,7 +96,8 @@
   function simplifyTaskFilters() {
     const advanced = document.querySelector('#taskAdvancedFilters');
     if (!advanced || advanced.dataset.refined === 'true') return;
-    const timing = document.querySelector('#tasks .task-choice-filter:nth-of-type(2)');
+    const taskFilters = [...document.querySelectorAll('#tasks .task-choice-filter')];
+    const timing = taskFilters.find(fieldset => fieldset.querySelector('[name="taskTimingFilter"]'));
     const filters = advanced.querySelector('.filters');
     if (timing && filters) advanced.insertBefore(timing, filters);
     const summary = advanced.querySelector('summary');
@@ -199,10 +193,12 @@
     const events = document.querySelector('#todayEvents')?.closest('.card');
     const glance = document.querySelector('#openCount')?.closest('.card');
     const grid = document.querySelector('#today > .grid2');
-    if (!grid) return;
-    if (tasks) grid.appendChild(tasks);
-    if (events) grid.appendChild(events);
-    if (glance) grid.appendChild(glance);
+    const desired = [tasks, events, glance].filter(Boolean);
+    if (!grid || !desired.length) return;
+    const current = [...grid.children].filter(node => desired.includes(node));
+    const alreadyOrdered = current.length === desired.length && desired.every((node, index) => current[index] === node);
+    if (alreadyOrdered) return;
+    desired.forEach(node => grid.appendChild(node));
   }
 
   function refresh() {
