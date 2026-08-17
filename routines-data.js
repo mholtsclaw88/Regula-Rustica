@@ -224,4 +224,10 @@ if (typeof document !== 'undefined') {
     script.dataset.ledgerReceiptModal = 'true';
     document.head.appendChild(script);
   }
+  if (!document.querySelector('script[data-routine-stabilization]')) {
+    const script = document.createElement('script');
+    script.src = 'routine-stabilization.js?v=stabilization-v2';
+    script.dataset.routineStabilization = 'true';
+    document.head.appendChild(script);
+  }
 }
