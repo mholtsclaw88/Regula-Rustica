@@ -230,10 +230,4 @@ if (typeof document !== 'undefined') {
     script.dataset.routineStabilization = 'true';
     document.head.appendChild(script);
   }
-  if (!document.querySelector('script[data-ui-navigation-refinement]')) {
-    const script = document.createElement('script');
-    script.src = 'ui-navigation-refinement.js?v=ui-nav-v1';
-    script.dataset.uiNavigationRefinement = 'true';
-    document.head.appendChild(script);
-  }
 }
