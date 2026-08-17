@@ -1,92 +1,48 @@
 import '../records-relationships.js';
 
-export const DOMAIN_ORDER = ['homestead_people', 'records', 'chore_windows', 'routines', 'tasks', 'routine_occurrences', 'record_relationships', 'task_assignments', 'chronicle_entries', 'calendar_events', 'yield_entries', 'notes', 'ledger_entries'];
+export const DOMAIN_ORDER = ['homestead_people','records','chore_windows','routines','tasks','routine_occurrences','record_relationships','task_assignments','chronicle_entries','calendar_events','yield_entries','notes','ledger_entries','ledger_allocations'];
+export const COLLECTIONS = {records:'records',homestead_people:'people',chore_windows:'choreWindows',routines:'routines',tasks:'tasks',routine_occurrences:'routineOccurrences',record_relationships:'relationships',task_assignments:'assignments',chronicle_entries:'events',calendar_events:'calendarEvents',yield_entries:'yieldEntries',notes:'notes',ledger_entries:'ledger',ledger_allocations:'ledgerAllocations'};
+const iso=v=>v||new Date().toISOString();
+const cloudId=(s,t,id)=>id?s.entity(t,id).cloudId:null;
+const localId=(s,t,id)=>id?s.localIdForCloud(t,id):null;
 
-export const COLLECTIONS = {
-  records: 'records',
-  homestead_people: 'people',
-  chore_windows: 'choreWindows',
-  routines: 'routines',
-  tasks: 'tasks',
-  routine_occurrences: 'routineOccurrences',
-  record_relationships: 'relationships',
-  task_assignments: 'assignments',
-  chronicle_entries: 'events',
-  calendar_events: 'calendarEvents',
-  yield_entries: 'yieldEntries',
-  notes: 'notes',
-  ledger_entries: 'ledger'
-};
-
-const iso = value => value || new Date().toISOString();
-const cloudId = (state, table, localId) => localId ? state.entity(table, localId).cloudId : null;
-const localId = (state, table, value) => value ? state.localIdForCloud(table, value) : null;
-
-export function toCloud(table, row, state, source = 'manual') {
-  const common = { id: cloudId(state, table, row.id), client_updated_at: iso(row.updatedAt || row.createdAt), source };
-  if (table === 'records') {
-    const stewardship = { ...(row.stewardship || {}) };
-    if (stewardship.responsiblePersonId) stewardship.responsiblePersonId = cloudId(state, 'homestead_people', stewardship.responsiblePersonId);
-    return { ...common, type: row.type.toLowerCase(), name: row.name, status: row.status, identity: row.identity || {}, stewardship };
-  }
-  if (table === 'homestead_people') return { ...common, person_type: row.personType || 'child', display_name: row.displayName, member_id: row.memberId || null };
-  if (table === 'chore_windows') return { ...common, system_key: row.systemKey || null, name: row.name, display_order: Number(row.displayOrder || 0), enabled: row.enabled !== false, daypart: row.daypart || null };
-  if (table === 'routines') return { ...common, record_id: cloudId(state, 'records', row.recordId), name: row.name, routine_type: row.routineType || null, enabled: row.enabled !== false, frequency: row.frequency, interval: Number(row.interval || 1), first_date: row.firstDate, next_date: row.nextDate, chore_window_id: cloudId(state, 'chore_windows', row.choreWindowId), person_id: cloudId(state, 'homestead_people', row.personId) };
-  if (table === 'tasks') {
-    const recurrenceRule = row.recurrenceRule ? { ...row.recurrenceRule } : null;
-    if (recurrenceRule && row.routineMigrationId) recurrenceRule.migratedToRoutineId = cloudId(state, 'routines', row.routineMigrationId);
-    return { ...common, record_id: cloudId(state, 'records', row.recordId), title: row.title, description: row.description || null, status: row.completed ? 'completed' : (row.status || 'open'), priority: row.priority || 'normal', due_date: row.dueDate || null, available_from: row.availableFrom || null, completed_at: row.completedAt || null, recurrence_rule: recurrenceRule, parent_task_id: cloudId(state, 'tasks', row.parentTaskId) };
-  }
-  if (table === 'routine_occurrences') return { ...common, routine_id: cloudId(state, 'routines', row.routineId), occurrence_date: row.occurrenceDate, status: row.status, completion_method: row.completionMethod || null, completed_at: row.completedAt || null, legacy_task_id: cloudId(state, 'tasks', row.legacyTaskId) };
-  if (table === 'record_relationships') return { ...common, source_record_id: cloudId(state, 'records', row.sourceRecordId), target_record_id: cloudId(state, 'records', row.targetRecordId), relationship_type: row.relationshipType, started_at: row.startedAt || null, ended_at: row.endedAt || null, details: row.details || {} };
-  if (table === 'task_assignments') return { ...common, task_id: cloudId(state, 'tasks', row.taskId), person_id: cloudId(state, 'homestead_people', row.personId), member_id: row.memberId || null, assignment_type: row.assignmentType || 'assignee', removed_at: row.removedAt || null };
-  if (table === 'chronicle_entries') return { ...common, record_id: cloudId(state, 'records', row.recordId), task_id: cloudId(state, 'tasks', row.taskId), event_type: row.eventType || 'Other', occurred_at: row.occurredAt || `${row.date}T12:00:00.000Z`, summary: row.summary || null, details: { text: row.details || '', ...(row.extraDetails || {}) }, value: row.value === '' ? null : row.value, unit: row.unit || null, corrects_entry_id: cloudId(state, 'chronicle_entries', row.correctsEntryId) };
-  if (table === 'calendar_events') return { ...common, record_id: cloudId(state, 'records', row.recordId), title: row.title, start_date: row.startDate, end_date: row.endDate || row.startDate, all_day: Boolean(row.allDay), start_time: row.allDay ? null : (row.startTime || null), end_time: row.allDay ? null : (row.endTime || null), location: row.location || null, notes: row.notes || null };
-  if (table === 'yield_entries') {
-    const taskId = cloudId(state, 'tasks', row.taskId);
-    const occurrenceId = cloudId(state, 'routine_occurrences', row.routineOccurrenceId);
-    return { ...common, record_id: cloudId(state, 'records', row.recordId), task_id: taskId, routine_occurrence_id: occurrenceId, yield_type: row.type, occurred_at: new Date(row.occurredAt).toISOString(), session: row.session || 'other', quantity: Number(row.quantity), unit: row.unit, unusable_quantity: Number(row.unusableQuantity || 0), details: { text: row.details || '', legacy_event_id: cloudId(state, 'chronicle_entries', row.legacyEventId), task_id: taskId, routine_occurrence_id: occurrenceId } };
-  }
-  if (table === 'notes') return { ...common, record_id: cloudId(state, 'records', row.recordId), title: row.title || null, body: row.text || row.body || '', pinned: Boolean(row.pinned) };
-  if (table === 'ledger_entries') return { ...common, record_id: cloudId(state, 'records', row.recordId), entry_type: row.type, entry_date: row.date, description: row.description, amount: Number(row.amount), currency_code: row.currencyCode || 'USD', category: row.category || null, vendor_or_source: row.vendorOrSource || null };
-  throw new Error(`Unsupported sync table: ${table}`);
+export function toCloud(t,r,s,source='manual'){
+ const c={id:cloudId(s,t,r.id),client_updated_at:iso(r.updatedAt||r.createdAt),source};
+ if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=cloudId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type.toLowerCase(),name:r.name,status:r.status,identity:r.identity||{},stewardship:x};}
+ if(t==='homestead_people')return{...c,person_type:r.personType||'child',display_name:r.displayName,member_id:r.memberId||null};
+ if(t==='chore_windows')return{...c,system_key:r.systemKey||null,name:r.name,display_order:Number(r.displayOrder||0),enabled:r.enabled!==false,daypart:r.daypart||null};
+ if(t==='routines')return{...c,record_id:cloudId(s,'records',r.recordId),name:r.name,routine_type:r.routineType||null,enabled:r.enabled!==false,frequency:r.frequency,interval:Number(r.interval||1),first_date:r.firstDate,next_date:r.nextDate,chore_window_id:cloudId(s,'chore_windows',r.choreWindowId),person_id:cloudId(s,'homestead_people',r.personId)};
+ if(t==='tasks'){const q=r.recurrenceRule?{...r.recurrenceRule}:null;if(q&&r.routineMigrationId)q.migratedToRoutineId=cloudId(s,'routines',r.routineMigrationId);return{...c,record_id:cloudId(s,'records',r.recordId),title:r.title,description:r.description||null,status:r.completed?'completed':(r.status||'open'),priority:r.priority||'normal',due_date:r.dueDate||null,available_from:r.availableFrom||null,completed_at:r.completedAt||null,recurrence_rule:q,parent_task_id:cloudId(s,'tasks',r.parentTaskId)};}
+ if(t==='routine_occurrences')return{...c,routine_id:cloudId(s,'routines',r.routineId),occurrence_date:r.occurrenceDate,status:r.status,completion_method:r.completionMethod||null,completed_at:r.completedAt||null,legacy_task_id:cloudId(s,'tasks',r.legacyTaskId)};
+ if(t==='record_relationships')return{...c,source_record_id:cloudId(s,'records',r.sourceRecordId),target_record_id:cloudId(s,'records',r.targetRecordId),relationship_type:r.relationshipType,started_at:r.startedAt||null,ended_at:r.endedAt||null,details:r.details||{}};
+ if(t==='task_assignments')return{...c,task_id:cloudId(s,'tasks',r.taskId),person_id:cloudId(s,'homestead_people',r.personId),member_id:r.memberId||null,assignment_type:r.assignmentType||'assignee',removed_at:r.removedAt||null};
+ if(t==='chronicle_entries')return{...c,record_id:cloudId(s,'records',r.recordId),task_id:cloudId(s,'tasks',r.taskId),event_type:r.eventType||'Other',occurred_at:r.occurredAt||`${r.date}T12:00:00.000Z`,summary:r.summary||null,details:{text:r.details||'',...(r.extraDetails||{})},value:r.value===''?null:r.value,unit:r.unit||null,corrects_entry_id:cloudId(s,'chronicle_entries',r.correctsEntryId)};
+ if(t==='calendar_events')return{...c,record_id:cloudId(s,'records',r.recordId),title:r.title,start_date:r.startDate,end_date:r.endDate||r.startDate,all_day:Boolean(r.allDay),start_time:r.allDay?null:(r.startTime||null),end_time:r.allDay?null:(r.endTime||null),location:r.location||null,notes:r.notes||null};
+ if(t==='yield_entries'){const task=cloudId(s,'tasks',r.taskId),occ=cloudId(s,'routine_occurrences',r.routineOccurrenceId);return{...c,record_id:cloudId(s,'records',r.recordId),task_id:task,routine_occurrence_id:occ,yield_type:r.type,occurred_at:new Date(r.occurredAt).toISOString(),session:r.session||'other',quantity:Number(r.quantity),unit:r.unit,unusable_quantity:Number(r.unusableQuantity||0),details:{text:r.details||'',legacy_event_id:cloudId(s,'chronicle_entries',r.legacyEventId),task_id:task,routine_occurrence_id:occ}};}
+ if(t==='notes')return{...c,record_id:cloudId(s,'records',r.recordId),title:r.title||null,body:r.text||r.body||'',pinned:Boolean(r.pinned)};
+ if(t==='ledger_entries')return{...c,record_id:cloudId(s,'records',r.recordId),entry_type:r.type,entry_date:r.date,description:r.description,amount:Number(r.amount),currency_code:r.currencyCode||'USD',category:r.category||null,vendor_or_source:r.vendorOrSource||null};
+ if(t==='ledger_allocations')return{...c,ledger_entry_id:cloudId(s,'ledger_entries',r.ledgerEntryId),record_id:cloudId(s,'records',r.recordId),amount:Number(r.amount)};
+ throw new Error(`Unsupported sync table: ${t}`);
 }
 
-export function fromCloud(table, row, state) {
-  const common = { id: localId(state, table, row.id), createdAt: row.created_at || row.assigned_at, updatedAt: row.updated_at || row.assigned_at, deletedAt: row.deleted_at || row.removed_at || null };
-  if (table === 'records') {
-    const stewardship = { ...(row.stewardship || {}) };
-    if (stewardship.responsiblePersonId) stewardship.responsiblePersonId = localId(state, 'homestead_people', stewardship.responsiblePersonId);
-    return { ...common, type: row.type[0].toUpperCase() + row.type.slice(1), name: row.name, status: row.status, identity: row.identity || {}, stewardship };
-  }
-  if (table === 'homestead_people') return { ...common, personType: row.person_type, displayName: row.display_name, memberId: row.member_id || null };
-  if (table === 'chore_windows') return { ...common, systemKey: row.system_key, name: row.name, displayOrder: row.display_order, enabled: row.enabled, daypart: row.daypart };
-  if (table === 'routines') return { ...common, recordId: localId(state, 'records', row.record_id), name: row.name, routineType: row.routine_type, enabled: row.enabled, frequency: row.frequency, interval: row.interval, firstDate: row.first_date, nextDate: row.next_date, choreWindowId: localId(state, 'chore_windows', row.chore_window_id), personId: localId(state, 'homestead_people', row.person_id) };
-  if (table === 'tasks') {
-    const routineMigrationId = row.recurrence_rule?.migratedToRoutineId ? localId(state, 'routines', row.recurrence_rule.migratedToRoutineId) : null;
-    return { ...common, recordId: localId(state, 'records', row.record_id), title: row.title, description: row.description || '', status: row.status, completed: row.status === 'completed', dueDate: row.due_date || '', availableFrom: row.available_from || '', completedAt: row.completed_at, priority: row.priority, recurrenceRule: row.recurrence_rule, routineMigrationId, parentTaskId: localId(state, 'tasks', row.parent_task_id) };
-  }
-  if (table === 'routine_occurrences') return { ...common, routineId: localId(state, 'routines', row.routine_id), occurrenceDate: row.occurrence_date, status: row.status, completionMethod: row.completion_method, completedAt: row.completed_at, legacyTaskId: localId(state, 'tasks', row.legacy_task_id) };
-  if (table === 'record_relationships') return { ...common, sourceRecordId: localId(state, 'records', row.source_record_id), targetRecordId: localId(state, 'records', row.target_record_id), relationshipType: row.relationship_type, startedAt: row.started_at, endedAt: row.ended_at, details: row.details || {} };
-  if (table === 'task_assignments') return { ...common, taskId: localId(state, 'tasks', row.task_id), personId: localId(state, 'homestead_people', row.person_id), memberId: row.member_id, assignmentType: row.assignment_type, assignedAt: row.assigned_at, removedAt: row.removed_at };
-  if (table === 'chronicle_entries') return { ...common, recordId: localId(state, 'records', row.record_id), taskId: localId(state, 'tasks', row.task_id), eventType: row.event_type, date: row.occurred_at.slice(0, 10), occurredAt: row.occurred_at, summary: row.summary, details: row.details?.text || '', extraDetails: row.details || {}, value: row.value ?? '', unit: row.unit || '', correctsEntryId: localId(state, 'chronicle_entries', row.corrects_entry_id) };
-  if (table === 'calendar_events') return { ...common, recordId: localId(state, 'records', row.record_id), title: row.title, startDate: row.start_date, endDate: row.end_date, allDay: row.all_day, startTime: row.start_time || '', endTime: row.end_time || '', location: row.location || '', notes: row.notes || '' };
-  if (table === 'yield_entries') return { ...common, recordId: localId(state, 'records', row.record_id), taskId: localId(state, 'tasks', row.task_id), routineOccurrenceId: localId(state, 'routine_occurrences', row.routine_occurrence_id || row.details?.routine_occurrence_id), type: row.yield_type, occurredAt: row.occurred_at, session: row.session, quantity: Number(row.quantity), unit: row.unit, unusableQuantity: Number(row.unusable_quantity || 0), details: row.details?.text || '', legacyEventId: localId(state, 'chronicle_entries', row.details?.legacy_event_id) };
-  if (table === 'notes') return { ...common, recordId: localId(state, 'records', row.record_id), title: row.title || '', text: row.body, pinned: row.pinned };
-  if (table === 'ledger_entries') return { ...common, recordId: localId(state, 'records', row.record_id), type: row.entry_type, date: row.entry_date, description: row.description, amount: Number(row.amount), currencyCode: row.currency_code, category: row.category, vendorOrSource: row.vendor_or_source };
-  throw new Error(`Unsupported sync table: ${table}`);
+export function fromCloud(t,r,s){
+ const c={id:localId(s,t,r.id),createdAt:r.created_at||r.assigned_at,updatedAt:r.updated_at||r.assigned_at,deletedAt:r.deleted_at||r.removed_at||null};
+ if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=localId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type[0].toUpperCase()+r.type.slice(1),name:r.name,status:r.status,identity:r.identity||{},stewardship:x};}
+ if(t==='homestead_people')return{...c,personType:r.person_type,displayName:r.display_name,memberId:r.member_id||null};
+ if(t==='chore_windows')return{...c,systemKey:r.system_key,name:r.name,displayOrder:r.display_order,enabled:r.enabled,daypart:r.daypart};
+ if(t==='routines')return{...c,recordId:localId(s,'records',r.record_id),name:r.name,routineType:r.routine_type,enabled:r.enabled,frequency:r.frequency,interval:r.interval,firstDate:r.first_date,nextDate:r.next_date,choreWindowId:localId(s,'chore_windows',r.chore_window_id),personId:localId(s,'homestead_people',r.person_id)};
+ if(t==='tasks'){const m=r.recurrence_rule?.migratedToRoutineId?localId(s,'routines',r.recurrence_rule.migratedToRoutineId):null;return{...c,recordId:localId(s,'records',r.record_id),title:r.title,description:r.description||'',status:r.status,completed:r.status==='completed',dueDate:r.due_date||'',availableFrom:r.available_from||'',completedAt:r.completed_at,priority:r.priority,recurrenceRule:r.recurrence_rule,routineMigrationId:m,parentTaskId:localId(s,'tasks',r.parent_task_id)};}
+ if(t==='routine_occurrences')return{...c,routineId:localId(s,'routines',r.routine_id),occurrenceDate:r.occurrence_date,status:r.status,completionMethod:r.completion_method,completedAt:r.completed_at,legacyTaskId:localId(s,'tasks',r.legacy_task_id)};
+ if(t==='record_relationships')return{...c,sourceRecordId:localId(s,'records',r.source_record_id),targetRecordId:localId(s,'records',r.target_record_id),relationshipType:r.relationship_type,startedAt:r.started_at,endedAt:r.ended_at,details:r.details||{}};
+ if(t==='task_assignments')return{...c,taskId:localId(s,'tasks',r.task_id),personId:localId(s,'homestead_people',r.person_id),memberId:r.member_id,assignmentType:r.assignment_type,assignedAt:r.assigned_at,removedAt:r.removed_at};
+ if(t==='chronicle_entries')return{...c,recordId:localId(s,'records',r.record_id),taskId:localId(s,'tasks',r.task_id),eventType:r.event_type,date:r.occurred_at.slice(0,10),occurredAt:r.occurred_at,summary:r.summary,details:r.details?.text||'',extraDetails:r.details||{},value:r.value??'',unit:r.unit||'',correctsEntryId:localId(s,'chronicle_entries',r.corrects_entry_id)};
+ if(t==='calendar_events')return{...c,recordId:localId(s,'records',r.record_id),title:r.title,startDate:r.start_date,endDate:r.end_date,allDay:r.all_day,startTime:r.start_time||'',endTime:r.end_time||'',location:r.location||'',notes:r.notes||''};
+ if(t==='yield_entries')return{...c,recordId:localId(s,'records',r.record_id),taskId:localId(s,'tasks',r.task_id),routineOccurrenceId:localId(s,'routine_occurrences',r.routine_occurrence_id||r.details?.routine_occurrence_id),type:r.yield_type,occurredAt:r.occurred_at,session:r.session,quantity:Number(r.quantity),unit:r.unit,unusableQuantity:Number(r.unusable_quantity||0),details:r.details?.text||'',legacyEventId:localId(s,'chronicle_entries',r.details?.legacy_event_id)};
+ if(t==='notes')return{...c,recordId:localId(s,'records',r.record_id),title:r.title||'',text:r.body,pinned:r.pinned};
+ if(t==='ledger_entries')return{...c,recordId:localId(s,'records',r.record_id),type:r.entry_type,date:r.entry_date,description:r.description,amount:Number(r.amount),currencyCode:r.currency_code,category:r.category,vendorOrSource:r.vendor_or_source};
+ if(t==='ledger_allocations')return{...c,ledgerEntryId:localId(s,'ledger_entries',r.ledger_entry_id),recordId:localId(s,'records',r.record_id),amount:Number(r.amount)};
+ throw new Error(`Unsupported sync table: ${t}`);
 }
-
-export function meaningfulCounts(data) {
-  return Object.fromEntries(DOMAIN_ORDER.map(table => [table, (data[COLLECTIONS[table]] || []).filter(row =>
-    !row.deletedAt && !row.removedAt && (table !== 'homestead_people' || row.personType === 'child')
-  ).length]));
-}
-
-export const hasMeaningfulData = data => Object.values(meaningfulCounts(data)).some(Boolean);
-
-export function operationOrder(operation) {
-  const domain = DOMAIN_ORDER.indexOf(operation.table);
-  const type = operation.type === 'create' || operation.type === 'restore' ? 0 : operation.type === 'update' ? 1 : 2;
-  return (type === 2 ? DOMAIN_ORDER.length - domain : domain) * 10 + type;
-}
+export function meaningfulCounts(data){return Object.fromEntries(DOMAIN_ORDER.map(t=>[t,(data[COLLECTIONS[t]]||[]).filter(r=>!r.deletedAt&&!r.removedAt&&(t!=='homestead_people'||r.personType==='child')).length]));}
+export const hasMeaningfulData=data=>Object.values(meaningfulCounts(data)).some(Boolean);
+export function operationOrder(o){const d=DOMAIN_ORDER.indexOf(o.table),t=o.type==='create'||o.type==='restore'?0:o.type==='update'?1:2;return(t===2?DOMAIN_ORDER.length-d:d)*10+t;}
