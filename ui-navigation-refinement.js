@@ -101,7 +101,7 @@
     const filters = advanced.querySelector('.filters');
     if (timing && filters) advanced.insertBefore(timing, filters);
     const summary = advanced.querySelector('summary');
-    if (summary) summary.textContent = 'Filter & sort';
+    if (summary && summary.textContent !== 'Filter & sort') summary.textContent = 'Filter & sort';
     advanced.open = false;
     advanced.dataset.refined = 'true';
   }
@@ -121,9 +121,9 @@
 
   function refineSettingsLabels() {
     const cloud = document.querySelector('.settings-nav [data-settings-target="settingCloud"]');
-    if (cloud) cloud.textContent = 'Cloud & Sharing';
+    if (cloud && cloud.textContent !== 'Cloud & Sharing') cloud.textContent = 'Cloud & Sharing';
     const backup = document.querySelector('.settings-nav [data-settings-target="settingBackup"]');
-    if (backup) backup.textContent = 'Backup & Restore';
+    if (backup && backup.textContent !== 'Backup & Restore') backup.textContent = 'Backup & Restore';
   }
 
   function buildMoreNavigation() {
@@ -184,8 +184,10 @@
     const active = nav.querySelector('button[data-view].active')?.dataset.view || '';
     const inMore = ['yield', 'ledger', 'settings'].includes(active);
     const toggle = wrap.querySelector(':scope > button');
-    toggle?.classList.toggle('active', inMore);
-    wrap.querySelectorAll('[data-proxy-view]').forEach(button => button.classList.toggle('active', button.dataset.proxyView === active));
+    if (toggle) toggle.classList.toggle('active', inMore);
+    wrap.querySelectorAll('[data-proxy-view]').forEach(button => {
+      button.classList.toggle('active', button.dataset.proxyView === active);
+    });
   }
 
   function refineToday() {
@@ -219,7 +221,12 @@
   function init() {
     refresh();
     const observer = new MutationObserver(refresh);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    // Watch structural application renders only. Watching class mutations here
+    // creates a feedback loop because navigation state itself toggles classes.
+    observer.observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('click', event => {
+      if (event.target.closest('.nav[aria-label="Primary navigation"] button')) queueMicrotask(syncMoreState);
+    });
     window.matchMedia(MOBILE_QUERY).addEventListener?.('change', refresh);
     window.addEventListener('regula-rustica:data-saved', refresh);
   }
