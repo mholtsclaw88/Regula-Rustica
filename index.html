@@ -12,12 +12,12 @@
   <link rel="stylesheet" href="housekeeping.css?v=ui-cleanup-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=reporting-v1" defer></script>
-  <script src="routines-data.js?v=ui-cleanup-v1" defer></script>
-  <script src="app.js?v=reporting-v1" defer></script>
+  <script src="housekeeping-data.js?v=unified-tasks-v1" defer></script>
+  <script src="task-foundation.js?v=unified-tasks-v1" defer></script>
+  <script src="app.js?v=unified-tasks-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=routines-v4" type="module"></script>
+  <script src="sync/runtime.mjs?v=unified-tasks-v1" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -163,7 +163,6 @@
             <legend>Show on calendar</legend>
             <div class="calendar-filter-pills">
               <label><input type="checkbox" id="calendarShowTasks" checked><span class="filter-dot task-dot"></span>Tasks</label>
-              <label><input type="checkbox" id="calendarShowRoutines" checked><span class="filter-dot routine-dot"></span>Routines</label>
               <label><input type="checkbox" id="calendarShowEvents" checked><span class="filter-dot event-dot"></span>Events</label>
               <label><input type="checkbox" id="calendarShowCompleted"><span class="filter-dot completed-dot"></span>Completed</label>
             </div>
@@ -181,10 +180,13 @@
         <article class="card">
           <span class="label">Quick entry</span>
           <h3>Record today’s yield</h3>
-          <p class="muted">Keep milk and egg collection close to the work itself.</p>
+          <p class="muted">Keep harvest and production records close to the work itself.</p>
           <div class="quick">
             <button class="btn primary milk-action" id="addMilkYield">Record milk</button>
             <button class="btn secondary egg-action" id="addEggYield">Record eggs</button>
+            <button class="btn secondary" id="addMeatYield">Record meat harvest</button>
+            <button class="btn secondary" id="addHarvestYield">Record crop harvest</button>
+            <button class="btn secondary" id="addForageYield">Record hay / forage</button>
           </div>
         </article>
         <aside class="card">
@@ -214,6 +216,9 @@
             <label><input type="radio" name="yieldTypeFilter" value="all" checked>All</label>
             <label><input type="radio" name="yieldTypeFilter" value="milk">Milk</label>
             <label><input type="radio" name="yieldTypeFilter" value="eggs">Eggs</label>
+            <label><input type="radio" name="yieldTypeFilter" value="meat">Meat</label>
+            <label><input type="radio" name="yieldTypeFilter" value="harvest">Harvest</label>
+            <label><input type="radio" name="yieldTypeFilter" value="forage">Hay / Forage</label>
           </div>
         </fieldset>
       </div>
@@ -297,7 +302,7 @@
         </article>
         <article class="card settings-section" id="settingChoreWindows">
           <span class="label">Daily rhythm</span><h2>Chore Windows</h2>
-          <p class="muted">Group Routines into practical parts of the day. These are not appointments.</p>
+          <p class="muted">Group recurring Tasks into practical parts of the day. These are not appointments.</p>
           <form id="choreWindowForm" class="form-grid"><label>Window name<input id="choreWindowName" maxlength="80" required></label><button class="btn primary" type="submit">Add window</button></form>
           <div id="choreWindowList" class="stack"></div>
         </article>
@@ -391,10 +396,8 @@
             <div id="recordIdentity" class="meta"></div>
           </div>
           <div class="record-actions action-cluster">
-            <button class="btn primary" id="recordEvent">Record</button>
-            <button class="btn secondary hidden" id="recordMilk">Milk</button>
-            <button class="btn secondary hidden" id="recordEggs">Eggs</button>
-            <button class="btn secondary" id="recordAddRoutine">+ Custom Routine</button>
+            <button class="btn primary" id="recordEvent">+ Event</button>
+            <button class="btn secondary hidden" id="recordYield">+ Yield</button>
             <button class="btn secondary" id="recordAddTask">+ Task</button>
             <button class="btn secondary" id="recordAddNote">+ Note</button>
             <button class="btn secondary" id="recordAddLedger">+ Ledger</button>
@@ -404,7 +407,6 @@
         <div class="record-workspace">
           <nav class="record-section-nav" aria-label="Record sections" role="tablist">
             <button type="button" class="active" role="tab" aria-selected="true" data-record-section="stewardship">Stewardship</button>
-            <button type="button" role="tab" aria-selected="false" data-record-section="routines">Routines</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="tasks">Tasks</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="chronicle">Chronicle</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="notes">Notes</button>
@@ -413,8 +415,7 @@
           </nav>
           <div class="record-section-content">
             <section class="record-section-panel active" role="tabpanel" data-record-section-panel="stewardship"><h3 class="record-section-heading">Stewardship</h3><div id="recordStewardship" class="steward-box"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="routines"><h3 class="record-section-heading">Routines</h3><div id="recordRoutines" class="stack"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><h3 class="record-section-heading">Tasks</h3><div id="panelTasks"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><h3 class="record-section-heading">Tasks</h3><div id="panelTasks"></div><div id="suggestedTasks" class="stack suggested-tasks"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="chronicle"><h3 class="record-section-heading">Chronicle</h3><div id="panelChronicle"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="notes"><h3 class="record-section-heading">Notes</h3><div id="panelNotes"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="ledger"><h3 class="record-section-heading">Ledger</h3><div id="panelLedger"></div></section>

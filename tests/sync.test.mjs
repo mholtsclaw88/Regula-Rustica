@@ -86,34 +86,32 @@ test('durable outbox survives reload', () => {
   assert.equal(new LocalSyncState(storage).state.outbox.length, 1);
 });
 
-test('recurrence normalization preserves explicit record Routine metadata', () => {
+test('recurrence normalization keeps scheduling separate from completion behavior', () => {
   assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', interval: 1, completionAction: 'milk_morning' }), {
-    mode: 'fixed_schedule', frequency: 'daily', interval: 1, routineType: 'milk_morning'
+    mode: 'fixed_schedule', frequency: 'daily', interval: 1
   });
-  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', routineType: 'guess_from_title' }).routineType, undefined);
-  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', routineType: 'egg_collection' }).routineType, 'egg_collection');
+  assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', routineType: 'egg_collection' }).routineType, undefined);
 });
 
-test('Routine matching uses yield type, record, work date, session, and explicit metadata', () => {
-  const configured = { id: 'morning', recordId: 'daisy', dueDate: '2026-08-10', status: 'open', completed: false, recurrenceRule: { frequency: 'daily', interval: 1, routineType: 'milk_morning' } };
-  const eggCollection = { ...configured, id: 'eggs', recordId: 'layers', recurrenceRule: { frequency: 'daily', interval: 1, routineType: 'egg_collection' } };
-  const titleOnly = { ...configured, id: 'title-only', recurrenceRule: { frequency: 'daily', interval: 1 }, title: 'Milk Daisy this morning' };
+test('Yield matching uses explicit Task behavior, record, and work date', () => {
+  const configured = { id: 'morning', recordId: 'daisy', dueDate: '2026-08-10', status: 'open', completed: false, yieldType:'milk' };
+  const eggCollection = { ...configured, id: 'eggs', recordId: 'layers', yieldType:'eggs' };
+  const titleOnly = { ...configured, id: 'title-only', yieldType:null, title: 'Milk Daisy this morning' };
   const yieldEntry = { recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-10T07:00:00' };
   const eggYield = { recordId: 'layers', type: 'eggs', session: 'other', occurredAt: '2026-08-10T12:00:00' };
-  assert.deepEqual(housekeepingData.matchingRoutineTasks([configured, titleOnly], yieldEntry).map(task => task.id), ['morning']);
-  assert.equal(housekeepingData.matchingRoutineTasks([configured], { ...yieldEntry, session: 'evening' }).length, 0);
-  assert.deepEqual(housekeepingData.matchingRoutineTasks([eggCollection], eggYield).map(task => task.id), ['eggs']);
-  assert.equal(housekeepingData.matchingRoutineTasks([eggCollection], { ...eggYield, type: 'milk' }).length, 0);
+  assert.deepEqual(housekeepingData.matchingYieldTasks([configured, titleOnly], yieldEntry).map(task => task.id), ['morning']);
+  assert.deepEqual(housekeepingData.matchingYieldTasks([eggCollection], eggYield).map(task => task.id), ['eggs']);
+  assert.equal(housekeepingData.matchingYieldTasks([eggCollection], { ...eggYield, type: 'milk' }).length, 0);
 });
 
-test('a task-linked yield reuses the task cloud identity and existing outbox', () => {
+test('a task-linked Yield keeps the canonical Task reference through migration', () => {
   const setup = harness();
   setup.state.bind(crypto.randomUUID());
   setup.state.state.initialSyncCompleted = true;
   const after = blank();
   after.records.push(record('daisy'));
-  after.tasks.push({ id: 'milk-task', recordId: 'daisy', title: 'Barn round', status: 'completed', completed: true, dueDate: '2026-08-10', recurrenceRule: { frequency: 'daily', interval: 1, routineType: 'milk_morning' }, createdAt: '2026-08-10T00:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
-  after.yieldEntries.push({ id: 'milk-task', taskId: 'milk-task', recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-10T11:00:00Z', quantity: 2, unit: 'gal', unusableQuantity: 0, details: '', createdAt: '2026-08-10T11:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
+  after.tasks.push({ id: 'milk-task', recordId: 'daisy', title: 'Barn round', status: 'completed', completed: true, dueDate: '2026-08-10', yieldType:'milk', recurrenceRule: { frequency: 'daily', interval: 1 }, createdAt: '2026-08-10T00:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
+  after.yieldEntries.push({ id: 'yield-one', taskId: 'milk-task', recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-10T11:00:00Z', quantity: 2, unit: 'gal', unusableQuantity: 0, details: '', createdAt: '2026-08-10T11:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
   setup.engine.queueLocalChanges(blank(), after);
   const taskOperation = setup.state.state.outbox.find(item => item.table === 'tasks');
   const yieldOperation = setup.state.state.outbox.find(item => item.table === 'yield_entries');
@@ -145,7 +143,7 @@ test('offline linked completion queues both changes and reconnect sync succeeds 
 });
 
 test('matching an existing yield ignores deleted entries and does not require title text', () => {
-  const task = { recordId: 'daisy', dueDate: '2026-08-10', recurrenceRule: { frequency: 'daily', routineType: 'milk_evening' } };
+  const task = { recordId: 'daisy', dueDate: '2026-08-10', yieldType:'milk', recurrenceRule: { frequency: 'daily' } };
   const deleted = { id: 'deleted', recordId: 'daisy', type: 'milk', session: 'evening', occurredAt: '2026-08-10T18:00:00', deletedAt: '2026-08-11T00:00:00Z' };
   const active = { ...deleted, id: 'active', deletedAt: null };
   assert.equal(housekeepingData.matchingYieldForTask([deleted, active], task).id, 'active');
