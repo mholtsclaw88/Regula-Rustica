@@ -30,15 +30,6 @@
     const style = document.createElement('style');
     style.id = 'record-navigation-refinement-styles';
     style.textContent = `
-      .record-workspace { display:grid; grid-template-columns: 170px minmax(0,1fr); gap:1rem; margin-top:1rem; align-items:start; }
-      .record-section-nav { position:sticky; top:1rem; display:flex; flex-direction:column; gap:.25rem; padding:.45rem; border:1px solid var(--line, #cdbf9f); border-radius:12px; background:rgba(255,255,255,.28); }
-      .record-section-nav button { appearance:none; border:0; background:transparent; color:inherit; text-align:left; padding:.65rem .75rem; border-radius:8px; font:inherit; cursor:pointer; }
-      .record-section-nav button:hover { background:rgba(91,71,43,.08); }
-      .record-section-nav button.active { background:rgba(91,71,43,.14); font-weight:700; }
-      .record-section-content { min-width:0; }
-      .record-section-panel { display:none; }
-      .record-section-panel.active { display:block; }
-      .record-section-panel > .record-section-heading { margin:0 0 .75rem; }
       .record-context, .tabs-mini { display:none !important; }
       .ledger-receipt-action.has-receipt::before { content:'✓ '; }
       .receipt-storage-note { margin:.65rem 0 1rem; font-size:.86rem; color:var(--muted, #6b6256); }
@@ -47,9 +38,6 @@
       .receipt-dialog .receipt-meta { margin:.65rem 0 0; color:var(--muted, #6b6256); font-size:.86rem; }
       .receipt-dialog .receipt-actions { display:flex; flex-wrap:wrap; gap:.5rem; justify-content:flex-end; margin-top:1rem; }
       @media (max-width: 720px) {
-        .record-workspace { display:block; }
-        .record-section-nav { position:static; flex-direction:row; overflow-x:auto; margin-bottom:.75rem; scrollbar-width:thin; }
-        .record-section-nav button { flex:0 0 auto; text-align:center; white-space:nowrap; }
         .receipt-dialog .receipt-actions .btn { flex:1 1 auto; }
       }
     `;

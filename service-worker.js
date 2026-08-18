@@ -1,6 +1,6 @@
-const CACHE = 'regula-rustica-unified-tasks-v3';
+const CACHE = 'regula-rustica-record-ui-v1';
 const ASSETS = [
-  './', './index.html', './styles.css', './housekeeping.css?v=ui-cleanup-v1', './cloud-auth.css', './housekeeping-data.js?v=unified-tasks-v1', './task-foundation.js?v=unified-tasks-v1', './records-relationships.js', './ui-refinements.js?v=ui-cleanup-v1', './ui-refinements-core.js?v=ui-cleanup-v1', './ledger-receipt-modal.js?v=ledger-form-v1', './ledger-allocations.js?v=ledger-form-v1', './ledger-allocation-display.js?v=reporting-v1', './app.js?v=unified-tasks-v2', './cloud-auth.js',
+  './', './index.html', './styles.css', './housekeeping.css?v=record-ui-v1', './cloud-auth.css', './housekeeping-data.js?v=unified-tasks-v1', './task-foundation.js?v=unified-tasks-v1', './records-relationships.js', './ui-refinements.js?v=record-ui-v1', './ui-refinements-core.js?v=record-ui-v1', './ledger-receipt-modal.js?v=ledger-form-v1', './ledger-allocations.js?v=ledger-form-v1', './ledger-allocation-display.js?v=reporting-v1', './app.js?v=record-ui-v1', './cloud-auth.js',
   './cloud-invitations.mjs', './sync/runtime.mjs?v=unified-tasks-v1', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
 ];

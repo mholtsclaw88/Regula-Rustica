@@ -547,6 +547,12 @@ function openRecord(id) {
   $$('.view,.record-shell').forEach(element => element.classList.remove('active'));
   $$('.nav button').forEach(button => button.classList.remove('active'));
   $('#recordView').classList.add('active');
+  $$('.record-section-nav button').forEach(button => {
+    const active = button.dataset.recordSection === 'overview';
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === 'overview'));
   renderRecord();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -594,8 +600,8 @@ function renderSuggestedTasks(record) {
   const root=$('#suggestedTasks'); root.innerHTML='';
   const suggestions=window.RegulaRusticaTasks.suggestedTasks(record).filter(item=>!window.RegulaRusticaTasks.suggestionEnabled(data.tasks,record.id,item.key));
   if (!suggestions.length) return;
-  const heading=document.createElement('div'); heading.className='section-head'; heading.innerHTML='<div><span class="label">Optional templates</span><h3>Suggested Tasks</h3><p class="muted">Enable once to create an ordinary recurring Task you can edit or delete.</p></div>'; root.append(heading);
-  suggestions.forEach(suggestion=>{const row=document.createElement('div');row.className='routine-management-row suggested';row.innerHTML=`<div><strong>${escapeHtml(suggestion.title)}</strong><div class="meta">Repeats ${escapeHtml(suggestion.frequency)}${suggestion.yieldType?' · records Yield on completion':''}</div></div><button class="btn secondary">Enable</button>`;row.querySelector('button').addEventListener('click',()=>createSuggestedTask(record,suggestion));root.append(row);});
+  const heading=document.createElement('div'); heading.className='section-head'; heading.innerHTML='<div><span class="label">Optional templates</span><h3>Suggested Tasks</h3><p class="muted">Enable a suggestion to create a recurring Task you can edit or delete.</p></div>'; root.append(heading);
+  suggestions.forEach(suggestion=>{const row=document.createElement('div');row.className='routine-management-row suggested';row.innerHTML=`<div><strong>${escapeHtml(suggestion.title)}</strong><div class="meta">${escapeHtml(suggestion.frequency)}${suggestion.yieldType?' · records Yield on completion':''}</div></div><button class="btn secondary">Enable</button>`;row.querySelector('button').addEventListener('click',()=>createSuggestedTask(record,suggestion));root.append(row);});
 }
 
 function completeTask(task) {
@@ -788,21 +794,57 @@ function renderRecord() {
   const record = recordById(currentRecordId);
   if (!record) return showView(priorView);
 
+  const portraitLetters = { Animal: 'A', Land: 'L', Equipment: 'E', Structure: 'S', Work: 'W' };
+  $('#recordPortrait').dataset.recordType = record.type;
+  $('#recordPortraitPlaceholder').textContent = portraitLetters[record.type] || 'R';
   $('#recordTypeLabel').textContent = record.type;
   $('#recordTitle').textContent = record.name;
   $('#recordStatus').textContent = record.status;
   $('#recordIdentity').textContent = identityText(record);
-  $('#recordStewardship').innerHTML = `<span class="label">Stewardship</span><div>${escapeHtml(stewardshipText(record))}</div>`;
-  $('#recordYield').classList.toggle('hidden', !window.RegulaRusticaTasks.eligibleYieldTypes(record).length);
+  $('#recordStewardship').textContent = stewardshipText(record);
+  const yieldEligible = window.RegulaRusticaTasks.eligibleYieldTypes(record).length > 0;
+  $('#recordYield').classList.toggle('hidden', !yieldEligible);
+  $('#recordSectionAddYield').classList.toggle('hidden', !yieldEligible);
 
   const taskPanel = $('#panelTasks');
   taskPanel.innerHTML = '';
-  data.tasks
-    .filter(task => !task.deletedAt && task.recordId === record.id)
-    .sort((a, b) => Number(a.completed) - Number(b.completed) || (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'))
-    .forEach(task => taskPanel.appendChild(taskRow(task)));
-  if (!taskPanel.children.length) taskPanel.innerHTML = '<div class="empty-panel">No linked Tasks.</div>';
+  const activeTasks = data.tasks
+    .filter(task => !task.deletedAt && task.recordId === record.id && !task.completed)
+    .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
+  activeTasks.forEach(task => taskPanel.appendChild(taskRow(task)));
+  if (!taskPanel.children.length) taskPanel.innerHTML = '<p class="muted record-empty">No active tasks.</p>';
   renderSuggestedTasks(record);
+
+  const nextTask = activeTasks[0];
+  $('#recordOverviewTask').innerHTML = nextTask
+    ? `<strong>${escapeHtml(nextTask.title)}</strong><div class="meta">${escapeHtml(taskDateText(nextTask))}</div>`
+    : '<span class="muted">No upcoming tasks.</span>';
+
+  const recentStart = new Date();
+  recentStart.setHours(0, 0, 0, 0);
+  recentStart.setDate(recentStart.getDate() - 29);
+  const recordYields = data.yieldEntries
+    .filter(entry => !entry.deletedAt && entry.recordId === record.id)
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+  const recentYields = recordYields.filter(entry => new Date(entry.occurredAt) >= recentStart);
+  const yieldSummary = [...new Set(recentYields.map(entry => entry.type))].map(type => {
+    const label = window.RegulaRusticaTasks.YIELD_TYPES[type]?.label || 'Yield';
+    return `${label}: ${summarizeYield(recentYields.filter(entry => entry.type === type))}`;
+  }).join(' · ');
+  $('#recordOverviewYieldWrap').classList.toggle('hidden', !yieldEligible && !recordYields.length);
+  $('#recordOverviewYield').innerHTML = yieldSummary || '<span class="muted">No Yield recorded in the last 30 days.</span>';
+  $('#recordYieldSummary').textContent = yieldSummary;
+  const yieldList = $('#recordYieldList');
+  yieldList.innerHTML = '';
+  recentYields.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'record-yield-entry';
+    const label = window.RegulaRusticaTasks.YIELD_TYPES[entry.type]?.label || 'Yield';
+    row.innerHTML = `<div><strong>${escapeHtml(label)}${entry.product ? ` · ${escapeHtml(entry.product)}` : ''}</strong><div class="meta">${new Date(entry.occurredAt).toLocaleString()}</div></div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong><div class="actions"><button class="btn ghost edit" type="button">Edit</button></div>`;
+    row.querySelector('.edit').addEventListener('click', () => openModal('yield', entry.id, entry.recordId, entry.type));
+    yieldList.appendChild(row);
+  });
+  if (!recentYields.length) yieldList.innerHTML = `<p class="muted record-empty">${yieldEligible ? 'No Yield recorded in the last 30 days.' : 'This Record does not produce tracked Yield.'}</p>`;
 
   const chroniclePanel = $('#panelChronicle');
   chroniclePanel.innerHTML = '';
@@ -831,7 +873,14 @@ function renderRecord() {
       item.innerHTML = `<div class="row"><strong>${escapeHtml(window.RegulaRusticaTasks.YIELD_TYPES[entry.type]?.label || 'Yield')}</strong><span class="meta">${new Date(entry.occurredAt).toLocaleString()}</span></div><div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong>${entry.product ? ` · ${escapeHtml(entry.product)}` : ''}</div>${entry.unusableQuantity ? `<div class="meta">${escapeHtml(entry.unusableQuantity)} unusable</div>` : ''}${entry.details ? `<p>${escapeHtml(entry.details)}</p>` : ''}`;
       chroniclePanel.appendChild(item);
     });
-  if (!chroniclePanel.children.length) chroniclePanel.innerHTML = '<div class="empty-panel">The Chronicle will grow as events are recorded.</div>';
+  if (!chroniclePanel.children.length) chroniclePanel.innerHTML = '<p class="muted record-empty">No events recorded yet.</p>';
+
+  const recentEvent = data.events
+    .filter(event => !event.deletedAt && event.recordId === record.id && !data.yieldEntries.some(entry => !entry.deletedAt && entry.legacyEventId === event.id))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))[0];
+  $('#recordOverviewEvent').innerHTML = recentEvent
+    ? `<strong>${escapeHtml(recentEvent.eventType)}</strong><div class="meta">${formatDate(recentEvent.date)}</div>`
+    : '<span class="muted">No events recorded yet.</span>';
 
   const notesPanel = $('#panelNotes');
   notesPanel.innerHTML = '';
@@ -851,7 +900,7 @@ function renderRecord() {
       });
       notesPanel.appendChild(item);
     });
-  if (!notesPanel.children.length) notesPanel.innerHTML = '<div class="empty-panel">No enduring notes.</div>';
+  if (!notesPanel.children.length) notesPanel.innerHTML = '<p class="muted record-empty">No notes yet.</p>';
 
   const ledgerPanel = $('#panelLedger');
   ledgerPanel.innerHTML = '';
@@ -859,7 +908,7 @@ function renderRecord() {
     .filter(entry => !entry.deletedAt && entry.recordId === record.id)
     .sort((a, b) => b.date.localeCompare(a.date))
     .forEach(entry => ledgerPanel.appendChild(ledgerRow(entry)));
-  if (!ledgerPanel.children.length) ledgerPanel.innerHTML = '<div class="empty-panel">No linked ledger entries.</div>';
+  if (!ledgerPanel.children.length) ledgerPanel.innerHTML = '<p class="muted record-empty">No ledger entries.</p>';
 }
 
 function renderTasks() {
@@ -1081,7 +1130,8 @@ function reportingRangeText(range) {
 function yieldRow(entry) {
   const row = document.createElement('div');
   row.className = 'task yield-row';
-  row.innerHTML = `<div class="yield-mark" aria-hidden="true">${entry.type === 'milk' ? 'M' : 'E'}</div><div class="task-body"><strong>${escapeHtml(recordName(entry.recordId) || 'Unlinked animal')}</strong><div class="meta">${new Date(entry.occurredAt).toLocaleString()} · ${escapeHtml(entry.session)}</div>${entry.details ? `<div class="task-description">${escapeHtml(entry.details)}</div>` : ''}</div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong>${entry.unusableQuantity ? `<span class="meta">${escapeHtml(entry.unusableQuantity)} unusable</span>` : ''}<div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
+  const yieldLabel = window.RegulaRusticaTasks.YIELD_TYPES[entry.type]?.label || 'Yield';
+  row.innerHTML = `<div class="yield-mark" aria-hidden="true">${escapeHtml(yieldLabel.charAt(0))}</div><div class="task-body"><strong>${escapeHtml(recordName(entry.recordId) || 'Unlinked record')}</strong><div class="meta">${new Date(entry.occurredAt).toLocaleString()} · ${escapeHtml(entry.session)}</div>${entry.details ? `<div class="task-description">${escapeHtml(entry.details)}</div>` : ''}</div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong>${entry.unusableQuantity ? `<span class="meta">${escapeHtml(entry.unusableQuantity)} unusable</span>` : ''}<div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
   row.querySelector('.edit').addEventListener('click', () => openModal('yield', entry.id, entry.recordId, entry.type));
   row.querySelector('.del').addEventListener('click', () => {
     if (confirm('Delete this yield entry?')) {
@@ -1593,11 +1643,24 @@ $('#addMeatYield')?.addEventListener('click', () => openModal('yield',null,null,
 $('#addHarvestYield')?.addEventListener('click', () => openModal('yield',null,null,'harvest'));
 $('#addForageYield')?.addEventListener('click', () => openModal('yield',null,null,'forage'));
 $('#recordEvent').addEventListener('click', () => openModal('event', null, currentRecordId));
-$('#recordYield').addEventListener('click', () => { const type=window.RegulaRusticaTasks.eligibleYieldTypes(recordById(currentRecordId))[0]; if(type)openModal('yield',null,currentRecordId,type); });
+const openCurrentRecordYield = () => { const type=window.RegulaRusticaTasks.eligibleYieldTypes(recordById(currentRecordId))[0]; if(type)openModal('yield',null,currentRecordId,type); };
+$('#recordYield').addEventListener('click', openCurrentRecordYield);
+$('#recordSectionAddYield').addEventListener('click', openCurrentRecordYield);
 $('#recordAddTask').addEventListener('click', () => openModal('task', null, currentRecordId));
-$('#recordAddNote').addEventListener('click', () => openModal('note', null, currentRecordId));
-$('#recordAddLedger').addEventListener('click', () => openModal('ledger', null, currentRecordId));
-$('#recordEdit').addEventListener('click', () => openModal('record', currentRecordId));
+const closeRecordMore = () => { $('#recordMore').open = false; };
+$('#recordAddNote').addEventListener('click', () => { closeRecordMore(); openModal('note', null, currentRecordId); });
+$('#recordAddLedger').addEventListener('click', () => { closeRecordMore(); openModal('ledger', null, currentRecordId); });
+$('#recordEdit').addEventListener('click', () => { closeRecordMore(); openModal('record', currentRecordId); });
+$('.record-section-nav').addEventListener('click', event => {
+  const button = event.target.closest('button[data-record-section]');
+  if (!button) return;
+  $$('.record-section-nav button').forEach(item => {
+    const active = item === button;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-selected', String(active));
+  });
+  $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === button.dataset.recordSection));
+});
 $('#backToList').addEventListener('click', () => showView(priorView));
 $('#modalClose').addEventListener('click', () => $('#modal').close());
 $('#modalCancel').addEventListener('click', () => $('#modal').close());
