@@ -37,7 +37,7 @@ create trigger validate_ledger_allocation before insert or update on public.ledg
 create trigger touch_ledger_allocations before update on public.ledger_allocations
   for each row execute function private.touch_row();
 create trigger protect_ledger_allocations before insert or update on public.ledger_allocations
-  for each row execute function private.protect_common_fields();
+  for each row execute function private.protect_content_fields();
 create trigger audit_ledger_allocations after insert or update on public.ledger_allocations
   for each row execute function private.audit_row();
 

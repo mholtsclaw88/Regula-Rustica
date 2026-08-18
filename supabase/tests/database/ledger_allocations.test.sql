@@ -7,6 +7,6 @@ select has_column('public','ledger_allocations','record_id','allocation links Re
 select has_column('public','ledger_allocations','amount','allocation has amount');
 select ok((select relrowsecurity from pg_class where oid='public.ledger_allocations'::regclass),'ledger allocations use RLS');
 select has_function('public','apply_ledger_allocation_sync_operation',array['text','uuid','text','uuid','text','integer','timestamp with time zone','jsonb'],'allocation sync RPC exists');
-select like(pg_get_functiondef('private.validate_ledger_allocation()'::regprocedure),'%cannot exceed the transaction amount%','server prevents over-allocation');
+select ok(pg_get_functiondef('private.validate_ledger_allocation()'::regprocedure) like '%cannot exceed the transaction amount%','server prevents over-allocation');
 select * from finish();
 rollback;
