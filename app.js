@@ -1209,6 +1209,18 @@ function summarizeYield(entries) {
   return [...totals].map(([unit, quantity]) => `${Number(quantity.toFixed(2))} ${unit}`).join(' · ') || '0';
 }
 
+function selectedReportingRange(name) {
+  const period = document.querySelector(`[name="${name}"]:checked`)?.value || '30';
+  return window.RegulaRusticaHousekeeping.reportingDateRange(period, today());
+}
+
+function reportingRangeText(range) {
+  if (!range.start) return 'All Time · all recorded dates';
+  if (range.start === range.end) return `Today · ${formatDate(range.start)}`;
+  const labels = { '7': 'Last 7 Days', '30': 'Last 30 Days', '90': 'Last 90 Days', ytd: 'Year to Date' };
+  return `${labels[range.period] || 'Selected period'} · ${formatDate(range.start)} – ${formatDate(range.end)}`;
+}
+
 function yieldRow(entry) {
   const row = document.createElement('div');
   row.className = 'task yield-row';
@@ -1226,13 +1238,17 @@ function yieldRow(entry) {
 
 function renderYield() {
   const active = data.yieldEntries.filter(entry => !entry.deletedAt);
-  const todayEntries = active.filter(entry => localDateTime(entry.occurredAt).slice(0, 10) === localDateTime().slice(0, 10));
-  $('#todayMilkYield').textContent = summarizeYield(todayEntries.filter(entry => entry.type === 'milk'));
-  $('#todayEggYield').textContent = summarizeYield(todayEntries.filter(entry => entry.type === 'eggs'));
+  const range = selectedReportingRange('yieldDateFilter');
+  const ranged = active.filter(entry => window.RegulaRusticaHousekeeping.matchesReportingDate(localDateTime(entry.occurredAt).slice(0, 10), range));
+  const rangeText = reportingRangeText(range);
+  $('#yieldSummaryPeriod').textContent = rangeText.split(' · ')[0];
+  $('#yieldDateRange').textContent = rangeText;
+  $('#todayMilkYield').textContent = summarizeYield(ranged.filter(entry => entry.type === 'milk'));
+  $('#todayEggYield').textContent = summarizeYield(ranged.filter(entry => entry.type === 'eggs'));
   const root = $('#yieldList');
   root.innerHTML = '';
   const filter = document.querySelector('[name="yieldTypeFilter"]:checked')?.value || 'all';
-  active.filter(entry => filter === 'all' || entry.type === filter).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 30).forEach(entry => root.appendChild(yieldRow(entry)));
+  ranged.filter(entry => filter === 'all' || entry.type === filter).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).forEach(entry => root.appendChild(yieldRow(entry)));
   if (!root.children.length) root.innerHTML = '<div class="empty-panel">No yield matches this filter.</div>';
 }
 
@@ -1255,10 +1271,13 @@ function renderLedger() {
   const root = $('#ledgerList');
   root.innerHTML = '';
   const filter = document.querySelector('[name="ledgerTypeFilter"]:checked')?.value || 'all';
-  data.ledger.filter(entry => !entry.deletedAt && (filter === 'all' || entry.type === filter)).sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => root.appendChild(ledgerRow(entry)));
+  const range = selectedReportingRange('ledgerDateFilter');
+  const ranged = data.ledger.filter(entry => !entry.deletedAt && window.RegulaRusticaHousekeeping.matchesReportingDate(entry.date, range));
+  $('#ledgerDateRange').textContent = reportingRangeText(range);
+  ranged.filter(entry => filter === 'all' || entry.type === filter).sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => root.appendChild(ledgerRow(entry)));
   if (!root.children.length) root.innerHTML = '<div class="empty-panel">No ledger entries match this filter.</div>';
-  const expenses = data.ledger.filter(entry => !entry.deletedAt && entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0);
-  const income = data.ledger.filter(entry => !entry.deletedAt && entry.type === 'income').reduce((sum, entry) => sum + entry.amount, 0);
+  const expenses = ranged.filter(entry => entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0);
+  const income = ranged.filter(entry => entry.type === 'income').reduce((sum, entry) => sum + entry.amount, 0);
   $('#expenseTotal').textContent = formatMoney(expenses);
   $('#incomeTotal').textContent = formatMoney(income);
   $('#ledgerNet').textContent = formatMoney(income - expenses);
@@ -1832,8 +1851,8 @@ $$('.tabs-mini button').forEach(button => button.addEventListener('click', () =>
 ['taskRecordFilter', 'taskAssigneeFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
 $$('[name="taskStatusFilter"], [name="taskTimingFilter"]').forEach(input => input.addEventListener('change', renderTasks));
 $$('[name="recordTypeFilter"]').forEach(input => input.addEventListener('change', renderRecords));
-$$('[name="yieldTypeFilter"]').forEach(input => input.addEventListener('change', renderYield));
-$$('[name="ledgerTypeFilter"]').forEach(input => input.addEventListener('change', renderLedger));
+$$('[name="yieldTypeFilter"], [name="yieldDateFilter"]').forEach(input => input.addEventListener('change', renderYield));
+$$('[name="ledgerTypeFilter"], [name="ledgerDateFilter"]').forEach(input => input.addEventListener('change', renderLedger));
 $$('[data-settings-target]').forEach(button => button.addEventListener('click', () => {
   $$('[data-settings-target]').forEach(item => item.classList.toggle('active', item === button));
   $(`#${button.dataset.settingsTarget}`).scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -9,12 +9,12 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css?v=routines-v4">
+  <link rel="stylesheet" href="housekeeping.css?v=ui-cleanup-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=routines-v4" defer></script>
-  <script src="routines-data.js?v=routines-v4" defer></script>
-  <script src="app.js?v=routines-v4" defer></script>
+  <script src="housekeeping-data.js?v=reporting-v1" defer></script>
+  <script src="routines-data.js?v=ui-cleanup-v1" defer></script>
+  <script src="app.js?v=reporting-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
   <script src="sync/runtime.mjs?v=routines-v4" type="module"></script>
@@ -188,22 +188,35 @@
           </div>
         </article>
         <aside class="card">
-          <span class="label">Today</span>
+          <span class="label" id="yieldSummaryPeriod">Last 30 Days</span>
           <div class="stats yield-stats">
             <div class="stat stat-milk"><strong id="todayMilkYield">0</strong><span>Milk</span></div>
             <div class="stat stat-eggs"><strong id="todayEggYield">0</strong><span>Eggs</span></div>
           </div>
         </aside>
       </div>
-      <div class="section-head yield-recent-head"><div><span class="label">Most recent</span><h3>Yield entries</h3></div></div>
-      <fieldset class="choice-filter">
-        <legend>Filter yield entries</legend>
-        <div class="choice-pills">
-          <label><input type="radio" name="yieldTypeFilter" value="all" checked>All</label>
-          <label><input type="radio" name="yieldTypeFilter" value="milk">Milk</label>
-          <label><input type="radio" name="yieldTypeFilter" value="eggs">Eggs</label>
-        </div>
-      </fieldset>
+      <div class="section-head yield-recent-head"><div><span class="label">Recorded provision</span><h3>Yield entries</h3><p class="reporting-range" id="yieldDateRange"></p></div></div>
+      <div class="reporting-controls">
+        <fieldset class="choice-filter">
+          <legend>Date range</legend>
+          <div class="choice-pills compact-pills">
+            <label><input type="radio" name="yieldDateFilter" value="today">Today</label>
+            <label><input type="radio" name="yieldDateFilter" value="7">Last 7 Days</label>
+            <label><input type="radio" name="yieldDateFilter" value="30" checked>Last 30 Days</label>
+            <label><input type="radio" name="yieldDateFilter" value="90">Last 90 Days</label>
+            <label><input type="radio" name="yieldDateFilter" value="ytd">Year to Date</label>
+            <label><input type="radio" name="yieldDateFilter" value="all">All Time</label>
+          </div>
+        </fieldset>
+        <fieldset class="choice-filter">
+          <legend>Yield type</legend>
+          <div class="choice-pills compact-pills">
+            <label><input type="radio" name="yieldTypeFilter" value="all" checked>All</label>
+            <label><input type="radio" name="yieldTypeFilter" value="milk">Milk</label>
+            <label><input type="radio" name="yieldTypeFilter" value="eggs">Eggs</label>
+          </div>
+        </fieldset>
+      </div>
       <div id="yieldList" class="stack"></div>
     </section>
 
@@ -217,14 +230,28 @@
         <div class="stat stat-income"><strong id="incomeTotal">$0</strong><span>Income</span></div>
         <div class="stat stat-net"><strong id="ledgerNet">$0</strong><span>Net</span></div>
       </div>
-      <fieldset class="choice-filter">
-        <legend>Filter ledger entries</legend>
-        <div class="choice-pills">
-          <label><input type="radio" name="ledgerTypeFilter" value="all" checked>All</label>
-          <label><input type="radio" name="ledgerTypeFilter" value="expense">Expenses</label>
-          <label><input type="radio" name="ledgerTypeFilter" value="income">Income</label>
-        </div>
-      </fieldset>
+      <p class="reporting-range" id="ledgerDateRange"></p>
+      <div class="reporting-controls">
+        <fieldset class="choice-filter">
+          <legend>Date range</legend>
+          <div class="choice-pills compact-pills">
+            <label><input type="radio" name="ledgerDateFilter" value="today">Today</label>
+            <label><input type="radio" name="ledgerDateFilter" value="7">Last 7 Days</label>
+            <label><input type="radio" name="ledgerDateFilter" value="30" checked>Last 30 Days</label>
+            <label><input type="radio" name="ledgerDateFilter" value="90">Last 90 Days</label>
+            <label><input type="radio" name="ledgerDateFilter" value="ytd">Year to Date</label>
+            <label><input type="radio" name="ledgerDateFilter" value="all">All Time</label>
+          </div>
+        </fieldset>
+        <fieldset class="choice-filter">
+          <legend>Entry type</legend>
+          <div class="choice-pills compact-pills">
+            <label><input type="radio" name="ledgerTypeFilter" value="all" checked>All</label>
+            <label><input type="radio" name="ledgerTypeFilter" value="expense">Expenses</label>
+            <label><input type="radio" name="ledgerTypeFilter" value="income">Income</label>
+          </div>
+        </fieldset>
+      </div>
       <div id="ledgerList" class="stack"></div>
     </section>
 
@@ -374,23 +401,24 @@
             <button class="btn ghost" id="recordEdit">Edit</button>
           </div>
         </div>
-        <details class="record-context" open><summary><strong>Stewardship</strong></summary><div id="recordStewardship" class="steward-box"></div></details>
-        <details class="record-context" open><summary><strong>Routines</strong></summary><div id="recordRoutines" class="stack"></div></details>
-        <div class="tabs-mini" role="tablist" aria-label="Record details">
-          <button class="active" data-panel="tasks">Tasks</button>
-          <button data-panel="chronicle">Chronicle</button>
-          <button data-panel="notes">Notes</button>
-          <button data-panel="ledger">Ledger</button>
-          <button data-panel="photos">Photos</button>
-        </div>
-        <div id="panelTasks" class="record-panel active"></div>
-        <div id="panelChronicle" class="record-panel"></div>
-        <div id="panelNotes" class="record-panel"></div>
-        <div id="panelLedger" class="record-panel"></div>
-        <div id="panelPhotos" class="record-panel">
-          <div class="photo-placeholder">
-            <span class="label">Photos</span>
-            <p>Photo support is planned for a later release.</p>
+        <div class="record-workspace">
+          <nav class="record-section-nav" aria-label="Record sections" role="tablist">
+            <button type="button" class="active" role="tab" aria-selected="true" data-record-section="stewardship">Stewardship</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="routines">Routines</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="tasks">Tasks</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="chronicle">Chronicle</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="notes">Notes</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="ledger">Ledger</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="photos">Photos</button>
+          </nav>
+          <div class="record-section-content">
+            <section class="record-section-panel active" role="tabpanel" data-record-section-panel="stewardship"><h3 class="record-section-heading">Stewardship</h3><div id="recordStewardship" class="steward-box"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="routines"><h3 class="record-section-heading">Routines</h3><div id="recordRoutines" class="stack"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><h3 class="record-section-heading">Tasks</h3><div id="panelTasks"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="chronicle"><h3 class="record-section-heading">Chronicle</h3><div id="panelChronicle"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="notes"><h3 class="record-section-heading">Notes</h3><div id="panelNotes"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="ledger"><h3 class="record-section-heading">Ledger</h3><div id="panelLedger"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="photos"><h3 class="record-section-heading">Photos</h3><div id="panelPhotos"><div class="photo-placeholder"><p>Photo support is planned for a later release.</p></div></div></section>
           </div>
         </div>
       </article>

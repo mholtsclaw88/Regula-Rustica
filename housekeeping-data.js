@@ -129,6 +129,26 @@
     return { starts, ends, showLabel: starts };
   }
 
+  function reportingDateRange(period = '30', todayValue = localDate(new Date())) {
+    const todayParts = dateParts(todayValue);
+    if (!todayParts) return { period: 'all', start: null, end: null };
+    if (period === 'all') return { period, start: null, end: todayValue };
+    if (period === 'ytd') return { period, start: formatDateParts(todayParts.year, 1, 1), end: todayValue };
+    const days = period === 'today' ? 1 : Math.max(1, Number(period) || 30);
+    const start = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day - (days - 1)));
+    return {
+      period,
+      start: formatDateParts(start.getUTCFullYear(), start.getUTCMonth() + 1, start.getUTCDate()),
+      end: todayValue
+    };
+  }
+
+  function matchesReportingDate(dateValue, range = {}) {
+    const date = String(dateValue || '').slice(0, 10);
+    if (!date) return false;
+    return (!range.start || date >= range.start) && (!range.end || date <= range.end);
+  }
+
   function dateParts(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
     if (!match) return null;
@@ -166,6 +186,7 @@
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
     routineType, routineYieldType, routineSession, routineLabel, taskWorkDate,
-    matchingRoutineTasks, matchingYieldForTask, taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment
+    matchingRoutineTasks, matchingYieldForTask, taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment,
+    reportingDateRange, matchesReportingDate
   };
 }));

@@ -265,6 +265,22 @@ summary:focus-visible {
 }
 .choice-pills label:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
 
+.reporting-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px 20px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+.reporting-controls .choice-filter { margin: 0; min-width: 0; }
+.compact-pills { gap: 6px; }
+.compact-pills label { min-height: 31px; padding: 6px 10px; font-size: .68rem; }
+.reporting-range { margin: 4px 0 0; color: var(--muted); font: .8rem Arial, sans-serif; }
+.record-section-panel .steward-box { margin-top: 0; }
+.record-relationships { margin-top: 18px; }
+.record-relationships h4 { margin: 0 0 8px; color: var(--forest); }
+.record-relationships .steward-box { margin-top: 0; }
+
 .task-choice-filter { margin-bottom: 13px; }
 .advanced-filters { margin: 4px 0 18px; }
 .advanced-filters summary {
@@ -374,6 +390,7 @@ summary:focus-visible {
 .danger-zone .muted { margin: 10px 0; }
 
 @media (max-width: 800px) {
+  .reporting-controls { grid-template-columns: 1fr; }
   .filters { grid-template-columns: 1fr 1fr; }
   .calendar-toolbar { grid-template-columns: 1fr auto; }
   .calendar-view-pills { justify-self: end; }
