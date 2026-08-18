@@ -32,9 +32,9 @@
     if (!output) return;
 
     if (Math.abs(remaining) < .005 && total > 0) {
-      output.textContent = `Allocated ${money(allocated)} · Fully allocated`;
+      output.textContent = `Allocated ${money(allocated)} · Unallocated ${money(0)} · Fully allocated`;
     } else {
-      output.textContent = `Allocated ${money(allocated)} · Remaining ${money(Math.max(remaining, 0))}`;
+      output.textContent = `Allocated ${money(allocated)} · Unallocated ${money(Math.max(remaining, 0))}`;
     }
     output.classList.toggle('allocation-error', remaining < -.004);
     if (remaining < -.004) output.textContent = `Allocated ${money(allocated)} · Over allocated ${money(Math.abs(remaining))}`;
@@ -90,7 +90,7 @@
     box.dataset.split = enabled ? 'true' : 'false';
     panel.hidden = !enabled;
     trigger.setAttribute('aria-expanded', String(enabled));
-    trigger.textContent = enabled ? '− Stop splitting this receipt' : '+ Split this receipt';
+    trigger.checked = enabled;
 
     if (!enabled || box.querySelector('.ledger-allocation-row')) return;
 
@@ -118,7 +118,7 @@
     box.className = 'ledger-allocation-field';
     box.dataset.split = 'false';
     box.innerHTML = `
-      <button type="button" class="allocation-trigger" aria-expanded="false">+ Split this receipt</button>
+      <label class="allocation-toggle"><input type="checkbox" class="allocation-trigger" aria-expanded="false">Add allocation / split this entry</label>
       <div class="allocation-panel" hidden>
         <p class="meta">Allocate this transaction among multiple Records. Allocation 1 starts with the Primary Record selected above. A remainder may stay unallocated for general Homestead costs.</p>
         <div class="allocation-rows"></div>
@@ -133,19 +133,21 @@
     add.addEventListener('click', () => addRow(box));
     fields.querySelector('[name=amount]')?.addEventListener('input', () => updateSummary(box));
 
-    trigger.addEventListener('click', () => {
+    trigger.addEventListener('change', () => {
       const split = box.dataset.split === 'true';
       if (!split) {
         setSplitMode(box, linkedSelect, true, {
-          initialRecordId: linkedSelect?.value || '',
-          openSecondRow: true
+          initialRecordId: linkedSelect?.value || ''
         });
         updateSummary(box);
         return;
       }
 
       const hasAllocations = box.querySelectorAll('.ledger-allocation-row').length > 0;
-      if (hasAllocations && !confirm('Stop splitting this receipt? The allocation rows will be removed when you save.')) return;
+      if (hasAllocations && !confirm('Stop splitting this entry? The allocation rows will be removed when you save.')) {
+        trigger.checked = true;
+        return;
+      }
       box.querySelector('.allocation-rows').innerHTML = '';
       setSplitMode(box, linkedSelect, false);
       updateSummary(box);
@@ -256,9 +258,9 @@
     style.id = 'ledger-allocation-styles';
     style.textContent = `
       .ledger-allocation-field { grid-column:1/-1; margin-top:.05rem; }
-      .allocation-trigger { border:0; background:transparent; color:var(--accent,#284536); padding:.35rem .1rem; font:inherit; font-weight:650; cursor:pointer; text-align:left; }
-      .allocation-trigger:hover { text-decoration:underline; }
-      .allocation-panel { margin-top:.3rem; padding:.8rem; border:1px solid var(--line,#cdbf9f); border-radius:10px; }
+      .allocation-toggle { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.55rem; width:fit-content; cursor:pointer; }
+      .allocation-toggle .allocation-trigger { width:20px; height:20px; margin:0; }
+      .allocation-panel { margin-top:.55rem; padding:.8rem 0 0; border-top:1px solid var(--line,#cdbf9f); }
       .allocation-panel[hidden] { display:none; }
       .ledger-allocation-row { display:grid; grid-template-columns:minmax(0,1fr) 8rem auto; gap:.55rem; margin:.55rem 0; align-items:end; }
       .ledger-allocation-row label { margin:0; }

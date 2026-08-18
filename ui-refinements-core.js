@@ -65,9 +65,25 @@
     panels.forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === key));
   }
 
+  function wireRecordNavigation(workspace) {
+    const nav = workspace?.querySelector('.record-section-nav');
+    const panels = [...(workspace?.querySelectorAll('.record-section-panel') || [])];
+    if (!nav || !panels.length || nav.dataset.wired === 'true') return;
+    nav.dataset.wired = 'true';
+    nav.addEventListener('click', event => {
+      const button = event.target.closest('button[data-record-section]');
+      if (button) activate(nav, panels, button.dataset.recordSection);
+    });
+  }
+
   function buildRecordNavigation() {
     const card = document.querySelector('#recordView > .card');
-    if (!card || card.querySelector('.record-workspace')) return;
+    if (!card) return;
+    const existingWorkspace = card.querySelector('.record-workspace');
+    if (existingWorkspace) {
+      wireRecordNavigation(existingWorkspace);
+      return;
+    }
 
     const stewardship = document.querySelector('#recordStewardship');
     const routines = document.querySelector('#recordRoutines');
@@ -124,16 +140,11 @@
       panels.push(panel);
     });
 
-    nav.addEventListener('click', event => {
-      const button = event.target.closest('button[data-record-section]');
-      if (!button) return;
-      activate(nav, panels, button.dataset.recordSection);
-    });
-
     workspace.append(nav, content);
     const oldTabs = card.querySelector('.tabs-mini');
     if (oldTabs) oldTabs.insertAdjacentElement('beforebegin', workspace);
     else card.appendChild(workspace);
+    wireRecordNavigation(workspace);
     activate(nav, panels, 'stewardship');
   }
 
@@ -271,7 +282,12 @@
 
   function mainLedgerEntries(data) {
     const filter = document.querySelector('[name="ledgerTypeFilter"]:checked')?.value || 'all';
-    return (data.ledger || []).filter(entry => !entry.deletedAt && (filter === 'all' || entry.type === filter))
+    const period = document.querySelector('[name="ledgerDateFilter"]:checked')?.value || '30';
+    const today = new Date();
+    const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const range = window.RegulaRusticaHousekeeping.reportingDateRange(period, localToday);
+    return (data.ledger || []).filter(entry => !entry.deletedAt && (filter === 'all' || entry.type === filter)
+      && window.RegulaRusticaHousekeeping.matchesReportingDate(entry.date, range))
       .sort((a, b) => b.date.localeCompare(a.date));
   }
 
@@ -328,7 +344,7 @@
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener('regula-rustica:data-saved', refreshEnhancements);
     document.addEventListener('change', event => {
-      if (event.target.matches('[name="ledgerTypeFilter"]')) refreshEnhancements();
+      if (event.target.matches('[name="ledgerTypeFilter"], [name="ledgerDateFilter"]')) refreshEnhancements();
     });
   }
 

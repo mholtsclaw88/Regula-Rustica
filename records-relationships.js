@@ -269,13 +269,12 @@
     function ensureRelationshipSection() {
       let section = document.querySelector('#recordRelationships');
       if (section) return section;
-      const stewardship = document.querySelector('#recordStewardship')?.closest('details');
+      const stewardship = document.querySelector('#recordStewardship');
       if (!stewardship) return null;
-      section = document.createElement('details');
+      section = document.createElement('div');
       section.id = 'recordRelationships';
-      section.className = 'record-context';
-      section.open = true;
-      section.innerHTML = '<summary><strong>Connected Records</strong></summary><div id="recordRelationshipList" class="steward-box"></div>';
+      section.className = 'record-relationships';
+      section.innerHTML = '<h4>Connected Records</h4><div id="recordRelationshipList" class="steward-box"></div>';
       stewardship.after(section);
       return section;
     }

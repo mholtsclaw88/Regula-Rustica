@@ -83,7 +83,9 @@
         <span class="receipt-form-status">${existing ? 'Receipt image attached.' : 'On a phone, this can open the camera. On desktop, choose an image file.'}</span>
       </div>
       <input class="receipt-file" type="file" accept="image/*" capture="environment">`;
-    root.appendChild(wrap);
+    const allocations = root.querySelector('.ledger-allocation-field');
+    if (allocations) root.insertBefore(wrap, allocations);
+    else root.appendChild(wrap);
 
     const input = wrap.querySelector('.receipt-file');
     const button = wrap.querySelector('.receipt-choose');
