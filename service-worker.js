@@ -1,4 +1,4 @@
-const CACHE = 'regula-rustica-mobile-shell-v2';
+const CACHE = 'regula-rustica-shared-task-rows-v1';
 const ASSETS = [
   './', './index.html', './styles.css', './housekeeping.css?v=yield-indicator-v1', './cloud-auth.css', './housekeeping-data.js?v=unified-tasks-v1', './task-foundation.js?v=record-task-ux-v4', './records-relationships.js', './ui-refinements.js?v=record-ui-v1', './ui-refinements-core.js?v=record-ui-v1', './ledger-receipt-modal.js?v=ledger-form-v1', './ledger-allocations.js?v=ledger-form-v1', './ledger-allocation-display.js?v=reporting-v1', './app.js?v=yield-indicator-v1', './cloud-auth.js',
   './cloud-invitations.mjs', './sync/runtime.mjs?v=unified-tasks-v1', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
