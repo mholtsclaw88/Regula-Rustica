@@ -591,6 +591,11 @@ function stewardshipText(record) {
 function createSuggestedTask(record, suggestion) {
   if (window.RegulaRusticaTasks.suggestionEnabled(data.tasks, record.id, suggestion.key)) return;
   const timestamp = nowIso();
+  const reactivated = window.RegulaRusticaTasks.reactivateSuggestedTask(data.tasks, record.id, suggestion.key, { dueDate: today(), updatedAt: timestamp });
+  if (reactivated) {
+    saveData();
+    return;
+  }
   const choreWindow = data.choreWindows.find(item => item.systemKey === suggestion.windowKey && !item.deletedAt);
   data.tasks.push(normalizeTask({id:uid(),recordId:record.id,title:suggestion.title,dueDate:today(),recurrenceRule:{frequency:suggestion.frequency,interval:1,mode:'fixed_schedule'},choreWindowId:choreWindow?.id||null,yieldType:suggestion.yieldType,suggestionKey:suggestion.key,createdAt:timestamp,updatedAt:timestamp}));
   saveData();
@@ -600,7 +605,7 @@ function renderSuggestedTasks(record) {
   const root=$('#suggestedTasks'); root.innerHTML='';
   const suggestions=window.RegulaRusticaTasks.suggestedTasks(record).filter(item=>!window.RegulaRusticaTasks.suggestionEnabled(data.tasks,record.id,item.key));
   if (!suggestions.length) return;
-  const heading=document.createElement('div'); heading.className='section-head'; heading.innerHTML='<div><span class="label">Optional templates</span><h3>Suggested Tasks</h3><p class="muted">Enable a suggestion to create a recurring Task you can edit or delete.</p></div>'; root.append(heading);
+  const heading=document.createElement('div'); heading.className='section-head'; heading.innerHTML='<div><h3>Suggested Tasks</h3><p class="muted">These are templates you can enable and customize.</p></div>'; root.append(heading);
   suggestions.forEach(suggestion=>{const row=document.createElement('div');row.className='routine-management-row suggested';row.innerHTML=`<div><strong>${escapeHtml(suggestion.title)}</strong><div class="meta">${escapeHtml(suggestion.frequency)}${suggestion.yieldType?' · records Yield on completion':''}</div></div><button class="btn secondary">Enable</button>`;row.querySelector('button').addEventListener('click',()=>createSuggestedTask(record,suggestion));root.append(row);});
 }
 
@@ -676,6 +681,44 @@ function taskRow(task) {
     saveData();
   });
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
+  row.querySelector('.del').addEventListener('click', () => {
+    if (confirm('Delete this task?')) {
+      task.deletedAt = nowIso();
+      task.updatedAt = task.deletedAt;
+      saveData();
+    }
+  });
+  return row;
+}
+
+function recordTaskRow(task) {
+  const row = document.createElement('div');
+  row.className = 'task record-task-row';
+  const assignedTo = assigneeName(task.id);
+  const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
+  const metadata = [
+    taskDateText(task),
+    recurrence,
+    assignedTo,
+    task.priority !== 'normal' ? task.priority : ''
+  ].filter(Boolean).join(' · ');
+  row.innerHTML = `<input class="record-task-check" type="checkbox" aria-label="Complete ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadata ? `<div class="record-task-meta">${escapeHtml(metadata)}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">...</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${task.suggestionKey ? '<button class="disable" type="button">Disable</button>' : ''}<button class="del" type="button">Delete</button></div></details>`;
+  row.querySelector('.record-task-check').addEventListener('change', event => {
+    if (!event.target.checked) return;
+    if (task.yieldType) {
+      event.target.checked = false;
+      openTaskYield(task);
+      return;
+    }
+    completeTask(task);
+    saveData();
+  });
+  row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
+  row.querySelector('.disable')?.addEventListener('click', () => {
+    task.deletedAt = nowIso();
+    task.updatedAt = task.deletedAt;
+    saveData();
+  });
   row.querySelector('.del').addEventListener('click', () => {
     if (confirm('Delete this task?')) {
       task.deletedAt = nowIso();
@@ -811,7 +854,7 @@ function renderRecord() {
   const activeTasks = data.tasks
     .filter(task => !task.deletedAt && task.recordId === record.id && !task.completed)
     .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
-  activeTasks.forEach(task => taskPanel.appendChild(taskRow(task)));
+  activeTasks.forEach(task => taskPanel.appendChild(recordTaskRow(task)));
   if (!taskPanel.children.length) taskPanel.innerHTML = '<p class="muted record-empty">No active tasks.</p>';
   renderSuggestedTasks(record);
 
@@ -1642,15 +1685,15 @@ $('#addEggYield').addEventListener('click', () => openModal('yield', null, null,
 $('#addMeatYield')?.addEventListener('click', () => openModal('yield',null,null,'meat'));
 $('#addHarvestYield')?.addEventListener('click', () => openModal('yield',null,null,'harvest'));
 $('#addForageYield')?.addEventListener('click', () => openModal('yield',null,null,'forage'));
-$('#recordEvent').addEventListener('click', () => openModal('event', null, currentRecordId));
+const closeRecordAdd = () => { $('#recordAdd').open = false; };
+$('#recordEvent').addEventListener('click', () => { closeRecordAdd(); openModal('event', null, currentRecordId); });
 const openCurrentRecordYield = () => { const type=window.RegulaRusticaTasks.eligibleYieldTypes(recordById(currentRecordId))[0]; if(type)openModal('yield',null,currentRecordId,type); };
-$('#recordYield').addEventListener('click', openCurrentRecordYield);
+$('#recordYield').addEventListener('click', () => { closeRecordAdd(); openCurrentRecordYield(); });
 $('#recordSectionAddYield').addEventListener('click', openCurrentRecordYield);
-$('#recordAddTask').addEventListener('click', () => openModal('task', null, currentRecordId));
-const closeRecordMore = () => { $('#recordMore').open = false; };
-$('#recordAddNote').addEventListener('click', () => { closeRecordMore(); openModal('note', null, currentRecordId); });
-$('#recordAddLedger').addEventListener('click', () => { closeRecordMore(); openModal('ledger', null, currentRecordId); });
-$('#recordEdit').addEventListener('click', () => { closeRecordMore(); openModal('record', currentRecordId); });
+$('#recordAddTask').addEventListener('click', () => { closeRecordAdd(); openModal('task', null, currentRecordId); });
+$('#recordAddNote').addEventListener('click', () => { closeRecordAdd(); openModal('note', null, currentRecordId); });
+$('#recordAddLedger').addEventListener('click', () => { closeRecordAdd(); openModal('ledger', null, currentRecordId); });
+$('#recordEdit').addEventListener('click', () => openModal('record', currentRecordId));
 $('.record-section-nav').addEventListener('click', event => {
   const button = event.target.closest('button[data-record-section]');
   if (!button) return;

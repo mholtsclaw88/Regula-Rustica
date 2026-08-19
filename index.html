@@ -9,12 +9,12 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css?v=record-ui-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=record-task-ux-v4">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=unified-tasks-v1" defer></script>
-  <script src="task-foundation.js?v=unified-tasks-v1" defer></script>
-  <script src="app.js?v=record-ui-v1" defer></script>
+  <script src="task-foundation.js?v=record-task-ux-v4" defer></script>
+  <script src="app.js?v=record-task-ux-v4" defer></script>
   <script src="ui-refinements.js?v=record-ui-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -400,17 +400,17 @@
             </div>
           </div>
           <div class="record-actions action-cluster">
-            <button class="btn primary" id="recordEvent">+ Event</button>
-            <button class="btn secondary hidden" id="recordYield">+ Yield</button>
-            <button class="btn secondary" id="recordAddTask">+ Task</button>
-            <details class="record-more" id="recordMore">
-              <summary class="btn secondary">More</summary>
-              <div class="record-more-menu">
-                <button class="btn ghost" id="recordAddNote" type="button">+ Note</button>
-                <button class="btn ghost" id="recordAddLedger" type="button">+ Ledger</button>
-                <button class="btn ghost" id="recordEdit" type="button">Edit</button>
+            <details class="record-add" id="recordAdd">
+              <summary class="btn primary">+ Add</summary>
+              <div class="record-add-menu">
+                <button id="recordEvent" type="button"><strong>Event</strong><small>Something that happened</small></button>
+                <button id="recordAddTask" type="button"><strong>Task</strong><small>Something that needs doing</small></button>
+                <button class="hidden" id="recordYield" type="button"><strong>Yield</strong><small>Something produced</small></button>
+                <button id="recordAddNote" type="button"><strong>Note</strong><small>Add an enduring note</small></button>
+                <button id="recordAddLedger" type="button"><strong>Ledger Entry</strong><small>Record an expense or income</small></button>
               </div>
             </details>
+            <button class="btn secondary" id="recordEdit" type="button">Edit</button>
           </div>
         </div>
         <div class="record-workspace">

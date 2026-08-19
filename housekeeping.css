@@ -447,12 +447,15 @@ summary:focus-visible {
 .record-portrait[data-record-type="Work"] { background: #d8d0c3; }
 
 .record-actions { justify-content: flex-end; }
-.record-more { position: relative; }
-.record-more > summary { list-style: none; user-select: none; }
-.record-more > summary::-webkit-details-marker { display: none; }
-.record-more-menu { position: absolute; right: 0; z-index: 8; display: grid; min-width: 150px; margin-top: 6px; padding: 7px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); box-shadow: 0 10px 28px rgba(48,42,34,.16); }
-.record-more-menu .btn { justify-content: flex-start; text-align: left; color: var(--ink); }
-.record-more-menu .btn:hover { background: #eadfc9; color: var(--forest); }
+.record-add { position: relative; }
+.record-add > summary { list-style: none; user-select: none; }
+.record-add > summary::-webkit-details-marker { display: none; }
+.record-add-menu { position: absolute; right: 0; z-index: 8; display: grid; min-width: 260px; margin-top: 6px; padding: 7px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); box-shadow: 0 10px 28px rgba(48,42,34,.16); }
+.record-add-menu button { display: grid; gap: 2px; padding: 10px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.record-add-menu button:hover,
+.record-add-menu button:focus-visible { background: #eadfc9; outline: 2px solid transparent; color: var(--forest); }
+.record-add-menu strong { font: 700 .84rem Arial, sans-serif; }
+.record-add-menu small { color: var(--muted); font: .75rem Arial, sans-serif; }
 
 .record-workspace { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 24px; margin-top: 20px; align-items: start; }
 .record-section-nav { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: #eadfc9; }
@@ -487,6 +490,20 @@ summary:focus-visible {
 .suggested-tasks .routine-management-row { padding: 12px 0; border: 0; border-bottom: 1px solid rgba(164,123,60,.24); border-radius: 0; background: transparent; box-shadow: none; }
 .suggested-tasks .routine-management-row:last-child { border-bottom: 0; }
 .suggested-tasks .routine-management-row .meta { text-transform: capitalize; }
+.record-task-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 44px; gap: 10px; align-items: start; padding: 13px 0; border: 0; border-bottom: 1px solid rgba(164,123,60,.24); border-radius: 0; background: transparent; }
+.record-task-row:last-child { border-bottom: 0; }
+.record-task-row .record-task-check { width: 28px; height: 28px; margin: 0; accent-color: var(--forest); cursor: pointer; }
+.record-task-meta { margin-top: 4px; color: var(--muted); font: .78rem/1.4 Arial, sans-serif; }
+.task-more { position: relative; justify-self: end; }
+.task-more > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 9px; color: var(--forest); cursor: pointer; list-style: none; font: 700 1rem Arial, sans-serif; letter-spacing: .08em; }
+.task-more > summary::-webkit-details-marker { display: none; }
+.task-more > summary:hover,
+.task-more > summary:focus-visible { background: #eadfc9; outline: 2px solid transparent; }
+.task-more-menu { position: absolute; right: 0; z-index: 7; display: grid; min-width: 132px; padding: 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: 0 8px 22px rgba(48,42,34,.15); }
+.task-more-menu button { min-height: 40px; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; font: 700 .78rem Arial, sans-serif; }
+.task-more-menu button:hover,
+.task-more-menu button:focus-visible { background: #eadfc9; outline: 2px solid transparent; }
+.task-more-menu .del { color: #7c4438; }
 .record-section-panel .empty-panel,
 .record-section-panel .photo-placeholder { padding: 5px 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); text-align: left; font-style: italic; }
 
@@ -504,9 +521,10 @@ summary:focus-visible {
   .record-heading-group h2 { font-size: 1.6rem; }
   .record-actions { flex-wrap: nowrap; align-items: stretch; }
   .record-actions > .btn,
-  .record-more > summary { padding: 9px 10px; white-space: nowrap; }
-  .record-more { margin-left: auto; }
-  .record-more-menu { position: fixed; top: auto; right: 14px; min-width: 170px; }
+  .record-add > summary { padding: 9px 12px; white-space: nowrap; }
+  .record-actions > .btn,
+  .record-add > summary { min-height: 44px; }
+  .record-add-menu { position: fixed; top: auto; right: 14px; left: 14px; min-width: 0; }
   .record-yield-entry { grid-template-columns: minmax(0,1fr) auto; }
   .record-yield-entry .actions { grid-column: 1 / -1; }
 }
