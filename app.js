@@ -640,6 +640,19 @@ function chooseMatchingYieldTask(yieldEntry) {
   return Number.isInteger(index) && matches[index] ? matches[index] : null;
 }
 
+function taskYieldIndicator(task) {
+  const indicators = {
+    milk: { label: 'Milk', path: '<path d="M5 3h6v2l1 1v7H4V6l1-1V3Z"/><path d="M6 3V2h4v1M6 8h4"/>' },
+    eggs: { label: 'Eggs', path: '<path d="M8 2c2 0 4 4.1 4 7a4 4 0 0 1-8 0c0-2.9 2-7 4-7Z"/>' },
+    harvest: { label: 'Harvest', path: '<path d="M13 3C8 3 4 5.2 4 9c0 2 1.4 3 3 3 3.7 0 5.8-4 6-9Z"/><path d="M3 13c2-3 4.4-4.8 7-6"/>' },
+    forage: { label: 'Hay / Forage', path: '<path d="M8 14V4M8 6 5 4M8 8 4 6M8 10 5 9M8 6l3-2M8 8l4-2M8 10l3-1"/>' },
+    meat: { label: 'Meat Harvest', path: '<path d="M3 7h10l-1 6H4L3 7Z"/><path d="M5 7c.4-2 1.5-3 3-3s2.6 1 3 3"/>' }
+  };
+  const indicator = indicators[task.yieldType];
+  if (!indicator) return '';
+  return `<span class="task-yield-meta"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">${indicator.path}</svg><span>${indicator.label}</span></span>`;
+}
+
 function taskRow(task) {
   const row = document.createElement('div');
   row.className = `task${task.completed ? ' done' : ''}`;
@@ -653,7 +666,7 @@ function taskRow(task) {
     task.recordId ? `<span class="meta-pill linked-record">${escapeHtml(recordName(task.recordId))}</span>` : '',
     task.priority !== 'normal' ? `<span class="meta-pill priority">${escapeHtml(task.priority)}</span>` : ''
   ].filter(Boolean).join('');
-  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta-pills">${meta}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
+  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta-pills">${meta}${taskYieldIndicator(task)}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
   if (task.yieldType) {
     const button = document.createElement('button');
     button.className = 'btn primary routine-record';
@@ -702,7 +715,9 @@ function recordTaskRow(task) {
     assignedTo,
     task.priority !== 'normal' ? task.priority : ''
   ].filter(Boolean).join(' · ');
-  row.innerHTML = `<input class="record-task-check" type="checkbox" aria-label="Complete ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadata ? `<div class="record-task-meta">${escapeHtml(metadata)}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">...</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${task.suggestionKey ? '<button class="disable" type="button">Disable</button>' : ''}<button class="del" type="button">Delete</button></div></details>`;
+  const yieldIndicator = taskYieldIndicator(task);
+  const metadataHtml = [metadata ? `<span>${escapeHtml(metadata)}</span>` : '', yieldIndicator].filter(Boolean).join('<span class="record-task-separator" aria-hidden="true">·</span>');
+  row.innerHTML = `<input class="record-task-check" type="checkbox" aria-label="Complete ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">...</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${task.suggestionKey ? '<button class="disable" type="button">Disable</button>' : ''}<button class="del" type="button">Delete</button></div></details>`;
   row.querySelector('.record-task-check').addEventListener('change', event => {
     if (!event.target.checked) return;
     if (task.yieldType) {

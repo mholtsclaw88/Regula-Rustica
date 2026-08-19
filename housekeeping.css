@@ -493,7 +493,11 @@ summary:focus-visible {
 .record-task-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 44px; gap: 10px; align-items: start; padding: 13px 0; border: 0; border-bottom: 1px solid rgba(164,123,60,.24); border-radius: 0; background: transparent; }
 .record-task-row:last-child { border-bottom: 0; }
 .record-task-row .record-task-check { width: 28px; height: 28px; margin: 0; accent-color: var(--forest); cursor: pointer; }
-.record-task-meta { margin-top: 4px; color: var(--muted); font: .78rem/1.4 Arial, sans-serif; }
+.record-task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; color: var(--muted); font: .78rem/1.4 Arial, sans-serif; }
+.record-task-separator { color: rgba(118,107,93,.72); }
+.task-yield-meta { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font: 700 .72rem/1.2 Arial, sans-serif; white-space: nowrap; }
+.task-yield-meta svg { width: 14px; height: 14px; flex: 0 0 14px; fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+.meta-pills .task-yield-meta { min-height: 23px; margin-left: 2px; }
 .task-more { position: relative; justify-self: end; }
 .task-more > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 9px; color: var(--forest); cursor: pointer; list-style: none; font: 700 1rem Arial, sans-serif; letter-spacing: .08em; }
 .task-more > summary::-webkit-details-marker { display: none; }
