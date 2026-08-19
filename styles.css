@@ -10,6 +10,8 @@
  body>.nav{display:none}
  body:not(.mobile-home) main{padding-top:10px}
  body:not(.mobile-home) .back{margin:0 0 8px;padding:5px 2px;min-height:32px}
+ body:not(.mobile-home) .record-shell.active .back{font-size:0}
+ body:not(.mobile-home) .record-shell.active .back::after{content:'‹ Records';font-size:.8rem}
  body:not(.mobile-home) .footer{padding:10px 12px;font-size:.72rem}
  .mobile-shell-menu{display:block;position:relative;margin-left:auto;font-family:Arial,sans-serif}
  .mobile-shell-menu>summary{display:flex;align-items:center;justify-content:center;width:42px;height:38px;border:1px solid rgba(255,255,255,.3);border-radius:9px;color:#fff;cursor:pointer;list-style:none;font-size:1.25rem}
