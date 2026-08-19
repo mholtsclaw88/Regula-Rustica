@@ -421,3 +421,114 @@ summary:focus-visible {
   .task { align-items: flex-start; }
   .task > .actions { margin-left: auto; }
 }
+
+/* PR #25 Record UI refinement */
+:root {
+  --cream: #efe6d2;
+  --paper: #f8f1e3;
+  --forest: #284536;
+  --forest2: #556b4f;
+  --gold: #a47b3c;
+  --ink: #302a22;
+  --muted: #766b5d;
+  --line: #d4c4a7;
+}
+
+.record-shell > .card { background: var(--paper); border-color: var(--line); }
+.record-head { align-items: center; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.record-heading-group { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.record-heading-group h2 { margin: 0 0 4px; font-size: clamp(1.65rem, 4vw, 2.35rem); }
+.record-meta-line { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; color: var(--forest2); font: 700 .75rem Arial, sans-serif; text-transform: uppercase; letter-spacing: .08em; }
+.record-portrait { display: grid; place-items: center; width: 64px; height: 64px; flex: 0 0 64px; border: 2px solid #b89a64; border-radius: 50%; background: #e6d8bb; color: var(--forest); font: 700 1.45rem Georgia, serif; box-shadow: inset 0 0 0 4px rgba(248,241,227,.65); }
+.record-portrait[data-record-type="Animal"] { background: #dbe1cf; }
+.record-portrait[data-record-type="Land"] { background: #d7ddc7; }
+.record-portrait[data-record-type="Equipment"] { background: #ddd4c3; }
+.record-portrait[data-record-type="Structure"] { background: #e2d2b7; }
+.record-portrait[data-record-type="Work"] { background: #d8d0c3; }
+
+.record-actions { justify-content: flex-end; }
+.record-add { position: relative; }
+.record-add > summary { list-style: none; user-select: none; }
+.record-add > summary::-webkit-details-marker { display: none; }
+.record-add-menu { position: absolute; right: 0; z-index: 8; display: grid; min-width: 260px; margin-top: 6px; padding: 7px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); box-shadow: 0 10px 28px rgba(48,42,34,.16); }
+.record-add-menu button { display: grid; gap: 2px; padding: 10px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.record-add-menu button:hover,
+.record-add-menu button:focus-visible { background: #eadfc9; outline: 2px solid transparent; color: var(--forest); }
+.record-add-menu strong { font: 700 .84rem Arial, sans-serif; }
+.record-add-menu small { color: var(--muted); font: .75rem Arial, sans-serif; }
+
+.record-workspace { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 24px; margin-top: 20px; align-items: start; }
+.record-section-nav { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: #eadfc9; }
+.record-section-nav button { appearance: none; border: 0; border-radius: 8px; background: #e2d3b7; color: var(--ink); padding: 10px 12px; text-align: left; cursor: pointer; font: 700 .78rem Arial, sans-serif; }
+.record-section-nav button:hover,
+.record-section-nav button:focus-visible { background: #d8c7a7; outline: 2px solid transparent; }
+.record-section-nav button.active { background: var(--forest); color: #fff8e9; }
+.record-section-content { min-width: 0; }
+.record-section-panel { display: none; }
+.record-section-panel.active { display: block; }
+.record-section-heading { margin: 0 0 15px; color: var(--forest); }
+
+.record-overview { display: grid; gap: 18px; }
+.record-overview > section { padding-bottom: 16px; border-bottom: 1px solid rgba(164,123,60,.28); }
+.record-overview > section:last-child { border-bottom: 0; }
+.record-overview-value { margin: 6px 0 0; color: var(--ink); font-size: .95rem; line-height: 1.45; }
+.record-overview-value.muted { color: var(--muted); }
+.record-relationships { margin-top: 10px; }
+.record-relationships h4 { margin: 0 0 5px; color: var(--forest2); font: 700 .7rem Arial, sans-serif; text-transform: uppercase; letter-spacing: .1em; }
+.record-relationships .steward-box { border: 0; background: transparent; padding: 0; margin: 0; }
+
+.record-panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.record-panel-head .muted { margin: -9px 0 14px; }
+.record-yield-summary { margin-bottom: 14px; color: var(--forest); font-weight: 700; }
+.record-yield-list { display: grid; gap: 0; }
+.record-yield-entry { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(164,123,60,.24); }
+.record-yield-entry:last-child { border-bottom: 0; }
+.record-yield-entry .meta { margin-top: 3px; }
+
+.suggested-tasks { margin-top: 24px; gap: 0; }
+.suggested-tasks .section-head { margin-bottom: 6px; }
+.suggested-tasks .routine-management-row { padding: 12px 0; border: 0; border-bottom: 1px solid rgba(164,123,60,.24); border-radius: 0; background: transparent; box-shadow: none; }
+.suggested-tasks .routine-management-row:last-child { border-bottom: 0; }
+.suggested-tasks .routine-management-row .meta { text-transform: capitalize; }
+.record-task-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 44px; gap: 10px; align-items: start; padding: 13px 0; border: 0; border-bottom: 1px solid rgba(164,123,60,.24); border-radius: 0; background: transparent; }
+.record-task-row:last-child { border-bottom: 0; }
+.record-task-row .record-task-check { width: 28px; height: 28px; margin: 0; accent-color: var(--forest); cursor: pointer; }
+.record-task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; color: var(--muted); font: .78rem/1.4 Arial, sans-serif; }
+.record-task-separator { color: rgba(118,107,93,.72); }
+.task-yield-meta { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font: 700 .72rem/1.2 Arial, sans-serif; white-space: nowrap; }
+.task-yield-meta svg { width: 14px; height: 14px; flex: 0 0 14px; fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+.meta-pills .task-yield-meta { min-height: 23px; margin-left: 2px; }
+.task-more { position: relative; justify-self: end; }
+.task-more > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 9px; color: var(--forest); cursor: pointer; list-style: none; font: 700 1rem Arial, sans-serif; letter-spacing: .08em; }
+.task-more > summary::-webkit-details-marker { display: none; }
+.task-more > summary:hover,
+.task-more > summary:focus-visible { background: #eadfc9; outline: 2px solid transparent; }
+.task-more-menu { position: absolute; right: 0; z-index: 7; display: grid; min-width: 132px; padding: 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: 0 8px 22px rgba(48,42,34,.15); }
+.task-more-menu button { min-height: 40px; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; font: 700 .78rem Arial, sans-serif; }
+.task-more-menu button:hover,
+.task-more-menu button:focus-visible { background: #eadfc9; outline: 2px solid transparent; }
+.task-more-menu .del { color: #7c4438; }
+.record-section-panel .empty-panel,
+.record-section-panel .photo-placeholder { padding: 5px 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); text-align: left; font-style: italic; }
+
+@media (max-width: 800px) {
+  .record-head { align-items: flex-start; }
+  .record-actions { width: 100%; justify-content: flex-start; }
+  .record-workspace { display: block; }
+  .record-section-nav { position: static; flex-direction: row; overflow-x: auto; margin-bottom: 18px; padding: 6px; scrollbar-width: thin; }
+  .record-section-nav button { flex: 0 0 auto; min-width: max-content; text-align: center; white-space: nowrap; }
+}
+
+@media (max-width: 520px) {
+  .record-heading-group { gap: 12px; }
+  .record-portrait { width: 52px; height: 52px; flex-basis: 52px; font-size: 1.15rem; }
+  .record-heading-group h2 { font-size: 1.6rem; }
+  .record-actions { flex-wrap: nowrap; align-items: stretch; }
+  .record-actions > .btn,
+  .record-add > summary { padding: 9px 12px; white-space: nowrap; }
+  .record-actions > .btn,
+  .record-add > summary { min-height: 44px; }
+  .record-add-menu { position: fixed; top: auto; right: 14px; left: 14px; min-width: 0; }
+  .record-yield-entry { grid-template-columns: minmax(0,1fr) auto; }
+  .record-yield-entry .actions { grid-column: 1 / -1; }
+}

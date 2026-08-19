@@ -9,15 +9,16 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css?v=ui-cleanup-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=yield-indicator-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=reporting-v1" defer></script>
-  <script src="routines-data.js?v=ui-cleanup-v1" defer></script>
-  <script src="app.js?v=reporting-v1" defer></script>
+  <script src="housekeeping-data.js?v=unified-tasks-v1" defer></script>
+  <script src="task-foundation.js?v=record-task-ux-v4" defer></script>
+  <script src="app.js?v=yield-indicator-v1" defer></script>
+  <script src="ui-refinements.js?v=record-ui-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=routines-v4" type="module"></script>
+  <script src="sync/runtime.mjs?v=unified-tasks-v1" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -163,7 +164,6 @@
             <legend>Show on calendar</legend>
             <div class="calendar-filter-pills">
               <label><input type="checkbox" id="calendarShowTasks" checked><span class="filter-dot task-dot"></span>Tasks</label>
-              <label><input type="checkbox" id="calendarShowRoutines" checked><span class="filter-dot routine-dot"></span>Routines</label>
               <label><input type="checkbox" id="calendarShowEvents" checked><span class="filter-dot event-dot"></span>Events</label>
               <label><input type="checkbox" id="calendarShowCompleted"><span class="filter-dot completed-dot"></span>Completed</label>
             </div>
@@ -181,10 +181,13 @@
         <article class="card">
           <span class="label">Quick entry</span>
           <h3>Record today’s yield</h3>
-          <p class="muted">Keep milk and egg collection close to the work itself.</p>
+          <p class="muted">Keep harvest and production records close to the work itself.</p>
           <div class="quick">
             <button class="btn primary milk-action" id="addMilkYield">Record milk</button>
             <button class="btn secondary egg-action" id="addEggYield">Record eggs</button>
+            <button class="btn secondary" id="addMeatYield">Record meat harvest</button>
+            <button class="btn secondary" id="addHarvestYield">Record crop harvest</button>
+            <button class="btn secondary" id="addForageYield">Record hay / forage</button>
           </div>
         </article>
         <aside class="card">
@@ -214,6 +217,9 @@
             <label><input type="radio" name="yieldTypeFilter" value="all" checked>All</label>
             <label><input type="radio" name="yieldTypeFilter" value="milk">Milk</label>
             <label><input type="radio" name="yieldTypeFilter" value="eggs">Eggs</label>
+            <label><input type="radio" name="yieldTypeFilter" value="meat">Meat</label>
+            <label><input type="radio" name="yieldTypeFilter" value="harvest">Harvest</label>
+            <label><input type="radio" name="yieldTypeFilter" value="forage">Hay / Forage</label>
           </div>
         </fieldset>
       </div>
@@ -297,7 +303,7 @@
         </article>
         <article class="card settings-section" id="settingChoreWindows">
           <span class="label">Daily rhythm</span><h2>Chore Windows</h2>
-          <p class="muted">Group Routines into practical parts of the day. These are not appointments.</p>
+          <p class="muted">Group recurring Tasks into practical parts of the day. These are not appointments.</p>
           <form id="choreWindowForm" class="form-grid"><label>Window name<input id="choreWindowName" maxlength="80" required></label><button class="btn primary" type="submit">Add window</button></form>
           <div id="choreWindowList" class="stack"></div>
         </article>
@@ -385,40 +391,54 @@
       <button class="btn secondary back" id="backToList">← Back</button>
       <article class="card">
         <div class="record-head">
-          <div>
-            <span id="recordTypeLabel" class="label"></span>
-            <div class="record-title-row"><h2 id="recordTitle"></h2><span id="recordStatus" class="pill"></span></div>
-            <div id="recordIdentity" class="meta"></div>
+          <div class="record-heading-group">
+            <div class="record-portrait" id="recordPortrait" aria-hidden="true"><span id="recordPortraitPlaceholder">R</span></div>
+            <div>
+              <h2 id="recordTitle"></h2>
+              <div class="record-meta-line"><span id="recordTypeLabel"></span><span aria-hidden="true">·</span><span id="recordStatus"></span></div>
+              <div id="recordIdentity" class="meta"></div>
+            </div>
           </div>
           <div class="record-actions action-cluster">
-            <button class="btn primary" id="recordEvent">Record</button>
-            <button class="btn secondary hidden" id="recordMilk">Milk</button>
-            <button class="btn secondary hidden" id="recordEggs">Eggs</button>
-            <button class="btn secondary" id="recordAddRoutine">+ Custom Routine</button>
-            <button class="btn secondary" id="recordAddTask">+ Task</button>
-            <button class="btn secondary" id="recordAddNote">+ Note</button>
-            <button class="btn secondary" id="recordAddLedger">+ Ledger</button>
-            <button class="btn ghost" id="recordEdit">Edit</button>
+            <details class="record-add" id="recordAdd">
+              <summary class="btn primary">+ Add</summary>
+              <div class="record-add-menu">
+                <button id="recordEvent" type="button"><strong>Event</strong><small>Something that happened</small></button>
+                <button id="recordAddTask" type="button"><strong>Task</strong><small>Something that needs doing</small></button>
+                <button class="hidden" id="recordYield" type="button"><strong>Yield</strong><small>Something produced</small></button>
+                <button id="recordAddNote" type="button"><strong>Note</strong><small>Add an enduring note</small></button>
+                <button id="recordAddLedger" type="button"><strong>Ledger Entry</strong><small>Record an expense or income</small></button>
+              </div>
+            </details>
+            <button class="btn secondary" id="recordEdit" type="button">Edit</button>
           </div>
         </div>
         <div class="record-workspace">
           <nav class="record-section-nav" aria-label="Record sections" role="tablist">
-            <button type="button" class="active" role="tab" aria-selected="true" data-record-section="stewardship">Stewardship</button>
-            <button type="button" role="tab" aria-selected="false" data-record-section="routines">Routines</button>
+            <button type="button" class="active" role="tab" aria-selected="true" data-record-section="overview">Overview</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="tasks">Tasks</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="yield">Yield</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="chronicle">Chronicle</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="notes">Notes</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="ledger">Ledger</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="photos">Photos</button>
           </nav>
           <div class="record-section-content">
-            <section class="record-section-panel active" role="tabpanel" data-record-section-panel="stewardship"><h3 class="record-section-heading">Stewardship</h3><div id="recordStewardship" class="steward-box"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="routines"><h3 class="record-section-heading">Routines</h3><div id="recordRoutines" class="stack"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><h3 class="record-section-heading">Tasks</h3><div id="panelTasks"></div></section>
+            <section class="record-section-panel active" role="tabpanel" data-record-section-panel="overview">
+              <h3 class="record-section-heading">Overview</h3>
+              <div class="record-overview">
+                <section><span class="label">Stewardship</span><p id="recordStewardship" class="record-overview-value"></p></section>
+                <section><span class="label">Next Task</span><div id="recordOverviewTask" class="record-overview-value"></div></section>
+                <section id="recordOverviewYieldWrap"><span class="label">Recent Yield</span><div id="recordOverviewYield" class="record-overview-value"></div></section>
+                <section><span class="label">Recent Event</span><div id="recordOverviewEvent" class="record-overview-value"></div></section>
+              </div>
+            </section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><h3 class="record-section-heading">Tasks</h3><div id="panelTasks"></div><div id="suggestedTasks" class="stack suggested-tasks"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="yield"><div class="record-panel-head"><div><h3 class="record-section-heading">Yield</h3><p class="muted">Last 30 Days</p></div><button class="btn primary hidden" id="recordSectionAddYield" type="button">+ Yield</button></div><div id="recordYieldSummary" class="record-yield-summary"></div><div id="recordYieldList" class="record-yield-list"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="chronicle"><h3 class="record-section-heading">Chronicle</h3><div id="panelChronicle"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="notes"><h3 class="record-section-heading">Notes</h3><div id="panelNotes"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="ledger"><h3 class="record-section-heading">Ledger</h3><div id="panelLedger"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="photos"><h3 class="record-section-heading">Photos</h3><div id="panelPhotos"><div class="photo-placeholder"><p>Photo support is planned for a later release.</p></div></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="photos"><h3 class="record-section-heading">Photos</h3><div id="panelPhotos"><p class="muted record-empty">Photo support is planned for a later release.</p></div></section>
           </div>
         </div>
       </article>

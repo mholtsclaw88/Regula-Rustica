@@ -1,0 +1,17 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(12);
+select has_column('public','tasks','chore_window_id','Task may belong to a Chore Window');
+select col_is_fk('public','tasks','chore_window_id','Task Chore Window link is a foreign key');
+select has_column('public','tasks','yield_type','Task has optional Yield completion behavior');
+select has_column('public','tasks','suggestion_key','enabled suggestions retain stable identity');
+select has_index('public','tasks','tasks_chore_window_due_idx','Today can query Chore Window Tasks efficiently');
+select has_function('public','apply_task_sync_operation',array['text','uuid','text','uuid','text','integer','timestamp with time zone','jsonb'],'Task sync has a dedicated RPC');
+select function_privs_are('public','apply_task_sync_operation',array['text','uuid','text','uuid','text','integer','timestamp with time zone','jsonb'],'authenticated',array['EXECUTE'],'authenticated may call Task sync');
+select ok((select relrowsecurity from pg_class where oid='public.tasks'::regclass),'Task RLS remains enabled');
+select ok((select relrowsecurity from pg_class where oid='public.yield_entries'::regclass),'Yield RLS remains enabled');
+select ok((select pg_get_constraintdef(oid) from pg_constraint where conrelid='public.yield_entries'::regclass and conname='yield_entries_yield_type_check') like '%forage%','Yield supports the complete v1 type matrix');
+select ok(pg_get_functiondef('private.validate_unified_task()'::regprocedure) like '%Chore Window belongs to another Homestead%','Task validator enforces Chore Window tenant isolation');
+select ok(pg_get_functiondef('public.complete_recurring_task(uuid,text,uuid)'::regprocedure) like '%current_task.chore_window_id%','recurrence preserves Chore Window and Yield configuration');
+select * from finish();
+rollback;
