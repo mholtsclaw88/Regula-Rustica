@@ -8,6 +8,8 @@ const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
 const RECORD_TYPES = ['Animal', 'Land', 'Equipment', 'Structure', 'Work'];
+const CURRENT_SCHEMA_VERSION = 10;
+const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, CURRENT_SCHEMA_VERSION];
 let startupMigrationBefore = null;
 
 const RECORD_CONFIG = {
@@ -268,7 +270,7 @@ function normalizeData(source = {}) {
   }
   const tasks = asArray(source.tasks).map(normalizeTask);
   return {
-    schemaVersion: 10,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
     records: asArray(source.records).map(normalizeRecord),
     tasks,
@@ -360,7 +362,7 @@ function migrateData(source = {}, sourceKey = 'imported legacy data') {
 }
 
 function isSupportedData(value) {
-  return [5, 6, 7, 8, 9].includes(value?.schemaVersion) || [5, 6, 7, 8, 9].includes(value?.version);
+  return SUPPORTED_SCHEMA_VERSIONS.includes(value?.schemaVersion) || SUPPORTED_SCHEMA_VERSIONS.includes(value?.version);
 }
 
 function prepareImportedData(value, sourceName = 'backup') {
@@ -381,9 +383,9 @@ function loadData() {
   if (currentRaw) {
     try {
       const current = JSON.parse(currentRaw);
-      const beforeMigration = normalizeData({ ...current, schemaVersion: 9 });
+      const beforeMigration = normalizeData({ ...current, schemaVersion: CURRENT_SCHEMA_VERSION });
       const normalized = isSupportedData(current) ? normalizeData(current) : migrateData(current, STORAGE_KEY);
-      if (current.schemaVersion !== 9) {
+      if (current.schemaVersion !== CURRENT_SCHEMA_VERSION) {
         safelyStoreBackup(MIGRATION_BACKUP_KEY, currentRaw);
         startupMigrationBefore = beforeMigration;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
@@ -423,7 +425,7 @@ function saveData(nextData = data, source = 'user') {
 function exportData() {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-  link.download = `regula-rustica-v9-${today()}.json`;
+  link.download = `regula-rustica-v${CURRENT_SCHEMA_VERSION}-${today()}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -444,7 +446,7 @@ async function importData(file) {
 
 const seedTimestamp = nowIso();
 const SEED_DATA = {
-  schemaVersion: 9,
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   settings: { homesteadName: 'Wood Thief Homestead' },
   records: [
     { id: 'daisy', type: 'Animal', name: 'Daisy', status: 'Active', identity: { managedAs: 'Individual', species: 'Cattle', breed: 'Jersey', purpose: 'Dairy' }, stewardship: { location: 'Barn and east pasture', responsible: '', currentUse: 'Milk cow', stage: '' }, createdAt: seedTimestamp, updatedAt: seedTimestamp },
