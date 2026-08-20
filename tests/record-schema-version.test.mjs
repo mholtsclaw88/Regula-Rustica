@@ -71,14 +71,14 @@ test('v10 Animal purposes survive normalize, persistence, and reload', async () 
   for (const purpose of ['Dairy', 'Eggs', 'Meat']) {
     const api = await dataApi();
     const normalized = api.normalizeData(currentData([
-      record('Animal', { managedAs: 'Individual', species: 'Cattle', purpose }, { location: 'North barn', responsible: 'keeper-1' })
+      record('Animal', { managedAs: 'Individual', species: 'Cattle', purpose }, { location: 'North barn', responsiblePersonId: 'keeper-1' })
     ]));
     api.localStorage.setItem(api.storageKey, JSON.stringify(normalized));
 
     const reloaded = api.loadData();
     assert.equal(reloaded.records[0].identity.purpose, purpose);
     assert.equal(reloaded.records[0].stewardship.location, 'North barn');
-    assert.equal(reloaded.records[0].stewardship.responsible, 'keeper-1');
+    assert.equal(reloaded.records[0].stewardship.responsiblePersonId, 'keeper-1');
   }
 });
 

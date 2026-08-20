@@ -44,6 +44,40 @@ test('dam and sire are independently replaceable', () => {
   assert.deepEqual(relationships.parentsFor(rows, 'calf-1'), { dam: 'cow-2', sire: 'bull-1' });
 });
 
+test('parent choices include only active individual Animals of the same species', () => {
+  const records = [
+    { id: 'calf', type: 'Animal', name: 'Calf', status: 'Active', identity: { managedAs: 'Individual', species: ' Cattle ' } },
+    { id: 'cow', type: 'Animal', name: 'Cow', status: 'Active', identity: { managedAs: 'Individual', species: 'cattle' } },
+    { id: 'herd', type: 'Animal', name: 'Herd', status: 'Active', identity: { managedAs: 'Group', species: 'Cattle' } },
+    { id: 'ewe', type: 'Animal', name: 'Ewe', status: 'Active', identity: { managedAs: 'Individual', species: 'Sheep' } },
+    { id: 'archived', type: 'Animal', name: 'Old Cow', status: 'Archived', identity: { managedAs: 'Individual', species: 'Cattle' } },
+    { id: 'deleted', type: 'Animal', name: 'Deleted Cow', status: 'Active', deletedAt: stamp, identity: { managedAs: 'Individual', species: 'Cattle' } },
+    { id: 'tractor', type: 'Equipment', name: 'Tractor', status: 'Active', identity: {} }
+  ];
+
+  assert.deepEqual(relationships.parentAnimalOptions(records, 'calf', ' cattle ').map(option => option.value), ['cow']);
+});
+
+test('Responsible Person choices include active members and children', () => {
+  const options = relationships.activePersonOptions({ people: [
+    { id: 'member', personType: 'member', displayName: 'Alex' },
+    { id: 'child', personType: 'child', displayName: 'Clare' },
+    { id: 'removed', personType: 'member', displayName: 'Former', deletedAt: stamp }
+  ] });
+
+  assert.deepEqual(options, [
+    { label: 'Alex', value: 'member' },
+    { label: 'Clare (child)', value: 'child' }
+  ]);
+});
+
+test('structured Responsible Person assignment replaces legacy free text', () => {
+  assert.deepEqual(
+    relationships.withResponsiblePerson({ location: 'North barn', responsible: 'Legacy name' }, 'member'),
+    { location: 'North barn', responsiblePersonId: 'member' }
+  );
+});
+
 test('reverse location contents derive animals and equipment only', () => {
   const records = [
     { id: 'animal-1', type: 'Animal', name: 'Cow' },
