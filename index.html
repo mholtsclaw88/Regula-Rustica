@@ -9,12 +9,12 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css?v=yield-indicator-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=today-task-row-v2">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=unified-tasks-v1" defer></script>
   <script src="task-foundation.js?v=record-task-ux-v4" defer></script>
-  <script src="app.js?v=yield-indicator-v1" defer></script>
+  <script src="app.js?v=today-task-row-v2" defer></script>
   <script src="ui-refinements.js?v=record-ui-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -42,32 +42,38 @@
 
   <main>
     <section id="today" class="view active">
+      <header class="today-date-block">
+        <span class="label">Today</span>
+        <h2 id="todayDate"></h2>
+      </header>
+      <aside class="card today-glance" aria-labelledby="todayGlanceTitle">
+        <span class="label" id="todayGlanceTitle">Today at a Glance</span>
+        <div class="today-status-strip">
+          <div><strong id="todayCompletedCount">0</strong><span>Completed</span></div>
+          <div><strong id="todayRemainingCount">0</strong><span>Remaining</span></div>
+          <div><strong id="todayEventCount">0</strong><span>Events</span></div>
+        </div>
+      </aside>
       <div id="todayChoreWindows" class="today-sections"></div>
-      <div class="grid2">
-        <article class="card">
-          <span class="label">Today's Work</span>
-          <h2 id="todayDate"></h2>
+      <details class="card today-section daily-section" id="todayWorkSection" open>
+        <summary>
+          <span><span class="label">Daily work</span><strong>Today's Work</strong></span>
+          <span class="today-section-summary"><span id="todayTaskCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
+        </summary>
+        <div class="daily-section-body">
           <div id="todayTasks" class="stack"></div>
           <p id="todayEmpty" class="empty">Nothing is due. Add the next useful task.</p>
-          <span id="todayTaskCount" class="pill">0</span>
-        </article>
-        <aside class="card">
-          <span class="label">At a glance</span>
-          <div class="stats">
-            <div class="stat"><strong id="openCount">0</strong><span>Open tasks</span></div>
-            <div class="stat"><strong id="recordCount">0</strong><span>Active records</span></div>
-            <div class="stat"><strong id="netCash">$0</strong><span>Net cash</span></div>
-          </div>
-          <div class="quick">
-            <button class="btn secondary" id="todayAddTask">Add task</button>
-            <button class="btn secondary" id="todayAddRecord">Add record</button>
-          </div>
-        </aside>
-        <article class="card today-section">
-          <span class="label">Shared time</span><h3>Today's Events</h3><span id="todayEventCount" class="pill">0</span>
+        </div>
+      </details>
+      <details class="card today-section daily-section" id="todayEventsSection" open>
+        <summary>
+          <span><span class="label">Shared time</span><strong>Today's Events</strong></span>
+          <span class="today-section-summary"><span id="todayEventsCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
+        </summary>
+        <div class="daily-section-body">
           <div id="todayEvents" class="stack"></div><p id="todayEventsEmpty" class="empty">No Calendar Events today.</p>
-        </article>
-      </div>
+        </div>
+      </details>
     </section>
 
     <section id="records" class="view">
