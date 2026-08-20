@@ -653,37 +653,32 @@ function taskYieldIndicator(task) {
   return `<span class="task-yield-meta"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">${indicator.path}</svg><span>${indicator.label}</span></span>`;
 }
 
-function taskRow(task) {
+function sharedTaskRow(task, { suggestionActions = false } = {}) {
   const row = document.createElement('div');
-  row.className = `task${task.completed ? ' done' : ''}`;
+  row.className = `task record-task-row shared-task-row${task.completed ? ' done' : ''}`;
   const assignedTo = assigneeName(task.id);
   const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
-  const dueClass = !task.completed && task.dueDate && task.dueDate < today() ? ' overdue' : '';
-  const meta = [
-    `<span class="meta-pill${dueClass}">${escapeHtml(taskDateText(task))}</span>`,
-    recurrence ? `<span class="meta-pill recurrence">${escapeHtml(recurrence)}</span>` : '',
-    assignedTo ? `<span class="meta-pill assignee">${escapeHtml(assignedTo)}</span>` : '',
-    task.recordId ? `<span class="meta-pill linked-record">${escapeHtml(recordName(task.recordId))}</span>` : '',
-    task.priority !== 'normal' ? `<span class="meta-pill priority">${escapeHtml(task.priority)}</span>` : ''
-  ].filter(Boolean).join('');
-  row.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete task"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div><div class="meta-pills">${meta}${taskYieldIndicator(task)}</div>${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
-  if (task.yieldType) {
-    const button = document.createElement('button');
-    button.className = 'btn primary routine-record';
-    button.textContent = task.completed ? 'Recorded' : 'Record Yield & Complete';
-    button.disabled = task.completed;
-    row.querySelector('input').replaceWith(button);
-    button.addEventListener('click', () => {
+  const metadata = [taskDateText(task), recurrence, assignedTo, task.recordId ? recordName(task.recordId) : '', task.priority !== 'normal' ? task.priority : '']
+    .filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
+  const yieldIndicator = taskYieldIndicator(task);
+  if (yieldIndicator) metadata.push(yieldIndicator);
+  const metadataHtml = metadata.join('<span class="record-task-separator" aria-hidden="true">·</span>');
+  const disableAction = suggestionActions && task.suggestionKey ? '<button class="disable" type="button">Disable</button>' : '';
+  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${disableAction}<button class="del" type="button">Delete</button></div></details>`;
+  row.querySelector('.shared-task-check').addEventListener('change', event => {
+    if (event.target.checked && task.yieldType && !task.completed) {
       const existingYield = window.RegulaRusticaHousekeeping.matchingYieldForTask(data.yieldEntries, task);
       if (existingYield && (!existingYield.taskId || existingYield.taskId === task.id)) {
         existingYield.taskId = task.id;
         existingYield.updatedAt = nowIso();
         completeTask(task);
         saveData();
-      } else openTaskYield(task);
-    });
-  }
-  row.querySelector('input')?.addEventListener('change', event => {
+      } else {
+        event.target.checked = false;
+        openTaskYield(task);
+      }
+      return;
+    }
     const wasCompleted = task.completed;
     task.completed = event.target.checked;
     task.status = task.completed ? 'completed' : 'open';
@@ -691,41 +686,6 @@ function taskRow(task) {
     task.updatedAt = nowIso();
     if (!wasCompleted && task.completed && task.recordId) addEvent(task.recordId, 'Task completed', task.title);
     if (!wasCompleted && task.completed && task.recurrenceRule && !window.RegulaRusticaSync?.isInitialized?.()) createNextLocalOccurrence(task);
-    saveData();
-  });
-  row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
-  row.querySelector('.del').addEventListener('click', () => {
-    if (confirm('Delete this task?')) {
-      task.deletedAt = nowIso();
-      task.updatedAt = task.deletedAt;
-      saveData();
-    }
-  });
-  return row;
-}
-
-function recordTaskRow(task) {
-  const row = document.createElement('div');
-  row.className = 'task record-task-row';
-  const assignedTo = assigneeName(task.id);
-  const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
-  const metadata = [
-    taskDateText(task),
-    recurrence,
-    assignedTo,
-    task.priority !== 'normal' ? task.priority : ''
-  ].filter(Boolean).join(' · ');
-  const yieldIndicator = taskYieldIndicator(task);
-  const metadataHtml = [metadata ? `<span>${escapeHtml(metadata)}</span>` : '', yieldIndicator].filter(Boolean).join('<span class="record-task-separator" aria-hidden="true">·</span>');
-  row.innerHTML = `<input class="record-task-check" type="checkbox" aria-label="Complete ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">...</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${task.suggestionKey ? '<button class="disable" type="button">Disable</button>' : ''}<button class="del" type="button">Delete</button></div></details>`;
-  row.querySelector('.record-task-check').addEventListener('change', event => {
-    if (!event.target.checked) return;
-    if (task.yieldType) {
-      event.target.checked = false;
-      openTaskYield(task);
-      return;
-    }
-    completeTask(task);
     saveData();
   });
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
@@ -744,22 +704,27 @@ function recordTaskRow(task) {
   return row;
 }
 
+function taskRow(task) { return sharedTaskRow(task); }
+function recordTaskRow(task) { return sharedTaskRow(task, { suggestionActions: true }); }
+
 function renderToday() {
+  const workDate = today();
   const root = $('#todayTasks');
   root.innerHTML = '';
-  const tasks = data.tasks
-    .filter(task => !task.deletedAt && !task.choreWindowId && !task.completed && (
+  const activeTodayTasks = data.tasks.filter(task => !task.deletedAt && (
+    (!task.completed && (
       (!task.availableFrom && !task.dueDate)
-      || (task.availableFrom && task.availableFrom <= today())
-      || (!task.availableFrom && task.dueDate <= today())
-    ))
+      || (task.availableFrom && task.availableFrom <= workDate)
+      || (!task.availableFrom && task.dueDate <= workDate)
+    )) || (task.completed && task.completedAt && localDateTime(task.completedAt).slice(0, 10) === workDate)
+  ));
+  const tasks = activeTodayTasks
+    .filter(task => !task.choreWindowId && !task.completed)
     .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
   tasks.forEach(task => root.appendChild(taskRow(task)));
   $('#todayEmpty').classList.toggle('hidden', tasks.length > 0);
   $('#todayTaskCount').textContent = tasks.length;
-  $('#openCount').textContent = data.tasks.filter(task => !task.deletedAt && !task.completed).length;
-  $('#recordCount').textContent = data.records.filter(record => !record.deletedAt && record.status !== 'Archived').length;
-  $('#netCash').textContent = formatMoney(data.ledger.filter(entry => !entry.deletedAt).reduce((sum, entry) => sum + (entry.type === 'income' ? 1 : -1) * entry.amount, 0));
+  const dailyStatus = new Map(activeTodayTasks.map(task => [task.id, task.completed]));
 
   const choreRoot = $('#todayChoreWindows');
   choreRoot.innerHTML = '';
@@ -801,8 +766,26 @@ function renderToday() {
     row.innerHTML = `<div class="task-body"><strong>${escapeHtml(event.title)}</strong><div class="meta">${event.allDay ? 'All day' : escapeHtml(calendarEventTime(event))}${event.location ? ` · ${escapeHtml(event.location)}` : ''}</div></div>`;
     eventRoot.append(row);
   });
+  const completedCount = [...dailyStatus.values()].filter(Boolean).length;
+  $('#todayCompletedCount').textContent = completedCount;
+  $('#todayRemainingCount').textContent = dailyStatus.size - completedCount;
   $('#todayEventCount').textContent = events.length;
+  $('#todayEventsCount').textContent = events.length;
   $('#todayEventsEmpty').classList.toggle('hidden', events.length > 0);
+
+  ['todayWorkSection', 'todayEventsSection'].forEach(id => {
+    const section = $(`#${id}`);
+    const storageKey = `regula-rustica:${id}:open`;
+    if (section.dataset.collapseReady) return;
+    try {
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored !== null) section.open = stored === 'true';
+    } catch (_) { /* Session preference is optional. */ }
+    section.addEventListener('toggle', () => {
+      try { sessionStorage.setItem(storageKey, String(section.open)); } catch (_) { /* Session preference is optional. */ }
+    });
+    section.dataset.collapseReady = 'true';
+  });
 }
 
 function renderRecords() {
@@ -1268,7 +1251,7 @@ function renderChoreWindows() {
 }
 
 function renderAll() {
-  $('#todayDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  $('#todayDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   $('#homesteadHeader').textContent = (data.settings.homesteadName || 'My Homestead').toUpperCase();
   $('#homesteadName').value = data.settings.homesteadName || '';
   renderToday();
@@ -1689,9 +1672,7 @@ $('#modalForm').addEventListener('submit', event => {
 
 $$('.nav button').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
 $('#globalAddTask').addEventListener('click', () => openModal('task'));
-$('#todayAddTask').addEventListener('click', () => openModal('task'));
 $('#tasksAddTask').addEventListener('click', () => openModal('task'));
-$('#todayAddRecord').addEventListener('click', () => openModal('record'));
 $('#addRecord').addEventListener('click', () => openModal('record'));
 $('#addLedger').addEventListener('click', () => openModal('ledger'));
 $('#addCalendarEvent').addEventListener('click', () => openModal('calendar'));
