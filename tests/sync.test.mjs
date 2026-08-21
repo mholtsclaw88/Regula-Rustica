@@ -316,6 +316,25 @@ test('account-backed directory entries do not make an empty Homestead look popul
   assert.equal(hasMeaningfulData(data), true);
 });
 
+test('Record responsibility retains its canonical Homestead Person mapping', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const personId = 'member-one';
+  const localRecord = record('daisy');
+  localRecord.stewardship = { responsiblePersonId: personId };
+
+  const cloudRecord = toCloud('records', localRecord, state);
+  assert.equal(cloudRecord.stewardship.responsiblePersonId, state.entity('homestead_people', personId).cloudId);
+
+  const restored = fromCloud('records', {
+    ...cloudRecord,
+    id: cloudRecord.id,
+    type: 'animal',
+    created_at: localRecord.createdAt,
+    updated_at: localRecord.updatedAt
+  }, state);
+  assert.equal(restored.stewardship.responsiblePersonId, personId);
+});
+
 test('calendar events retain all-day and optional time metadata', () => {
   const state = new LocalSyncState(new MemoryStorage());
   const event = { id: crypto.randomUUID(), title: 'Farmers market', startDate: '2026-08-15', endDate: '2026-08-15', allDay: false, startTime: '08:30', endTime: '11:00', location: 'Town green', notes: '', createdAt: '2026-08-09T12:00:00Z' };

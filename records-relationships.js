@@ -99,6 +99,36 @@
       .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
   }
 
+  const normalizedSpecies = value => String(value || '').trim().toLowerCase();
+
+  function parentAnimalOptions(records = [], animalId, species) {
+    const expectedSpecies = normalizedSpecies(species);
+    if (!expectedSpecies) return [];
+    return records
+      .filter(record => !record.deletedAt && record.status === 'Active' && record.type === 'Animal'
+        && record.id !== animalId
+        && String(record.identity?.managedAs || 'Individual').trim().toLowerCase() !== 'group'
+        && normalizedSpecies(record.identity?.species) === expectedSpecies)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(record => ({ label: record.name, value: record.id }));
+  }
+
+  function activePersonOptions(data = {}) {
+    return (data.people || [])
+      .filter(person => !person.deletedAt)
+      .sort((a, b) => String(a.displayName || '').localeCompare(String(b.displayName || '')))
+      .map(person => ({
+        label: `${person.displayName || 'Unnamed person'}${person.personType === 'child' ? ' (child)' : ''}`,
+        value: person.id
+      }));
+  }
+
+  function withResponsiblePerson(stewardship = {}, responsiblePersonId = '') {
+    const next = { ...stewardship, responsiblePersonId: responsiblePersonId || '' };
+    delete next.responsible;
+    return next;
+  }
+
   function installBrowserIntegration() {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
@@ -137,18 +167,11 @@
     }
 
     function personOptions(data) {
-      return [{ label: 'Not selected', value: '' }, ...(data.people || [])
-        .filter(person => !person.deletedAt)
-        .sort((a, b) => a.displayName.localeCompare(b.displayName))
-        .map(person => ({ label: `${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`, value: person.id }))];
+      return [{ label: 'Not selected', value: '' }, ...activePersonOptions(data)];
     }
 
-    function animalOptions(data, animalId) {
-      return [{ label: 'Not recorded', value: '' }, ...activeRecords(data)
-        .filter(record => record.id !== animalId && record.type === 'Animal'
-          && String(record.identity?.managedAs || 'Individual').toLowerCase() !== 'group')
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(record => ({ label: record.name, value: record.id }))];
+    function animalOptions(data, animalId, species) {
+      return [{ label: 'Not recorded', value: '' }, ...parentAnimalOptions(data.records, animalId, species)];
     }
 
     function replaceLabel(root, prefixes, replacement) {
@@ -166,6 +189,9 @@
       if (!type) return;
       const record = data.records.find(item => item.id === id) || { id: null, type, identity: {}, stewardship: {} };
       const relationshipList = data.relationships || (data.relationships = []);
+      const pendingResponsible = root.querySelector('[name=rrResponsiblePerson]')?.value;
+      const pendingDam = root.querySelector('[name=rrDam]')?.value;
+      const pendingSire = root.querySelector('[name=rrSire]')?.value;
       root.querySelectorAll('[data-records-relationships=true]').forEach(node => node.remove());
 
       if (type === 'Structure') labelStarting(root, 'Location (optional)')?.remove();
@@ -178,7 +204,7 @@
       if (['Animal', 'Equipment', 'Structure', 'Work'].includes(type)) {
         replaceLabel(root,
           ['Responsible person (optional)', 'Assigned household member (optional)', 'Responsible household member (optional)'],
-          makeSelectLabel('Responsible person (optional)', 'rrResponsiblePerson', personOptions(data), record.stewardship?.responsiblePersonId || '')
+          makeSelectLabel('Responsible person (optional)', 'rrResponsiblePerson', personOptions(data), pendingResponsible ?? (record.stewardship?.responsiblePersonId || ''))
         );
       }
 
@@ -186,17 +212,23 @@
 
       if (type === 'Animal') {
         const parents = record.id ? parentsFor(relationshipList, record.id) : { dam: null, sire: null };
+        const species = root.querySelector('[name=species]')?.value || record.identity?.species || '';
         const parentWrap = document.createElement('div');
         parentWrap.dataset.recordsRelationships = 'true';
         parentWrap.className = 'form-grid rr-parentage';
         parentWrap.append(
-          makeSelectLabel('Dam (optional)', 'rrDam', animalOptions(data, record.id), parents.dam),
-          makeSelectLabel('Sire (optional)', 'rrSire', animalOptions(data, record.id), parents.sire)
+          makeSelectLabel('Dam (optional)', 'rrDam', animalOptions(data, record.id, species), pendingDam ?? parents.dam),
+          makeSelectLabel('Sire (optional)', 'rrSire', animalOptions(data, record.id, species), pendingSire ?? parents.sire)
         );
         root.append(parentWrap);
         const managed = root.querySelector('[name=managedAs]');
         const update = () => parentWrap.classList.toggle('hidden', managed?.value === 'Group');
         managed?.addEventListener('change', update);
+        const speciesInput = root.querySelector('[name=species]');
+        if (speciesInput && !speciesInput.dataset.rrParentBound) {
+          speciesInput.dataset.rrParentBound = 'true';
+          speciesInput.addEventListener('input', () => augmentRecordForm(id));
+        }
         update();
       }
 
@@ -363,8 +395,7 @@
         delete record.stewardship.location;
       }
       if (['Animal', 'Equipment', 'Structure', 'Work'].includes(record.type)) {
-        record.stewardship.responsiblePersonId = pending.responsiblePersonId || '';
-        delete record.stewardship.responsible;
+        record.stewardship = withResponsiblePerson(record.stewardship, pending.responsiblePersonId);
       }
       if (record.type === 'Land') delete record.stewardship.currentOccupants;
       if (record.type === 'Structure' && record.identity) delete record.identity.location;
@@ -431,6 +462,7 @@
 
   return {
     normalizeRelationship, isActive, activeRelationships, currentLocation, replaceRelationship,
-    setParent, parentsFor, offspringFor, reverseLocationContents, installBrowserIntegration
+    setParent, parentsFor, offspringFor, reverseLocationContents, parentAnimalOptions,
+    activePersonOptions, withResponsiblePerson, installBrowserIntegration
   };
 }));

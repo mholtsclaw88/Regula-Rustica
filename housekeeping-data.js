@@ -73,6 +73,25 @@
       && localDate(entry.occurredAt) === taskWorkDate(task)) || null;
   }
 
+  function linkedYieldsForTask(entries = [], taskId) {
+    if (!taskId) return [];
+    return entries.filter(entry => !entry.deletedAt && entry.taskId === taskId);
+  }
+
+  function reopenTask(task, yieldEntries = [], { deleteLinkedYield = false, timestamp = new Date().toISOString() } = {}) {
+    if (!task) return [];
+    const linkedYields = linkedYieldsForTask(yieldEntries, task.id);
+    task.completed = false;
+    task.status = 'open';
+    task.completedAt = null;
+    task.updatedAt = timestamp;
+    if (deleteLinkedYield) linkedYields.forEach(entry => {
+      entry.deletedAt = timestamp;
+      entry.updatedAt = timestamp;
+    });
+    return linkedYields;
+  }
+
   function taskCalendarBounds(task = {}) {
     const start = task.availableFrom || task.dueDate || '';
     const end = task.dueDate || task.availableFrom || '';
@@ -154,6 +173,7 @@
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
     taskWorkDate, matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
+    linkedYieldsForTask, reopenTask,
     taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment,
     reportingDateRange, matchesReportingDate
   };
