@@ -9,14 +9,15 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css?v=today-task-row-v2">
+  <link rel="stylesheet" href="housekeeping.css?v=journal-consolidation-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=record-task-lifecycle-v2" defer></script>
   <script src="task-foundation.js?v=record-task-lifecycle-v2" defer></script>
   <script src="record-documents.js?v=local-attachments-v1" defer></script>
-  <script src="app.js?v=local-attachments-v1" defer></script>
-  <script src="ui-refinements.js?v=record-ui-v1" defer></script>
+  <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
+  <script src="app.js?v=journal-consolidation-v3" defer></script>
+  <script src="ui-refinements.js?v=journal-consolidation-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
   <script src="sync/runtime.mjs?v=unified-tasks-v1" type="module"></script>
@@ -429,7 +430,6 @@
                 <button id="recordEvent" type="button"><strong>Event</strong><small>Something that happened</small></button>
                 <button id="recordAddTask" type="button"><strong>Task</strong><small>Something that needs doing</small></button>
                 <button class="hidden" id="recordYield" type="button"><strong>Yield</strong><small>Something produced</small></button>
-                <button id="recordAddNote" type="button"><strong>Note</strong><small>Add an enduring note</small></button>
                 <button id="recordAddLedger" type="button"><strong>Ledger Entry</strong><small>Record an expense or income</small></button>
               </div>
             </details>
@@ -442,7 +442,6 @@
             <button type="button" role="tab" aria-selected="false" data-record-section="tasks">Tasks</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="yield">Yield</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="journal">Journal</button>
-            <button type="button" role="tab" aria-selected="false" data-record-section="documents">Documents</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="ledger">Ledger</button>
           </nav>
           <div class="record-section-content">
@@ -457,24 +456,27 @@
             </section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><h3 class="record-section-heading">Tasks</h3><div id="panelTasks"></div><div id="suggestedTasks" class="stack suggested-tasks"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="yield"><div class="record-panel-head"><div><h3 class="record-section-heading">Yield</h3><p class="muted">Last 30 Days</p></div><button class="btn primary hidden" id="recordSectionAddYield" type="button">+ Yield</button></div><div id="recordYieldSummary" class="record-yield-summary"></div><div id="recordYieldList" class="record-yield-list"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="journal"><h3 class="record-section-heading">Journal</h3><div id="panelChronicle"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="documents">
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="journal">
               <div class="record-panel-head">
-                <div><h3 class="record-section-heading">Documents</h3><p class="muted">Keep notes, photos, paperwork, and other documentation with this Record.</p></div>
-                <details class="record-add" id="documentAdd">
-                  <summary class="btn primary">+ Add</summary>
+                <div><h3 class="record-section-heading">Journal</h3><p class="muted">What has happened, and what you have intentionally recorded.</p></div>
+                <details class="record-add" id="journalAdd">
+                  <summary class="btn primary">+ Journal Entry</summary>
                   <div class="record-add-menu">
-                    <button id="documentAddNote" type="button"><strong>Note</strong><small>Keep enduring information</small></button>
-                    <button id="documentTakePhoto" type="button"><strong>Photo · Take Photo</strong><small>Use this device's camera</small></button>
-                    <button id="documentChoosePhoto" type="button"><strong>Photo · Choose from Device</strong><small>Add an existing image</small></button>
-                    <button id="documentAddFile" type="button"><strong>Document</strong><small>Add a PDF or image</small></button>
+                    <button id="journalAddNote" type="button"><strong>Note</strong><small>Keep something worth remembering</small></button>
+                    <button id="journalTakePhoto" type="button"><strong>Photo · Take Photo</strong><small>Use this device's camera</small></button>
+                    <button id="journalChoosePhoto" type="button"><strong>Photo · Choose from Device</strong><small>Add an existing image</small></button>
+                    <button id="journalAddFile" type="button"><strong>Document</strong><small>Add a PDF or image</small></button>
+                    <button id="journalAddEvent" type="button"><strong>Event</strong><small>Record what happened</small></button>
                   </div>
                 </details>
               </div>
-              <div id="panelDocuments" class="record-documents"></div>
-              <input class="hidden" id="documentCameraInput" type="file" accept="image/*" capture="environment">
-              <input class="hidden" id="documentPhotoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
-              <input class="hidden" id="documentFileInput" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif">
+              <div class="journal-filters" role="group" aria-label="Filter Journal">
+                <button class="active" type="button" data-journal-filter="all">All</button><button type="button" data-journal-filter="tasks">Tasks</button><button type="button" data-journal-filter="yield">Yield</button><button type="button" data-journal-filter="notes">Notes</button><button type="button" data-journal-filter="photos">Photos</button><button type="button" data-journal-filter="documents">Documents</button><button type="button" data-journal-filter="events">Events</button>
+              </div>
+              <div id="panelJournal" class="record-journal"></div>
+              <input class="hidden" id="journalCameraInput" type="file" accept="image/*" capture="environment">
+              <input class="hidden" id="journalPhotoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+              <input class="hidden" id="journalFileInput" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif">
             </section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="ledger"><h3 class="record-section-heading">Ledger</h3><div id="panelLedger"></div></section>
           </div>
@@ -495,6 +497,15 @@
         <button type="button" class="btn secondary" id="modalCancel">Cancel</button>
         <button type="submit" class="btn primary" id="modalSubmit">Save</button>
       </div>
+    </form>
+  </dialog>
+  <dialog id="profileCropDialog" class="profile-crop-dialog">
+    <form method="dialog" id="profileCropForm">
+      <div class="row"><div><span class="label">Profile Photo</span><h2>Choose the framing</h2></div><button type="button" class="btn ghost" id="profileCropClose" aria-label="Close">✕</button></div>
+      <p class="muted">Drag the image to reposition it, then adjust the zoom.</p>
+      <div class="profile-crop-preview" id="profileCropPreview"><img id="profileCropImage" alt="Profile photo crop preview"></div>
+      <label for="profileCropZoom">Zoom <input id="profileCropZoom" type="range" min="1" max="3" step="0.05" value="1"></label>
+      <div class="dialog-actions"><button type="button" class="btn secondary" id="profileCropCancel">Cancel</button><button type="submit" class="btn primary">Save framing</button></div>
     </form>
   </dialog>
 </body>
