@@ -8,8 +8,8 @@ const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
 const RECORD_TYPES = ['Animal', 'Land', 'Equipment', 'Structure', 'Work'];
-const CURRENT_SCHEMA_VERSION = 10;
-const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, CURRENT_SCHEMA_VERSION];
+const CURRENT_SCHEMA_VERSION = 11;
+const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, CURRENT_SCHEMA_VERSION];
 let startupMigrationBefore = null;
 
 const RECORD_CONFIG = {
@@ -75,6 +75,7 @@ function normalizeRecord(record = {}) {
     status: record.status || 'Active',
     identity: record.identity && typeof record.identity === 'object' ? record.identity : {},
     stewardship: record.stewardship && typeof record.stewardship === 'object' ? record.stewardship : {},
+    profilePhotoAttachmentId: record.profilePhotoAttachmentId || record.primaryPhotoId || null,
     createdAt: timestamp.length === 10 ? `${timestamp}T12:00:00.000Z` : timestamp,
     updatedAt: record.updatedAt || timestamp,
     deletedAt: record.deletedAt || null
@@ -279,6 +280,8 @@ function normalizeData(source = {}) {
     assignments: asArray(source.assignments).map(assignment => normalizeAssignment(assignment, people)),
     events,
     notes: asArray(source.notes).map(normalizeNote),
+    documents: asArray(source.documents).map(normalizeDocument),
+    attachments: asArray(source.attachments).map(normalizeAttachment),
     ledger: asArray(source.ledger).map(normalizeLedgerEntry),
     calendarEvents: asArray(source.calendarEvents).map(normalizeCalendarEvent),
     yieldEntries,
@@ -364,6 +367,9 @@ function migrateData(source = {}, sourceKey = 'imported legacy data') {
 function isSupportedData(value) {
   return SUPPORTED_SCHEMA_VERSIONS.includes(value?.schemaVersion) || SUPPORTED_SCHEMA_VERSIONS.includes(value?.version);
 }
+
+const normalizeDocument = value => window.RegulaRusticaDocuments.normalizeDocument(value);
+const normalizeAttachment = value => window.RegulaRusticaDocuments.normalizeAttachment(value);
 
 function prepareImportedData(value, sourceName = 'backup') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup must contain a data object.');
@@ -459,6 +465,8 @@ const SEED_DATA = {
   assignments: [],
   events: [],
   notes: [],
+  documents: [],
+  attachments: [],
   ledger: [],
   calendarEvents: [],
   yieldEntries: [],
@@ -476,6 +484,7 @@ let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
 let calendarView = 'month';
 let calendarDefaultDate = null;
 let yieldCompletionTaskId = null;
+let pendingDocumentFiles = [];
 
 function recordById(id) {
   return data.records.find(record => record.id === id);
@@ -541,6 +550,7 @@ function showView(id) {
   $$('.nav button').forEach(button => button.classList.toggle('active', button.dataset.view === id));
   $(`#${id}`).classList.add('active');
   priorView = id;
+  if (id === 'records') renderRecords();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -816,15 +826,57 @@ function renderToday() {
   });
 }
 
+const INACTIVE_RECORD_STATUSES = new Set(['Sold', 'Deceased', 'Processed', 'Archived', 'Inactive', 'Out of Service', 'Completed', 'Cancelled']);
+
+function profileAttachment(record) {
+  if (!record?.profilePhotoAttachmentId) return null;
+  return data.attachments.find(attachment => attachment.id === record.profilePhotoAttachmentId
+    && attachment.recordId === record.id && !attachment.deletedAt && attachment.mimeType.startsWith('image/')) || null;
+}
+
+function populateProfileImage(img, fallback, record) {
+  const attachment = profileAttachment(record);
+  img.hidden = true;
+  fallback.hidden = false;
+  if (!attachment) return;
+  const applyUrl = async retry => {
+    try {
+      const url = await window.RegulaRusticaDocuments.signedUrl(attachment.storagePath);
+      if (!url && retry) return setTimeout(() => applyUrl(false), 400);
+      if (!url || !img.isConnected || profileAttachment(record)?.id !== attachment.id) return;
+      img.src = url;
+      img.hidden = false;
+      fallback.hidden = true;
+    } catch (error) { console.warn('Profile photo could not be displayed.', error); }
+  };
+  applyUrl(true);
+}
+
+function nextTaskTiming(task) {
+  if (!task) return '';
+  if (!task.dueDate) return 'No due date';
+  if (task.dueDate === today()) return 'Due today';
+  if (task.dueDate < today()) return `Overdue · ${formatDate(task.dueDate)}`;
+  return `Due ${formatDate(task.dueDate)}`;
+}
+
 function renderRecords() {
   const root = $('#recordGroups');
   root.innerHTML = '';
   const selectedType = document.querySelector('[name="recordTypeFilter"]:checked')?.value || 'all';
+  const selectedStatus = $('#recordStatusFilter').value;
+  const selectedSort = $('#recordSort').value;
   const grid = document.createElement('div');
   grid.className = 'records-grid';
-  data.records
-    .filter(record => !record.deletedAt && record.status !== 'Archived' && (selectedType === 'all' || record.type === selectedType))
-    .sort((a, b) => RECORD_TYPES.indexOf(a.type) - RECORD_TYPES.indexOf(b.type) || a.name.localeCompare(b.name))
+  const records = data.records
+    .filter(record => !record.deletedAt && (selectedType === 'all' || record.type === selectedType))
+    .filter(record => selectedStatus === 'all' || (selectedStatus === 'inactive') === INACTIVE_RECORD_STATUSES.has(record.status));
+  records.sort((a, b) => selectedSort === 'updated'
+    ? (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt)
+    : selectedSort === 'added'
+      ? b.createdAt.localeCompare(a.createdAt)
+      : a.name.localeCompare(b.name));
+  records
     .forEach(record => {
       const nextTask = data.tasks
         .filter(task => !task.deletedAt && task.recordId === record.id && !task.completed)
@@ -833,7 +885,11 @@ function renderRecords() {
       card.className = 'record-card';
       card.tabIndex = 0;
       card.setAttribute('role', 'button');
-      card.innerHTML = `<div class="row"><div><span class="label">${escapeHtml(record.type)}</span><h3>${escapeHtml(record.name)}</h3></div><span class="pill">${escapeHtml(record.status)}</span></div><div class="meta">${escapeHtml(identityText(record))}</div><p class="record-next">${nextTask ? `Next: ${escapeHtml(nextTask.title)}` : 'No open task'}</p>`;
+      const responsible = record.stewardship?.responsiblePersonId
+        ? data.people.find(person => person.id === record.stewardship.responsiblePersonId && !person.deletedAt)?.displayName
+        : '';
+      card.innerHTML = `<div class="record-card-main"><div class="record-card-portrait" data-record-type="${escapeHtml(record.type)}" aria-hidden="true"><img alt="" hidden><span>${escapeHtml(record.name.slice(0, 1).toUpperCase() || record.type.slice(0, 1))}</span></div><div class="record-card-copy"><div class="record-card-title"><h3>${escapeHtml(record.name)}</h3><span class="pill">${escapeHtml(record.status)}</span></div><div class="meta">${escapeHtml(record.type)} · ${escapeHtml(identityText(record))}</div>${responsible ? `<div class="meta">Responsible: ${escapeHtml(responsible)}</div>` : ''}</div><span class="record-card-chevron" aria-hidden="true">›</span></div><div class="record-next">${nextTask ? `<strong>Next:</strong> ${escapeHtml(nextTask.title)} <span>${escapeHtml(nextTaskTiming(nextTask))}</span>` : '<span>No open task</span>'}</div>`;
+      populateProfileImage(card.querySelector('img'), card.querySelector('.record-card-portrait span'), record);
       card.addEventListener('click', () => openRecord(record.id));
       card.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -859,6 +915,106 @@ function eventChoices(record) {
   return [...new Set([...specialized, ...standard])].slice(0, 9).concat('Other');
 }
 
+function activeDocumentAttachments(documentId) {
+  return data.attachments.filter(attachment => !attachment.deletedAt && attachment.documentId === documentId);
+}
+
+async function openStoredAttachment(attachment) {
+  const opened = window.open('', '_blank');
+  if (opened) opened.opener = null;
+  try {
+    const url = await window.RegulaRusticaDocuments.signedUrl(attachment.storagePath);
+    if (!url) throw new Error('Connect to cloud access to open this attachment.');
+    if (opened) opened.location.href = url;
+    else window.location.href = url;
+  } catch (error) {
+    opened?.close();
+    alert(error.message || 'The attachment could not be opened.');
+  }
+}
+
+async function deleteStoredAttachment(record, documentEntry, attachment) {
+  if (!confirm(`Delete ${attachment.filename}? This permanently removes the stored file.`)) return;
+  try {
+    await window.RegulaRusticaDocuments.remove([attachment.storagePath]);
+    const deletedAt = nowIso();
+    attachment.deletedAt = deletedAt;
+    attachment.updatedAt = deletedAt;
+    record.profilePhotoAttachmentId = window.RegulaRusticaDocuments.profileReferenceAfterAttachmentDelete(record.profilePhotoAttachmentId, attachment.id);
+    record.updatedAt = deletedAt;
+    if (!documentEntry.title && !documentEntry.body && activeDocumentAttachments(documentEntry.id).length === 0) {
+      documentEntry.deletedAt = deletedAt;
+      documentEntry.updatedAt = deletedAt;
+    }
+    saveData();
+  } catch (error) { alert(error.message || 'The attachment could not be deleted.'); }
+}
+
+async function deleteDocumentEntry(record, documentEntry) {
+  const attachments = activeDocumentAttachments(documentEntry.id);
+  if (!confirm(attachments.length
+    ? 'Delete this entry and all of its stored attachments? This cannot be undone.'
+    : 'Delete this document entry?')) return;
+  try {
+    await window.RegulaRusticaDocuments.remove(attachments.map(attachment => attachment.storagePath));
+    const deletedAt = nowIso();
+    attachments.forEach(attachment => {
+      attachment.deletedAt = deletedAt;
+      attachment.updatedAt = deletedAt;
+      record.profilePhotoAttachmentId = window.RegulaRusticaDocuments.profileReferenceAfterAttachmentDelete(record.profilePhotoAttachmentId, attachment.id);
+    });
+    documentEntry.deletedAt = deletedAt;
+    documentEntry.updatedAt = deletedAt;
+    record.updatedAt = deletedAt;
+    saveData();
+  } catch (error) { alert(error.message || 'The document entry could not be deleted.'); }
+}
+
+function renderDocuments(record) {
+  const root = $('#panelDocuments');
+  root.innerHTML = '';
+  const entries = data.documents
+    .filter(documentEntry => !documentEntry.deletedAt && documentEntry.recordId === record.id)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  entries.forEach(documentEntry => {
+    const item = document.createElement('article');
+    item.className = 'document-entry';
+    const attachments = activeDocumentAttachments(documentEntry.id);
+    item.innerHTML = `<div class="document-entry-head"><div>${documentEntry.title ? `<h4>${escapeHtml(documentEntry.title)}</h4>` : '<h4>Record document</h4>'}<div class="meta">${new Date(documentEntry.createdAt).toLocaleDateString()}</div></div><button class="btn ghost delete-document" type="button">Delete</button></div>${documentEntry.body ? `<p>${escapeHtml(documentEntry.body)}</p>` : ''}<div class="document-attachments"></div>`;
+    const attachmentRoot = item.querySelector('.document-attachments');
+    attachments.forEach(attachment => {
+      const image = attachment.mimeType.startsWith('image/');
+      const activeProfile = record.profilePhotoAttachmentId === attachment.id;
+      const row = document.createElement('div');
+      row.className = 'document-attachment';
+      row.innerHTML = `${image ? '<div class="document-thumbnail"><img alt="" hidden><span aria-hidden="true">Image</span></div>' : '<div class="document-file-icon" aria-hidden="true">PDF</div>'}<div class="document-file-copy"><strong>${escapeHtml(attachment.filename)}</strong><span class="meta">${Math.max(1, Math.round(attachment.size / 1024))} KB${activeProfile ? ' · Profile photo' : ''}</span></div><div class="document-file-actions"><button class="btn ghost open" type="button">Open</button>${image ? `<button class="btn ghost profile" type="button">${activeProfile ? 'Remove profile' : 'Set as profile'}</button>` : ''}<button class="btn ghost delete" type="button">Delete</button></div>`;
+      if (image) window.RegulaRusticaDocuments.signedUrl(attachment.storagePath).then(url => {
+        if (!url) return;
+        const img = row.querySelector('img');
+        img.src = url; img.hidden = false; row.querySelector('.document-thumbnail span').hidden = true;
+      }).catch(error => console.warn('Document preview could not be displayed.', error));
+      row.querySelector('.open').addEventListener('click', () => openStoredAttachment(attachment));
+      row.querySelector('.delete').addEventListener('click', () => deleteStoredAttachment(record, documentEntry, attachment));
+      row.querySelector('.profile')?.addEventListener('click', () => {
+        record.profilePhotoAttachmentId = activeProfile ? null : attachment.id;
+        record.updatedAt = nowIso();
+        saveData();
+      });
+      attachmentRoot.append(row);
+    });
+    item.querySelector('.delete-document').addEventListener('click', () => deleteDocumentEntry(record, documentEntry));
+    root.append(item);
+  });
+
+  data.notes.filter(note => !note.deletedAt && note.recordId === record.id).forEach(note => {
+    const item = document.createElement('article');
+    item.className = 'document-entry legacy-document-note';
+    item.innerHTML = `<div class="document-entry-head"><div><h4>${escapeHtml(note.title || 'Note')}</h4><div class="meta">${new Date(note.createdAt).toLocaleDateString()}</div></div></div><p>${escapeHtml(note.text)}</p>`;
+    root.append(item);
+  });
+  if (!root.children.length) root.innerHTML = '<p class="muted record-empty">No documentation yet. Add a note, photo, or document when there is something worth keeping.</p>';
+}
+
 function renderRecord() {
   const record = recordById(currentRecordId);
   if (!record) return showView(priorView);
@@ -866,6 +1022,7 @@ function renderRecord() {
   const portraitLetters = { Animal: 'A', Land: 'L', Equipment: 'E', Structure: 'S', Work: 'W' };
   $('#recordPortrait').dataset.recordType = record.type;
   $('#recordPortraitPlaceholder').textContent = portraitLetters[record.type] || 'R';
+  populateProfileImage($('#recordPortraitImage'), $('#recordPortraitPlaceholder'), record);
   $('#recordTypeLabel').textContent = record.type;
   $('#recordTitle').textContent = record.name;
   $('#recordStatus').textContent = record.status;
@@ -925,7 +1082,7 @@ function renderRecord() {
       item.className = 'chronicle-item';
       item.innerHTML = `<div class="row"><strong>${escapeHtml(event.eventType)}</strong><div class="actions"><span class="meta">${formatDate(event.date)}</span><button class="btn ghost del">Delete</button></div></div>${event.value ? `<div><strong>${escapeHtml(event.value)} ${escapeHtml(event.unit)}</strong></div>` : ''}${event.details ? `<p>${escapeHtml(event.details)}</p>` : ''}`;
       item.querySelector('.del').addEventListener('click', () => {
-        if (confirm('Delete this Chronicle entry?')) {
+        if (confirm('Delete this Journal entry?')) {
           event.deletedAt = nowIso();
           event.updatedAt = event.deletedAt;
           saveData();
@@ -951,25 +1108,7 @@ function renderRecord() {
     ? `<strong>${escapeHtml(recentEvent.eventType)}</strong><div class="meta">${formatDate(recentEvent.date)}</div>`
     : '<span class="muted">No events recorded yet.</span>';
 
-  const notesPanel = $('#panelNotes');
-  notesPanel.innerHTML = '';
-  data.notes
-    .filter(note => !note.deletedAt && note.recordId === record.id)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .forEach(note => {
-      const item = document.createElement('div');
-      item.className = 'chronicle-item';
-      item.innerHTML = `<div class="row"><div>${escapeHtml(note.text)}</div><button class="btn ghost del">Delete</button></div><div class="meta">${new Date(note.createdAt).toLocaleDateString()}</div>`;
-      item.querySelector('.del').addEventListener('click', () => {
-        if (confirm('Delete this note?')) {
-          note.deletedAt = nowIso();
-          note.updatedAt = note.deletedAt;
-          saveData();
-        }
-      });
-      notesPanel.appendChild(item);
-    });
-  if (!notesPanel.children.length) notesPanel.innerHTML = '<p class="muted record-empty">No notes yet.</p>';
+  renderDocuments(record);
 
   const ledgerPanel = $('#panelLedger');
   ledgerPanel.innerHTML = '';
@@ -1467,7 +1606,7 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   calendarDefaultDate = defaultDate;
   const root = $('#modalFields');
   root.innerHTML = '';
-  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'What happened?', note: 'Add note', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit Yield' : `Record ${window.RegulaRusticaTasks.YIELD_TYPES[defaultType]?.label || 'Yield'}` };
+  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'What happened?', note: 'Add note', document: 'Add to Documents', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit Yield' : `Record ${window.RegulaRusticaTasks.YIELD_TYPES[defaultType]?.label || 'Yield'}` };
   $('#modalTitle').textContent = titles[nextMode];
   $('#modalDelete').classList.toggle('hidden', !(id && ['calendar', 'yield'].includes(nextMode)));
   $('#modalCompleteWithoutYield').classList.add('hidden');
@@ -1489,6 +1628,23 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     root.append(field('On completion', 'yieldType', 'select', task.yieldType || '', ['', ...Object.keys(window.RegulaRusticaTasks.YIELD_TYPES)]));
   }
   if (nextMode === 'note') root.append(field('What should I remember?', 'text', 'textarea'));
+  if (nextMode === 'document') {
+    root.append(field('Title (optional)', 'title', 'text'));
+    root.append(field('Note (optional)', 'body', 'textarea'));
+    const fileLabel = document.createElement('label');
+    fileLabel.textContent = 'Attachments (optional)';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file'; fileInput.multiple = true; fileInput.accept = 'application/pdf,image/jpeg,image/png,image/webp,image/gif';
+    fileInput.addEventListener('change', () => { pendingDocumentFiles = [...fileInput.files]; });
+    fileLabel.append(fileInput);
+    root.append(fileLabel);
+    if (pendingDocumentFiles.length) {
+      const selected = document.createElement('p');
+      selected.className = 'muted selected-document-files';
+      selected.textContent = pendingDocumentFiles.map(file => file.name).join(' · ');
+      root.append(selected);
+    }
+  }
   if (nextMode === 'ledger') {
     const entry = data.ledger.find(item => item.id === id) || {};
     root.append(field('Type', 'type', 'select', entry.type || 'expense', ['expense', 'income']));
@@ -1577,7 +1733,7 @@ function recordStewardshipFromForm(type, form) {
   return withResponsible({ stage: form.stage, blockedBy: form.blockedBy });
 }
 
-$('#modalForm').addEventListener('submit', event => {
+$('#modalForm').addEventListener('submit', async event => {
   event.preventDefault();
   const form = Object.fromEntries(new FormData(event.target));
 
@@ -1623,6 +1779,32 @@ $('#modalForm').addEventListener('submit', event => {
   if (modalMode === 'note') {
     if (!form.text.trim()) return;
     data.notes.unshift({ id: uid(), recordId: contextRecordId, text: form.text.trim(), createdAt: nowIso(), updatedAt: nowIso() });
+  }
+  if (modalMode === 'document') {
+    const files = [...pendingDocumentFiles];
+    if (!form.title?.trim() && !form.body?.trim() && !files.length) {
+      alert('Add a note or choose at least one attachment.');
+      return;
+    }
+    const documentEntry = normalizeDocument({ id: uid(), recordId: contextRecordId, title: form.title?.trim(), body: form.body?.trim(), createdAt: nowIso() });
+    const uploaded = [];
+    try {
+      $('#modalSubmit').disabled = true;
+      for (const file of files) {
+        const attachmentId = uid();
+        const attachment = await window.RegulaRusticaDocuments.upload(file, { attachmentId, recordId: contextRecordId });
+        uploaded.push(normalizeAttachment({ ...attachment, documentId: documentEntry.id }));
+      }
+    } catch (error) {
+      try { await window.RegulaRusticaDocuments.remove(uploaded.map(attachment => attachment.storagePath)); } catch (cleanupError) { console.warn('Uploaded attachment cleanup failed.', cleanupError); }
+      alert(error.message || 'The attachment could not be uploaded. No document entry was created.');
+      $('#modalSubmit').disabled = false;
+      return;
+    }
+    $('#modalSubmit').disabled = false;
+    data.documents.unshift(documentEntry);
+    data.attachments.push(...uploaded);
+    pendingDocumentFiles = [];
   }
   if (modalMode === 'event') {
     if (form.eventType === 'Other' && !form.details.trim()) {
@@ -1727,9 +1909,24 @@ const openCurrentRecordYield = () => { const type=window.RegulaRusticaTasks.elig
 $('#recordYield').addEventListener('click', () => { closeRecordAdd(); openCurrentRecordYield(); });
 $('#recordSectionAddYield').addEventListener('click', openCurrentRecordYield);
 $('#recordAddTask').addEventListener('click', () => { closeRecordAdd(); openModal('task', null, currentRecordId); });
-$('#recordAddNote').addEventListener('click', () => { closeRecordAdd(); openModal('note', null, currentRecordId); });
+$('#recordAddNote').addEventListener('click', () => { closeRecordAdd(); pendingDocumentFiles = []; openModal('document', null, currentRecordId); });
 $('#recordAddLedger').addEventListener('click', () => { closeRecordAdd(); openModal('ledger', null, currentRecordId); });
 $('#recordEdit').addEventListener('click', () => openModal('record', currentRecordId));
+const closeDocumentAdd = () => { $('#documentAdd').open = false; };
+const openDocumentFromFiles = files => {
+  const selected = [...files];
+  if (!selected.length) return;
+  pendingDocumentFiles = selected;
+  closeDocumentAdd();
+  openModal('document', null, currentRecordId);
+};
+$('#documentAddNote').addEventListener('click', () => { pendingDocumentFiles = []; closeDocumentAdd(); openModal('document', null, currentRecordId); });
+$('#documentTakePhoto').addEventListener('click', () => { $('#documentCameraInput').value = ''; $('#documentCameraInput').click(); });
+$('#documentChoosePhoto').addEventListener('click', () => { $('#documentPhotoInput').value = ''; $('#documentPhotoInput').click(); });
+$('#documentAddFile').addEventListener('click', () => { $('#documentFileInput').value = ''; $('#documentFileInput').click(); });
+$('#documentCameraInput').addEventListener('change', event => openDocumentFromFiles(event.target.files));
+$('#documentPhotoInput').addEventListener('change', event => openDocumentFromFiles(event.target.files));
+$('#documentFileInput').addEventListener('change', event => openDocumentFromFiles(event.target.files));
 $('.record-section-nav').addEventListener('click', event => {
   const button = event.target.closest('button[data-record-section]');
   if (!button) return;
@@ -1741,8 +1938,9 @@ $('.record-section-nav').addEventListener('click', event => {
   $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === button.dataset.recordSection));
 });
 $('#backToList').addEventListener('click', () => showView(priorView));
-$('#modalClose').addEventListener('click', () => $('#modal').close());
-$('#modalCancel').addEventListener('click', () => $('#modal').close());
+const cancelModal = () => { pendingDocumentFiles = []; $('#modal').close(); };
+$('#modalClose').addEventListener('click', cancelModal);
+$('#modalCancel').addEventListener('click', cancelModal);
 $('#modalCompleteWithoutYield').addEventListener('click', () => {
   if (modalMode === 'reopen-task') {
     const task = data.tasks.find(item => item.id === editId);
@@ -1789,6 +1987,7 @@ $$('.tabs-mini button').forEach(button => button.addEventListener('click', () =>
 ['taskRecordFilter', 'taskAssigneeFilter', 'taskSort'].forEach(id => $(`#${id}`).addEventListener('change', renderTasks));
 $$('[name="taskStatusFilter"], [name="taskTimingFilter"]').forEach(input => input.addEventListener('change', renderTasks));
 $$('[name="recordTypeFilter"]').forEach(input => input.addEventListener('change', renderRecords));
+['recordStatusFilter', 'recordSort'].forEach(id => $(`#${id}`).addEventListener('change', renderRecords));
 $$('[name="yieldTypeFilter"], [name="yieldDateFilter"]').forEach(input => input.addEventListener('change', renderYield));
 $$('[name="ledgerTypeFilter"], [name="ledgerDateFilter"]').forEach(input => input.addEventListener('change', renderLedger));
 $$('[data-settings-target]').forEach(button => button.addEventListener('click', () => {
@@ -1840,6 +2039,10 @@ $('#resetData').addEventListener('click', () => {
 });
 
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(error => console.warn('Offline support could not start.', error)));
+window.addEventListener('regula-rustica:cloud-context', () => {
+  renderRecords();
+  if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
+});
 
 window.RegulaRustica = { normalizeData, migrateData, prepareImportedData };
 renderAll();

@@ -2,6 +2,55 @@
   grid-template-columns: repeat(4, 1fr);
 }
 
+/* Records + Documents foundation */
+.record-secondary-filters { display: flex; justify-content: flex-end; gap: 10px; margin: -2px 0 12px; }
+.record-secondary-filters label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .7rem; }
+.record-secondary-filters select { width: auto; min-width: 128px; padding: 7px 28px 7px 9px; background: rgba(248,241,227,.9); }
+.records-grid { gap: 11px; }
+.record-card { display: flex; flex-direction: column; min-height: 0; padding: 13px; overflow: hidden; }
+.record-card-main { display: grid; grid-template-columns: 68px minmax(0,1fr) 14px; gap: 12px; align-items: center; }
+.record-card-portrait { display: grid; place-items: center; width: 68px; height: 68px; overflow: hidden; border: 2px solid #b89a64; border-radius: 50%; background: #e6d8bb; color: var(--forest); font: 700 1.35rem Georgia, serif; box-shadow: inset 0 0 0 3px rgba(248,241,227,.65); }
+.record-card-portrait img { width: 100%; height: 100%; object-fit: cover; }
+.record-card-copy { min-width: 0; }
+.record-card-copy .meta { margin: 3px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record-card-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 7px; }
+.record-card-title h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.08rem; }
+.record-card-title .pill { flex: 0 0 auto; padding: 4px 7px; }
+.record-card-chevron { color: var(--gold); font-size: 1.35rem; }
+.record-card .record-next { display: flex; gap: 5px; align-items: baseline; margin: 10px -13px -13px; padding: 8px 13px; font: .76rem Arial, sans-serif; }
+.record-card .record-next > span:last-child { color: var(--muted); }
+.record-portrait { width: 68px; height: 68px; flex-basis: 68px; overflow: hidden; }
+.record-portrait img { grid-area: 1 / 1; width: 100%; height: 100%; object-fit: cover; }
+.record-portrait span { grid-area: 1 / 1; }
+.record-documents { display: grid; gap: 12px; }
+.document-entry { padding: 13px; border: 1px solid rgba(164,123,60,.34); border-radius: 11px; background: rgba(255,253,247,.5); }
+.document-entry-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.document-entry h4 { margin: 0 0 3px; color: var(--forest); font-size: 1rem; }
+.document-entry > p { margin: 10px 0; line-height: 1.45; white-space: pre-wrap; }
+.document-attachments { display: grid; gap: 8px; margin-top: 10px; }
+.document-attachment { display: grid; grid-template-columns: 52px minmax(0,1fr) auto; gap: 10px; align-items: center; padding-top: 8px; border-top: 1px solid rgba(164,123,60,.22); }
+.document-thumbnail, .document-file-icon { display: grid; place-items: center; width: 52px; height: 52px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: #eadfc9; color: var(--forest2); font: 700 .62rem Arial, sans-serif; }
+.document-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.document-file-copy { min-width: 0; display: grid; gap: 3px; }
+.document-file-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-file-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
+.document-file-actions .btn { min-height: 36px; }
+
+@media (max-width: 520px) {
+  .record-secondary-filters { justify-content: stretch; }
+  .record-secondary-filters label { flex: 1; display: grid; gap: 4px; }
+  .record-secondary-filters select { width: 100%; min-width: 0; }
+  .records-grid { gap: 9px; }
+  .record-card { padding: 11px; }
+  .record-card-main { grid-template-columns: 64px minmax(0,1fr) 12px; gap: 10px; }
+  .record-card-portrait { width: 64px; height: 64px; }
+  .record-card .record-next { margin: 8px -11px -11px; padding: 7px 11px; }
+  .record-portrait { width: 64px; height: 64px; flex-basis: 64px; }
+  .document-attachment { grid-template-columns: 48px minmax(0,1fr); }
+  .document-thumbnail, .document-file-icon { width: 48px; height: 48px; }
+  .document-file-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
 .nav { scrollbar-width: none; }
 .nav::-webkit-scrollbar { display: none; }
 
@@ -556,4 +605,12 @@ summary:focus-visible {
   .record-add-menu { position: fixed; top: auto; right: 14px; left: 14px; min-width: 0; }
   .record-yield-entry { grid-template-columns: minmax(0,1fr) auto; }
   .record-yield-entry .actions { grid-column: 1 / -1; }
+}
+
+/* Final cascade for the compact Records sprint. */
+.record-card { min-height: 0; padding: 13px; }
+.record-card .meta { margin-bottom: 0; }
+@media (max-width: 520px) {
+  .record-card { padding: 11px; }
+  .record-portrait { width: 64px; height: 64px; flex-basis: 64px; }
 }

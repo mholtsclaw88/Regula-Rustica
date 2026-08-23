@@ -97,7 +97,7 @@
       ['stewardship', 'Stewardship', stewardship],
       ['routines', 'Routines', routines],
       ['tasks', 'Tasks', existingPanels.tasks],
-      ['chronicle', 'Chronicle', existingPanels.chronicle],
+      ['chronicle', 'Journal', existingPanels.chronicle],
       ['notes', 'Notes', existingPanels.notes],
       ['ledger', 'Ledger', existingPanels.ledger],
       ['photos', 'Photos', existingPanels.photos]
