@@ -1,4 +1,4 @@
-import { COLLECTIONS, DOMAIN_ORDER, fromCloud, hasMeaningfulData, meaningfulCounts, operationOrder, toCloud } from './entities.mjs';
+import { COLLECTIONS, DOMAIN_ORDER, attachmentCloudReady, fromCloud, hasMeaningfulData, meaningfulCounts, operationOrder, toCloud } from './entities.mjs';
 
 const totals = counts => Object.values(counts).reduce((sum, count) => sum + count, 0);
 
@@ -28,8 +28,9 @@ export class SyncEngine {
     if (!this.state.state.initialSyncCompleted) return;
     for (const table of DOMAIN_ORDER) {
       const collection = COLLECTIONS[table];
-      const previous = new Map((before[collection] || []).map(row => [row.id, row]));
-      const current = new Map((after[collection] || []).map(row => [row.id, row]));
+      const cloudRows = rows => table === 'record_attachments' ? rows.filter(attachmentCloudReady) : rows;
+      const previous = new Map(cloudRows(before[collection] || []).map(row => [row.id, row]));
+      const current = new Map(cloudRows(after[collection] || []).map(row => [row.id, row]));
       for (const [id, row] of current) {
         if (table === 'yield_entries' && row.taskId) this.state.linkEntityIdentity(table, id, 'tasks', row.taskId);
         const old = previous.get(id);
@@ -37,7 +38,7 @@ export class SyncEngine {
           this.state.enqueue({ table, localId: id, type: 'create', payload: toCloud(table, row, this.state) });
           if (row.deletedAt || row.removedAt) this.state.enqueue({ table, localId: id, type: 'soft_delete', payload: toCloud(table, row, this.state) });
         }
-        else if (JSON.stringify(old) !== JSON.stringify(row)) {
+        else if (JSON.stringify(table === 'record_attachments' ? toCloud(table, old, this.state) : old) !== JSON.stringify(table === 'record_attachments' ? toCloud(table, row, this.state) : row)) {
           const type = !old.deletedAt && row.deletedAt ? 'soft_delete' : old.deletedAt && !row.deletedAt ? 'restore' : 'update';
           this.state.enqueue({ table, localId: id, type, payload: toCloud(table, row, this.state), clientUpdatedAt: row.updatedAt });
         }
@@ -77,7 +78,8 @@ export class SyncEngine {
     const expected = Object.fromEntries(DOMAIN_ORDER.map(table => [table, []]));
     this.state.createVerifiedBackup(local, 'before-first-cloud-migration');
     for (const table of DOMAIN_ORDER) {
-      for (const row of local[COLLECTIONS[table]] || []) {
+      const rows = table === 'record_attachments' ? (local[COLLECTIONS[table]] || []).filter(attachmentCloudReady) : (local[COLLECTIONS[table]] || []);
+      for (const row of rows) {
         if (table === 'yield_entries' && row.taskId) this.state.linkEntityIdentity(table, row.id, 'tasks', row.taskId);
         const payload = toCloud(table, row, this.state, 'migration');
         expected[table].push(payload);

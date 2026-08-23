@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { COLLECTIONS, DOMAIN_ORDER, fromCloud, operationOrder, toCloud } from '../sync/entities.mjs';
+import { COLLECTIONS, DOMAIN_ORDER, attachmentCloudReady, fromCloud, operationOrder, toCloud } from '../sync/entities.mjs';
 
 const require = createRequire(import.meta.url);
 const documents = require('../record-documents.js');
@@ -10,12 +10,54 @@ const state = {
   localIdForCloud: (table, id) => id?.replace(`cloud-${table}-`, '')
 };
 
+function installFakeIndexedDb() {
+  const rows = new Map();
+  const database = {
+    objectStoreNames: { contains: () => true },
+    createObjectStore: () => {},
+    transaction: () => {
+      const transaction = {
+        objectStore: () => ({
+          put: value => rows.set(value.id, value),
+          delete: id => rows.delete(id),
+          get: id => {
+            const request = {};
+            setImmediate(() => { request.result = rows.get(id); request.onsuccess?.(); });
+            return request;
+          }
+        })
+      };
+      setImmediate(() => transaction.oncomplete?.());
+      return transaction;
+    }
+  };
+  globalThis.indexedDB = {
+    open: () => {
+      const request = { result: database };
+      setImmediate(() => request.onsuccess?.());
+      return request;
+    }
+  };
+}
+
 test('document and attachment metadata normalize without binary payloads', () => {
   const entry = documents.normalizeDocument({ id: 'doc-1', recordId: 'daisy', title: 'Registration', body: 'Renew in April' });
   const attachment = documents.normalizeAttachment({ id: 'file-1', documentId: entry.id, recordId: 'daisy', storagePath: 'homesteads/h/records/daisy/file-1/registration.pdf', filename: 'registration.pdf', mimeType: 'application/pdf', size: 4200 });
   assert.equal(entry.body, 'Renew in April');
   assert.equal(attachment.size, 4200);
+  assert.equal(attachment.syncState, 'synced');
   assert.equal('payload' in attachment || 'base64' in attachment || 'file' in attachment, false);
+});
+
+test('local attachments retain stable identity and quiet sync state without binary metadata', () => {
+  const attachment = documents.normalizeAttachment({ id: 'file-local', documentId: 'doc-1', recordId: 'daisy', filename: 'photo.jpg', mimeType: 'image/jpeg', size: 1000 });
+  assert.equal(attachment.id, 'file-local');
+  assert.equal(attachment.storagePath, '');
+  assert.equal(attachment.syncState, 'local');
+  assert.equal(documents.syncLabel(attachment), 'On this device');
+  assert.equal(attachmentCloudReady(attachment), false);
+  assert.equal(attachmentCloudReady({ ...attachment, storagePath: 'homesteads/h/file-local', syncState: 'synced' }), true);
+  assert.equal('blob' in attachment || 'base64' in attachment, false);
 });
 
 test('profile reference clears only when its active attachment is deleted', () => {
@@ -57,4 +99,29 @@ test('file validation accepts supported images/PDFs and rejects unsupported or o
   assert.equal(documents.validateFile({ type: 'image/webp', size: 100 }), true);
   assert.throws(() => documents.validateFile({ type: 'text/plain', size: 100 }), /PDF or common image/);
   assert.throws(() => documents.validateFile({ type: 'image/jpeg', size: documents.MAX_FILE_BYTES + 1 }), /10 MB/);
+});
+
+test('IndexedDB keeps the local copy through cloud upload failure and retries by stable ID', async () => {
+  installFakeIndexedDb();
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
+  const file = new Blob(['%PDF-local'], { type: 'application/pdf' });
+  Object.defineProperty(file, 'name', { value: 'local.pdf' });
+  Object.defineProperty(file, 'lastModified', { value: 1 });
+  const uploads = [];
+  let fail = true;
+  const client = { storage: { from: () => ({
+    upload: async (path, blob, options) => {
+      uploads.push({ path, blob, options });
+      return fail ? { error: new Error('network unavailable') } : { error: null };
+    }
+  }) } };
+  documents.setContext({ client, session: { user: {} }, homesteadId: 'home-1' });
+  const attachment = await documents.saveLocal(file, { attachmentId: 'stable-file-id', recordId: 'daisy' });
+  assert.equal(attachment.id, 'stable-file-id');
+  await assert.rejects(documents.uploadStored(attachment), /network unavailable/);
+  assert.equal((await documents.readLocal(attachment.id)).blob.size, file.size);
+  fail = false;
+  const synced = await documents.uploadStored(attachment);
+  assert.match(synced.storagePath, /stable-file-id\/local\.pdf$/);
+  assert.equal(uploads.at(-1).options.upsert, true);
 });

@@ -13,7 +13,7 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-const blank = () => ({ schemaVersion: 9, settings: { homesteadName: 'Test' }, records: [], people: [], choreWindows: [], routines: [], routineOccurrences: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
+const blank = () => ({ schemaVersion: 9, settings: { homesteadName: 'Test' }, records: [], documents: [], attachments: [], people: [], choreWindows: [], routines: [], routineOccurrences: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
 const record = (id = crypto.randomUUID()) => ({ id, type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', deletedAt: null });
 
 class MockCloud {
@@ -314,6 +314,19 @@ test('account-backed directory entries do not make an empty Homestead look popul
   assert.equal(hasMeaningfulData(data), false);
   data.people.push({ id: 'child-one', personType: 'child', displayName: 'Clare' });
   assert.equal(hasMeaningfulData(data), true);
+});
+
+test('local attachment metadata waits for binary upload before entering the cloud outbox', () => {
+  const before = blank(); const h = harness(before);
+  h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const local = structuredClone(before);
+  local.attachments.push({ id: 'photo-1', documentId: 'doc-1', recordId: 'daisy', storagePath: '', filename: 'photo.jpg', mimeType: 'image/jpeg', size: 1000, syncState: 'local', createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' });
+  h.engine.queueLocalChanges(before, local);
+  assert.equal(h.state.state.outbox.some(item => item.table === 'record_attachments'), false);
+  const uploaded = structuredClone(local);
+  Object.assign(uploaded.attachments[0], { storagePath: 'homesteads/h/records/daisy/photo-1/photo.jpg', syncState: 'synced' });
+  h.engine.queueLocalChanges(local, uploaded);
+  assert.equal(h.state.state.outbox.find(item => item.table === 'record_attachments')?.type, 'create');
 });
 
 test('Record responsibility retains its canonical Homestead Person mapping', () => {

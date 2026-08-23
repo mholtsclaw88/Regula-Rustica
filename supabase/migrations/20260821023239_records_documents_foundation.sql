@@ -154,6 +154,15 @@ create policy record_documents_storage_insert on storage.objects for insert to a
   and (storage.foldername(name))[2] = public.current_homestead_id()::text
   and owner_id = (select auth.uid())::text and public.has_capability('upload_photos')
 );
+create policy record_documents_storage_update on storage.objects for update to authenticated using (
+  bucket_id = 'record-documents' and (storage.foldername(name))[1] = 'homesteads'
+  and (storage.foldername(name))[2] = public.current_homestead_id()::text
+  and public.has_capability('upload_photos')
+) with check (
+  bucket_id = 'record-documents' and (storage.foldername(name))[1] = 'homesteads'
+  and (storage.foldername(name))[2] = public.current_homestead_id()::text
+  and public.has_capability('upload_photos')
+);
 create policy record_documents_storage_delete on storage.objects for delete to authenticated using (
   bucket_id = 'record-documents' and (storage.foldername(name))[1] = 'homesteads'
   and (storage.foldername(name))[2] = public.current_homestead_id()::text

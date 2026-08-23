@@ -428,6 +428,59 @@ function saveData(nextData = data, source = 'user') {
   window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', { detail: { before, after: structuredClone(data), source } }));
 }
 
+async function syncLocalAttachments({ requireAll = false } = {}) {
+  if (attachmentSyncPromise) return attachmentSyncPromise;
+  if (!window.RegulaRusticaDocuments.canSync()) return { synced: 0, failed: 0 };
+  attachmentSyncPromise = (async () => {
+    let synced = 0;
+    let failed = 0;
+    let changed = false;
+    for (const attachment of data.attachments) {
+      if (attachment.deletedAt) {
+        if (!attachment.storagePath || attachment.syncState === 'synced') continue;
+        try {
+          await window.RegulaRusticaDocuments.removeRemote([attachment.storagePath]);
+          attachment.syncState = 'synced';
+          attachment.syncError = '';
+          synced += 1;
+        } catch (error) {
+          attachment.syncState = 'failed';
+          attachment.syncError = error.message || 'Cloud deletion failed.';
+          failed += 1;
+        }
+        changed = true;
+        continue;
+      }
+      if (attachment.storagePath && attachment.syncState === 'synced') continue;
+      let local;
+      try { local = await window.RegulaRusticaDocuments.readLocal(attachment.id); }
+      catch (_) { local = null; }
+      if (!local?.blob) {
+        attachment.syncState = 'failed';
+        attachment.syncError = 'The local attachment copy is unavailable.';
+        failed += 1;
+        changed = true;
+        continue;
+      }
+      attachment.syncState = 'pending';
+      attachment.syncError = '';
+      try {
+        Object.assign(attachment, await window.RegulaRusticaDocuments.uploadStored(attachment));
+        synced += 1;
+      } catch (error) {
+        attachment.syncState = 'failed';
+        attachment.syncError = error.message || 'Cloud upload failed.';
+        failed += 1;
+      }
+      changed = true;
+    }
+    if (changed) saveData(data, 'attachment-sync');
+    if (requireAll && failed) throw new Error(`${failed} attachment${failed === 1 ? '' : 's'} could not be synchronized. Local copies are still available.`);
+    return { synced, failed };
+  })().finally(() => { attachmentSyncPromise = null; });
+  return attachmentSyncPromise;
+}
+
 function exportData() {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
@@ -485,6 +538,7 @@ let calendarView = 'month';
 let calendarDefaultDate = null;
 let yieldCompletionTaskId = null;
 let pendingDocumentFiles = [];
+let attachmentSyncPromise = null;
 
 function recordById(id) {
   return data.records.find(record => record.id === id);
@@ -841,7 +895,7 @@ function populateProfileImage(img, fallback, record) {
   if (!attachment) return;
   const applyUrl = async retry => {
     try {
-      const url = await window.RegulaRusticaDocuments.signedUrl(attachment.storagePath);
+      const url = await window.RegulaRusticaDocuments.urlFor(attachment);
       if (!url && retry) return setTimeout(() => applyUrl(false), 400);
       if (!url || !img.isConnected || profileAttachment(record)?.id !== attachment.id) return;
       img.src = url;
@@ -923,8 +977,8 @@ async function openStoredAttachment(attachment) {
   const opened = window.open('', '_blank');
   if (opened) opened.opener = null;
   try {
-    const url = await window.RegulaRusticaDocuments.signedUrl(attachment.storagePath);
-    if (!url) throw new Error('Connect to cloud access to open this attachment.');
+    const url = await window.RegulaRusticaDocuments.urlFor(attachment);
+    if (!url) throw new Error('The attachment copy is unavailable.');
     if (opened) opened.location.href = url;
     else window.location.href = url;
   } catch (error) {
@@ -936,10 +990,12 @@ async function openStoredAttachment(attachment) {
 async function deleteStoredAttachment(record, documentEntry, attachment) {
   if (!confirm(`Delete ${attachment.filename}? This permanently removes the stored file.`)) return;
   try {
-    await window.RegulaRusticaDocuments.remove([attachment.storagePath]);
+    await window.RegulaRusticaDocuments.removeLocal([attachment.id]);
     const deletedAt = nowIso();
     attachment.deletedAt = deletedAt;
     attachment.updatedAt = deletedAt;
+    attachment.syncState = attachment.storagePath ? 'pending' : 'local';
+    attachment.syncError = '';
     record.profilePhotoAttachmentId = window.RegulaRusticaDocuments.profileReferenceAfterAttachmentDelete(record.profilePhotoAttachmentId, attachment.id);
     record.updatedAt = deletedAt;
     if (!documentEntry.title && !documentEntry.body && activeDocumentAttachments(documentEntry.id).length === 0) {
@@ -956,11 +1012,13 @@ async function deleteDocumentEntry(record, documentEntry) {
     ? 'Delete this entry and all of its stored attachments? This cannot be undone.'
     : 'Delete this document entry?')) return;
   try {
-    await window.RegulaRusticaDocuments.remove(attachments.map(attachment => attachment.storagePath));
+    await window.RegulaRusticaDocuments.removeLocal(attachments.map(attachment => attachment.id));
     const deletedAt = nowIso();
     attachments.forEach(attachment => {
       attachment.deletedAt = deletedAt;
       attachment.updatedAt = deletedAt;
+      attachment.syncState = attachment.storagePath ? 'pending' : 'local';
+      attachment.syncError = '';
       record.profilePhotoAttachmentId = window.RegulaRusticaDocuments.profileReferenceAfterAttachmentDelete(record.profilePhotoAttachmentId, attachment.id);
     });
     documentEntry.deletedAt = deletedAt;
@@ -987,8 +1045,9 @@ function renderDocuments(record) {
       const activeProfile = record.profilePhotoAttachmentId === attachment.id;
       const row = document.createElement('div');
       row.className = 'document-attachment';
-      row.innerHTML = `${image ? '<div class="document-thumbnail"><img alt="" hidden><span aria-hidden="true">Image</span></div>' : '<div class="document-file-icon" aria-hidden="true">PDF</div>'}<div class="document-file-copy"><strong>${escapeHtml(attachment.filename)}</strong><span class="meta">${Math.max(1, Math.round(attachment.size / 1024))} KB${activeProfile ? ' · Profile photo' : ''}</span></div><div class="document-file-actions"><button class="btn ghost open" type="button">Open</button>${image ? `<button class="btn ghost profile" type="button">${activeProfile ? 'Remove profile' : 'Set as profile'}</button>` : ''}<button class="btn ghost delete" type="button">Delete</button></div>`;
-      if (image) window.RegulaRusticaDocuments.signedUrl(attachment.storagePath).then(url => {
+      const syncLabel = window.RegulaRusticaDocuments.syncLabel(attachment);
+      row.innerHTML = `${image ? '<div class="document-thumbnail"><img alt="" hidden><span aria-hidden="true">Image</span></div>' : '<div class="document-file-icon" aria-hidden="true">PDF</div>'}<div class="document-file-copy"><strong>${escapeHtml(attachment.filename)}</strong><span class="meta">${Math.max(1, Math.round(attachment.size / 1024))} KB${activeProfile ? ' · Profile photo' : ''} · ${escapeHtml(syncLabel)}</span></div><div class="document-file-actions"><button class="btn ghost open" type="button">Open</button>${image ? `<button class="btn ghost profile" type="button">${activeProfile ? 'Remove profile' : 'Set as profile'}</button>` : ''}<button class="btn ghost delete" type="button">Delete</button></div>`;
+      if (image) window.RegulaRusticaDocuments.urlFor(attachment).then(url => {
         if (!url) return;
         const img = row.querySelector('img');
         img.src = url; img.hidden = false; row.querySelector('.document-thumbnail span').hidden = true;
@@ -1787,23 +1846,23 @@ $('#modalForm').addEventListener('submit', async event => {
       return;
     }
     const documentEntry = normalizeDocument({ id: uid(), recordId: contextRecordId, title: form.title?.trim(), body: form.body?.trim(), createdAt: nowIso() });
-    const uploaded = [];
+    const stored = [];
     try {
       $('#modalSubmit').disabled = true;
       for (const file of files) {
         const attachmentId = uid();
-        const attachment = await window.RegulaRusticaDocuments.upload(file, { attachmentId, recordId: contextRecordId });
-        uploaded.push(normalizeAttachment({ ...attachment, documentId: documentEntry.id }));
+        const attachment = await window.RegulaRusticaDocuments.saveLocal(file, { attachmentId, recordId: contextRecordId });
+        stored.push(normalizeAttachment({ ...attachment, documentId: documentEntry.id }));
       }
     } catch (error) {
-      try { await window.RegulaRusticaDocuments.remove(uploaded.map(attachment => attachment.storagePath)); } catch (cleanupError) { console.warn('Uploaded attachment cleanup failed.', cleanupError); }
-      alert(error.message || 'The attachment could not be uploaded. No document entry was created.');
+      try { await window.RegulaRusticaDocuments.removeLocal(stored.map(attachment => attachment.id)); } catch (cleanupError) { console.warn('Local attachment cleanup failed.', cleanupError); }
+      alert(error.message || 'The attachment could not be saved on this device. No document entry was created.');
       $('#modalSubmit').disabled = false;
       return;
     }
     $('#modalSubmit').disabled = false;
     data.documents.unshift(documentEntry);
-    data.attachments.push(...uploaded);
+    data.attachments.push(...stored);
     pendingDocumentFiles = [];
   }
   if (modalMode === 'event') {
@@ -2044,7 +2103,7 @@ window.addEventListener('regula-rustica:cloud-context', () => {
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 });
 
-window.RegulaRustica = { normalizeData, migrateData, prepareImportedData };
+window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments };
 renderAll();
 if (startupMigrationBefore) setTimeout(() => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {
   detail: { before: startupMigrationBefore, after: structuredClone(data), source: 'migration' }

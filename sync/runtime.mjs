@@ -60,6 +60,11 @@ async function run(action) {
   catch (error) { render(navigator.onLine ? 'problem' : 'offline', error); }
 }
 
+async function syncAttachmentsThen(action) {
+  if (window.RegulaRustica?.syncLocalAttachments) await window.RegulaRustica.syncLocalAttachments({ requireAll: true });
+  return action();
+}
+
 async function connect(nextContext) {
   context = nextContext;
   engine = offlineEngine;
@@ -80,7 +85,7 @@ async function connect(nextContext) {
     writeLocal: (data, source) => window.RegulaRusticaLocal.write(data, source),
     onStatus: render
   });
-  if (state.state.initialSyncCompleted) run(() => engine.sync());
+  if (state.state.initialSyncCompleted) run(() => syncAttachmentsThen(() => engine.sync()));
   else run(async () => {
     const inspection = await engine.inspectFirstSync(context.homesteadId);
     firstCase = inspection.case;
@@ -93,19 +98,20 @@ window.addEventListener('regula-rustica:data-saved', event => {
   if (event.detail.source === 'sync') return;
   engine.queueLocalChanges(event.detail.before, event.detail.after);
   render(navigator.onLine ? 'ready' : 'offline');
-  if (navigator.onLine && context?.homesteadId) run(() => engine.sync());
+  if (event.detail.source === 'attachment-sync') return;
+  if (navigator.onLine && context?.homesteadId && state.state.initialSyncCompleted) run(() => syncAttachmentsThen(() => engine.sync()));
 });
-window.addEventListener('online', () => engine && state.state.initialSyncCompleted && run(() => engine.sync()));
+window.addEventListener('online', () => engine && state.state.initialSyncCompleted && run(() => syncAttachmentsThen(() => engine.sync())));
 window.addEventListener('offline', () => render('offline'));
 
-syncNow.addEventListener('click', () => context?.homesteadId && run(() => engine.sync()));
-document.querySelector('#syncUpload').addEventListener('click', () => run(() => engine.initialize('upload', context.homesteadId)));
-document.querySelector('#syncDownload').addEventListener('click', () => run(() => engine.initialize('download', context.homesteadId)));
+syncNow.addEventListener('click', () => context?.homesteadId && run(() => syncAttachmentsThen(() => engine.sync())));
+document.querySelector('#syncUpload').addEventListener('click', () => run(() => syncAttachmentsThen(() => engine.initialize('upload', context.homesteadId))));
+document.querySelector('#syncDownload').addEventListener('click', () => run(() => syncAttachmentsThen(() => engine.initialize('download', context.homesteadId))));
 document.querySelector('#syncUseCloud').addEventListener('click', () => {
   window.RegulaRusticaLocal.exportBackup();
   run(() => engine.initialize('cloud', context.homesteadId));
 });
-document.querySelector('#syncInitializeEmpty').addEventListener('click', () => run(() => engine.initialize('empty', context.homesteadId)));
+document.querySelector('#syncInitializeEmpty').addEventListener('click', () => run(() => syncAttachmentsThen(() => engine.initialize('empty', context.homesteadId))));
 document.querySelector('#syncCancel').addEventListener('click', () => { firstCase = null; render('ready'); });
 
 render();

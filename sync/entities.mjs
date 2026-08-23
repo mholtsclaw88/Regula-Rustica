@@ -5,6 +5,7 @@ export const COLLECTIONS = {records:'records',record_documents:'documents',recor
 const iso=v=>v||new Date().toISOString();
 const cloudId=(s,t,id)=>id?s.entity(t,id).cloudId:null;
 const localId=(s,t,id)=>id?s.localIdForCloud(t,id):null;
+export const attachmentCloudReady=row=>Boolean(row?.storagePath)&&(row.syncState==='synced'||!row.syncState||Boolean(row.deletedAt));
 
 export function toCloud(t,r,s,source='manual'){
  const c={id:cloudId(s,t,r.id),client_updated_at:iso(r.updatedAt||r.createdAt),source};
@@ -29,7 +30,7 @@ export function fromCloud(t,r,s){
  const c={id:localId(s,t,r.id),createdAt:r.created_at||r.assigned_at,updatedAt:r.updated_at||r.assigned_at,deletedAt:r.deleted_at||r.removed_at||null};
  if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=localId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type[0].toUpperCase()+r.type.slice(1),name:r.name,status:r.status,identity:r.identity||{},stewardship:x,profilePhotoAttachmentId:localId(s,'record_attachments',r.primary_photo_id)};}
  if(t==='record_documents')return{...c,recordId:localId(s,'records',r.record_id),title:r.title||'',body:r.body||''};
- if(t==='record_attachments')return{...c,documentId:localId(s,'record_documents',r.document_id),recordId:localId(s,'records',r.record_id),storagePath:r.storage_path,filename:r.file_name,mimeType:r.mime_type,size:Number(r.file_size_bytes)};
+ if(t==='record_attachments')return{...c,documentId:localId(s,'record_documents',r.document_id),recordId:localId(s,'records',r.record_id),storagePath:r.storage_path,filename:r.file_name,mimeType:r.mime_type,size:Number(r.file_size_bytes),syncState:'synced',syncError:''};
  if(t==='homestead_people')return{...c,personType:r.person_type,displayName:r.display_name,memberId:r.member_id||null};
  if(t==='chore_windows')return{...c,systemKey:r.system_key,name:r.name,displayOrder:r.display_order,enabled:r.enabled,daypart:r.daypart};
  if(t==='tasks')return{...c,recordId:localId(s,'records',r.record_id),title:r.title,description:r.description||'',status:r.status,completed:r.status==='completed',dueDate:r.due_date||'',availableFrom:r.available_from||'',completedAt:r.completed_at,priority:r.priority,recurrenceRule:r.recurrence_rule,parentTaskId:localId(s,'tasks',r.parent_task_id),choreWindowId:localId(s,'chore_windows',r.chore_window_id),yieldType:r.yield_type,suggestionKey:r.suggestion_key};
@@ -43,6 +44,6 @@ export function fromCloud(t,r,s){
  if(t==='ledger_allocations')return{...c,ledgerEntryId:localId(s,'ledger_entries',r.ledger_entry_id),recordId:localId(s,'records',r.record_id),amount:Number(r.amount)};
  throw new Error(`Unsupported sync table: ${t}`);
 }
-export function meaningfulCounts(data){return Object.fromEntries(DOMAIN_ORDER.map(t=>[t,(data[COLLECTIONS[t]]||[]).filter(r=>!r.deletedAt&&!r.removedAt&&(t!=='homestead_people'||r.personType==='child')).length]));}
+export function meaningfulCounts(data){return Object.fromEntries(DOMAIN_ORDER.map(t=>[t,(data[COLLECTIONS[t]]||[]).filter(r=>!r.deletedAt&&!r.removedAt&&(t!=='homestead_people'||r.personType==='child')&&(t!=='record_attachments'||attachmentCloudReady(r))).length]));}
 export const hasMeaningfulData=data=>Object.values(meaningfulCounts(data)).some(Boolean);
 export function operationOrder(o){const d=DOMAIN_ORDER.indexOf(o.table),t=o.type==='create'||o.type==='restore'?0:o.type==='update'?1:2;if(o.table==='records'&&o.type==='update'&&o.payload?.primary_photo_id)return(DOMAIN_ORDER.indexOf('record_attachments')+1)*10+1;return(t===2?DOMAIN_ORDER.length-d:d)*10+t;}

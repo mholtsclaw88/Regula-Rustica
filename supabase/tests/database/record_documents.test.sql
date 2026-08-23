@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(23);
 
 select has_table('public','record_documents','Record documents table exists');
 select has_table('public','record_attachments','Record attachments table exists');
@@ -20,6 +20,7 @@ select ok(exists(select 1 from pg_policies where schemaname='public' and tablena
 select ok(exists(select 1 from pg_policies where schemaname='public' and tablename='record_attachments' and policyname='record_attachments_select'),'Attachment SELECT policy exists');
 select ok(exists(select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='record_documents_storage_select'),'Storage SELECT policy exists');
 select ok(exists(select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='record_documents_storage_insert'),'Storage INSERT policy exists');
+select ok(exists(select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='record_documents_storage_update'),'Storage UPDATE policy exists for idempotent attachment retries');
 select ok(exists(select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='record_documents_storage_delete'),'Storage DELETE policy exists');
 select ok((select qual from pg_policies where schemaname='storage' and tablename='objects' and policyname='record_documents_storage_select') like '%current_homestead_id%','Storage reads are tenant-scoped');
 select ok(exists(select 1 from pg_trigger where tgrelid='public.record_documents'::regclass and tgname='audit_record_documents' and not tgisinternal),'Document changes are audited');
