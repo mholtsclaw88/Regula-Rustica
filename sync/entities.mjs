@@ -1,14 +1,17 @@
 import '../records-relationships.js';
 
-export const DOMAIN_ORDER = ['homestead_people','records','chore_windows','tasks','record_relationships','task_assignments','chronicle_entries','calendar_events','yield_entries','notes','ledger_entries','ledger_allocations'];
-export const COLLECTIONS = {records:'records',homestead_people:'people',chore_windows:'choreWindows',tasks:'tasks',record_relationships:'relationships',task_assignments:'assignments',chronicle_entries:'events',calendar_events:'calendarEvents',yield_entries:'yieldEntries',notes:'notes',ledger_entries:'ledger',ledger_allocations:'ledgerAllocations'};
+export const DOMAIN_ORDER = ['homestead_people','records','record_documents','record_attachments','chore_windows','tasks','record_relationships','task_assignments','chronicle_entries','calendar_events','yield_entries','notes','ledger_entries','ledger_allocations'];
+export const COLLECTIONS = {records:'records',record_documents:'documents',record_attachments:'attachments',homestead_people:'people',chore_windows:'choreWindows',tasks:'tasks',record_relationships:'relationships',task_assignments:'assignments',chronicle_entries:'events',calendar_events:'calendarEvents',yield_entries:'yieldEntries',notes:'notes',ledger_entries:'ledger',ledger_allocations:'ledgerAllocations'};
 const iso=v=>v||new Date().toISOString();
 const cloudId=(s,t,id)=>id?s.entity(t,id).cloudId:null;
 const localId=(s,t,id)=>id?s.localIdForCloud(t,id):null;
+export const attachmentCloudReady=row=>Boolean(row?.storagePath)&&(row.syncState==='synced'||!row.syncState||Boolean(row.deletedAt));
 
 export function toCloud(t,r,s,source='manual'){
  const c={id:cloudId(s,t,r.id),client_updated_at:iso(r.updatedAt||r.createdAt),source};
- if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=cloudId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type.toLowerCase(),name:r.name,status:r.status,identity:r.identity||{},stewardship:x};}
+ if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=cloudId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type.toLowerCase(),name:r.name,status:r.status,identity:r.identity||{},stewardship:x,primary_photo_id:cloudId(s,'record_attachments',r.profilePhotoAttachmentId)};}
+ if(t==='record_documents')return{...c,record_id:cloudId(s,'records',r.recordId),title:r.title||null,body:r.body||null};
+ if(t==='record_attachments')return{...c,document_id:cloudId(s,'record_documents',r.documentId),record_id:cloudId(s,'records',r.recordId),storage_bucket:'record-documents',storage_path:r.storagePath,file_name:r.filename,mime_type:r.mimeType,file_size_bytes:Number(r.size)};
  if(t==='homestead_people')return{...c,person_type:r.personType||'child',display_name:r.displayName,member_id:r.memberId||null};
  if(t==='chore_windows')return{...c,system_key:r.systemKey||null,name:r.name,display_order:Number(r.displayOrder||0),enabled:r.enabled!==false,daypart:r.daypart||null};
  if(t==='tasks')return{...c,record_id:cloudId(s,'records',r.recordId),title:r.title,description:r.description||null,status:r.completed?'completed':(r.status||'open'),priority:r.priority||'normal',due_date:r.dueDate||null,available_from:r.availableFrom||null,completed_at:r.completedAt||null,recurrence_rule:r.recurrenceRule||null,parent_task_id:cloudId(s,'tasks',r.parentTaskId),chore_window_id:cloudId(s,'chore_windows',r.choreWindowId),yield_type:r.yieldType||null,suggestion_key:r.suggestionKey||null};
@@ -25,7 +28,9 @@ export function toCloud(t,r,s,source='manual'){
 
 export function fromCloud(t,r,s){
  const c={id:localId(s,t,r.id),createdAt:r.created_at||r.assigned_at,updatedAt:r.updated_at||r.assigned_at,deletedAt:r.deleted_at||r.removed_at||null};
- if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=localId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type[0].toUpperCase()+r.type.slice(1),name:r.name,status:r.status,identity:r.identity||{},stewardship:x};}
+ if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=localId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type[0].toUpperCase()+r.type.slice(1),name:r.name,status:r.status,identity:r.identity||{},stewardship:x,profilePhotoAttachmentId:localId(s,'record_attachments',r.primary_photo_id)};}
+ if(t==='record_documents')return{...c,recordId:localId(s,'records',r.record_id),title:r.title||'',body:r.body||''};
+ if(t==='record_attachments')return{...c,documentId:localId(s,'record_documents',r.document_id),recordId:localId(s,'records',r.record_id),storagePath:r.storage_path,filename:r.file_name,mimeType:r.mime_type,size:Number(r.file_size_bytes),syncState:'synced',syncError:''};
  if(t==='homestead_people')return{...c,personType:r.person_type,displayName:r.display_name,memberId:r.member_id||null};
  if(t==='chore_windows')return{...c,systemKey:r.system_key,name:r.name,displayOrder:r.display_order,enabled:r.enabled,daypart:r.daypart};
  if(t==='tasks')return{...c,recordId:localId(s,'records',r.record_id),title:r.title,description:r.description||'',status:r.status,completed:r.status==='completed',dueDate:r.due_date||'',availableFrom:r.available_from||'',completedAt:r.completed_at,priority:r.priority,recurrenceRule:r.recurrence_rule,parentTaskId:localId(s,'tasks',r.parent_task_id),choreWindowId:localId(s,'chore_windows',r.chore_window_id),yieldType:r.yield_type,suggestionKey:r.suggestion_key};
@@ -39,6 +44,6 @@ export function fromCloud(t,r,s){
  if(t==='ledger_allocations')return{...c,ledgerEntryId:localId(s,'ledger_entries',r.ledger_entry_id),recordId:localId(s,'records',r.record_id),amount:Number(r.amount)};
  throw new Error(`Unsupported sync table: ${t}`);
 }
-export function meaningfulCounts(data){return Object.fromEntries(DOMAIN_ORDER.map(t=>[t,(data[COLLECTIONS[t]]||[]).filter(r=>!r.deletedAt&&!r.removedAt&&(t!=='homestead_people'||r.personType==='child')).length]));}
+export function meaningfulCounts(data){return Object.fromEntries(DOMAIN_ORDER.map(t=>[t,(data[COLLECTIONS[t]]||[]).filter(r=>!r.deletedAt&&!r.removedAt&&(t!=='homestead_people'||r.personType==='child')&&(t!=='record_attachments'||attachmentCloudReady(r))).length]));}
 export const hasMeaningfulData=data=>Object.values(meaningfulCounts(data)).some(Boolean);
-export function operationOrder(o){const d=DOMAIN_ORDER.indexOf(o.table),t=o.type==='create'||o.type==='restore'?0:o.type==='update'?1:2;return(t===2?DOMAIN_ORDER.length-d:d)*10+t;}
+export function operationOrder(o){const d=DOMAIN_ORDER.indexOf(o.table),t=o.type==='create'||o.type==='restore'?0:o.type==='update'?1:2;if(o.table==='records'&&o.type==='update'&&o.payload?.primary_photo_id)return(DOMAIN_ORDER.indexOf('record_attachments')+1)*10+1;return(t===2?DOMAIN_ORDER.length-d:d)*10+t;}

@@ -1,6 +1,6 @@
 export const INVITATION_ROLES = Object.freeze({
   steward: 'Full Homestead administration and data authority.',
-  keeper: 'Trusted day-to-day management of records, tasks, Chronicle, notes, ledger, and photos.',
+  keeper: 'Trusted day-to-day management of records, tasks, Journal, notes, ledger, and photos.',
   hand: 'Limited participation in ordinary work, assigned tasks, approved events, and observations.',
   guest: 'Read-only access.'
 });

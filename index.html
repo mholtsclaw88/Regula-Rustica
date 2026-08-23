@@ -14,7 +14,8 @@
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=record-task-lifecycle-v2" defer></script>
   <script src="task-foundation.js?v=record-task-lifecycle-v2" defer></script>
-  <script src="app.js?v=record-task-lifecycle-v2" defer></script>
+  <script src="record-documents.js?v=local-attachments-v1" defer></script>
+  <script src="app.js?v=local-attachments-v1" defer></script>
   <script src="ui-refinements.js?v=record-ui-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -92,6 +93,22 @@
           <label><input type="radio" name="recordTypeFilter" value="Work">Work</label>
         </div>
       </fieldset>
+      <div class="record-secondary-filters" aria-label="Record display options">
+        <label>Status
+          <select id="recordStatusFilter">
+            <option value="active">Active records</option>
+            <option value="all">All</option>
+            <option value="inactive">Inactive / archived</option>
+          </select>
+        </label>
+        <label>Sort
+          <select id="recordSort">
+            <option value="name">Name</option>
+            <option value="updated">Recently updated</option>
+            <option value="added">Recently added</option>
+          </select>
+        </label>
+      </div>
       <div id="recordGroups"></div>
     </section>
 
@@ -398,7 +415,7 @@
       <article class="card">
         <div class="record-head">
           <div class="record-heading-group">
-            <div class="record-portrait" id="recordPortrait" aria-hidden="true"><span id="recordPortraitPlaceholder">R</span></div>
+            <div class="record-portrait" id="recordPortrait" aria-hidden="true"><img id="recordPortraitImage" alt=""><span id="recordPortraitPlaceholder">R</span></div>
             <div>
               <h2 id="recordTitle"></h2>
               <div class="record-meta-line"><span id="recordTypeLabel"></span><span aria-hidden="true">·</span><span id="recordStatus"></span></div>
@@ -424,10 +441,9 @@
             <button type="button" class="active" role="tab" aria-selected="true" data-record-section="overview">Overview</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="tasks">Tasks</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="yield">Yield</button>
-            <button type="button" role="tab" aria-selected="false" data-record-section="chronicle">Chronicle</button>
-            <button type="button" role="tab" aria-selected="false" data-record-section="notes">Notes</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="journal">Journal</button>
+            <button type="button" role="tab" aria-selected="false" data-record-section="documents">Documents</button>
             <button type="button" role="tab" aria-selected="false" data-record-section="ledger">Ledger</button>
-            <button type="button" role="tab" aria-selected="false" data-record-section="photos">Photos</button>
           </nav>
           <div class="record-section-content">
             <section class="record-section-panel active" role="tabpanel" data-record-section-panel="overview">
@@ -441,10 +457,26 @@
             </section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><h3 class="record-section-heading">Tasks</h3><div id="panelTasks"></div><div id="suggestedTasks" class="stack suggested-tasks"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="yield"><div class="record-panel-head"><div><h3 class="record-section-heading">Yield</h3><p class="muted">Last 30 Days</p></div><button class="btn primary hidden" id="recordSectionAddYield" type="button">+ Yield</button></div><div id="recordYieldSummary" class="record-yield-summary"></div><div id="recordYieldList" class="record-yield-list"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="chronicle"><h3 class="record-section-heading">Chronicle</h3><div id="panelChronicle"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="notes"><h3 class="record-section-heading">Notes</h3><div id="panelNotes"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="journal"><h3 class="record-section-heading">Journal</h3><div id="panelChronicle"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="documents">
+              <div class="record-panel-head">
+                <div><h3 class="record-section-heading">Documents</h3><p class="muted">Keep notes, photos, paperwork, and other documentation with this Record.</p></div>
+                <details class="record-add" id="documentAdd">
+                  <summary class="btn primary">+ Add</summary>
+                  <div class="record-add-menu">
+                    <button id="documentAddNote" type="button"><strong>Note</strong><small>Keep enduring information</small></button>
+                    <button id="documentTakePhoto" type="button"><strong>Photo · Take Photo</strong><small>Use this device's camera</small></button>
+                    <button id="documentChoosePhoto" type="button"><strong>Photo · Choose from Device</strong><small>Add an existing image</small></button>
+                    <button id="documentAddFile" type="button"><strong>Document</strong><small>Add a PDF or image</small></button>
+                  </div>
+                </details>
+              </div>
+              <div id="panelDocuments" class="record-documents"></div>
+              <input class="hidden" id="documentCameraInput" type="file" accept="image/*" capture="environment">
+              <input class="hidden" id="documentPhotoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+              <input class="hidden" id="documentFileInput" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif">
+            </section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="ledger"><h3 class="record-section-heading">Ledger</h3><div id="panelLedger"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="photos"><h3 class="record-section-heading">Photos</h3><div id="panelPhotos"><p class="muted record-empty">Photo support is planned for a later release.</p></div></section>
           </div>
         </div>
       </article>

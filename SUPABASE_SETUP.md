@@ -76,12 +76,15 @@ The foundation migration creates:
 - `tasks` and `task_assignments`
 - `homestead_people`, containing assignable members and account-free children
 - `chronicle_entries`, `notes`, and `ledger_entries`
+- `record_documents` and `record_attachments`, with metadata synchronized separately from file bytes
 - `calendar_events` and canonical `yield_entries`
 - `chore_windows`, `routines`, and dated `routine_occurrences`
 - append-only `audit_entries`
 - idempotent `sync_operations`
 
-Photos remain deferred, as permitted by `DATABASE_SCHEMA.md`.
+Record attachment bytes are local-first. The browser keeps photos and PDFs in the `regula-rustica-attachments` IndexedDB database, keyed by the stable attachment ID; localStorage and exported Record JSON contain metadata only. Signed-out and offline users can add, preview, open, and delete those local attachments.
+
+When cloud sync is connected, the same bytes are uploaded idempotently to the private `record-documents` Storage bucket before their metadata enters the cloud outbox. Object paths begin with `homesteads/<homestead-id>/`, Storage policies enforce the same active-membership and role capabilities as metadata rows, and the browser obtains short-lived signed URLs rather than public object URLs. Upload failure leaves the IndexedDB copy usable and marks the metadata for a later retry. A Record profile photo is only a `primary_photo_id` reference to an active image attachment; changing it never duplicates file bytes, and deleting the active image clears the reference safely.
 
 All application tables have RLS enabled. The `anon` role receives no table or function access. The `authenticated` role receives explicit, minimal Data API grants, with tenant and capability checks applied by policies. Security-definer functions use an empty `search_path`, validate `auth.uid()`, and derive the active Homestead from membership rather than accepting a client-supplied Homestead ID.
 
@@ -102,6 +105,7 @@ The protected RPC surface is:
 - `apply_housekeeping_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
 - `apply_people_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
 - `apply_routine_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
+- `apply_document_sync_operation(operation_key, client_device_id, target_table, target_id, operation_kind, expected_version, client_timestamp, operation_payload)`
 
 `create_invitation` generates a cryptographically random token on the server and returns the raw token once so the Steward can share the resulting link through a private channel. Only its lowercase SHA-256 hash is stored. Tokens are single-use, revocable, and expire after seven days by default. Notification delivery is deliberately deferred; Regula Rustica does not email invitation links automatically.
 
@@ -118,12 +122,12 @@ supabase test db supabase/tests/database
 supabase db lint --local --level warning
 ```
 
-The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The 21-assertion member-invitation suite covers invitation lifecycle and Steward-only access. Sync v1 adds 21 assertions; Housekeeping adds 39; Homestead people adds 37; and the 33-assertion Task/Yield suite remains as migration compatibility coverage. The first-class Routine suite adds 35 assertions for defaults, definition/occurrence separation, assignment-aware completion, Yield completion, recurrence idempotency, tenant isolation, all four roles, soft deletion, auditing, and RLS. The database total is 234 assertions. Client suites cover conservative Task-backed migration, recurrence, matching, synchronization, recovery, and conflicts.
+The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The 21-assertion member-invitation suite covers invitation lifecycle and Steward-only access. Sync v1 adds 21 assertions; Housekeeping adds 39; Homestead people adds 37; and the 33-assertion Task/Yield suite remains as migration compatibility coverage. The first-class Routine suite adds 35 assertions for defaults, definition/occurrence separation, assignment-aware completion, Yield completion, recurrence idempotency, tenant isolation, all four roles, soft deletion, auditing, and RLS. The Records Documents suite adds 23 assertions covering private storage, tenant paths, permissions, metadata lifecycle, auditing, synchronization, and RLS. The database total is 296 assertions. Client suites cover conservative Task-backed migration, recurrence, matching, synchronization, recovery, conflicts, IndexedDB attachment persistence, and attachment retry/lifecycle helpers.
 
 ## Deliberately deferred
 
 - Realtime subscriptions
-- Photo storage and upload processing
+- Image transformations beyond the client-side 1200 px JPEG preparation
 - Cellarer/AI integration
 - Social login, MFA, and account deletion
 - Notification delivery and automatic backups
