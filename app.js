@@ -1153,7 +1153,6 @@ function renderRecord() {
   $('#recordIdentity').textContent = identityText(record);
   $('#recordStewardship').textContent = stewardshipText(record);
   const yieldEligible = window.RegulaRusticaTasks.eligibleYieldTypes(record).length > 0;
-  $('#recordYield').classList.toggle('hidden', !yieldEligible);
   $('#recordSectionAddYield').classList.toggle('hidden', !yieldEligible);
 
   const taskPanel = $('#panelTasks');
@@ -2001,12 +2000,17 @@ $('#addForageYield')?.addEventListener('click', () => openModal('yield',null,nul
 const closeRecordAdd = () => { $('#recordAdd').open = false; };
 $('#recordEvent').addEventListener('click', () => { closeRecordAdd(); openModal('event', null, currentRecordId); });
 const openCurrentRecordYield = () => { const type=window.RegulaRusticaTasks.eligibleYieldTypes(recordById(currentRecordId))[0]; if(type)openModal('yield',null,currentRecordId,type); };
-$('#recordYield').addEventListener('click', () => { closeRecordAdd(); openCurrentRecordYield(); });
 $('#recordSectionAddYield').addEventListener('click', openCurrentRecordYield);
 $('#recordAddTask').addEventListener('click', () => { closeRecordAdd(); openModal('task', null, currentRecordId); });
 $('#recordAddLedger').addEventListener('click', () => { closeRecordAdd(); openModal('ledger', null, currentRecordId); });
 $('#recordEdit').addEventListener('click', () => openModal('record', currentRecordId));
 const closeJournalAdd = () => { $('#journalAdd').open = false; };
+$('#recordAddJournal').addEventListener('click', () => {
+  closeRecordAdd();
+  $('.record-section-nav button[data-record-section="journal"]').click();
+  $('#journalAdd').open = true;
+  $('#journalAdd').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
 const openDocumentFromFiles = files => {
   const selected = [...files];
   if (!selected.length) return;
@@ -2018,7 +2022,6 @@ $('#journalAddNote').addEventListener('click', () => { pendingDocumentFiles = []
 $('#journalTakePhoto').addEventListener('click', () => { $('#journalCameraInput').value = ''; $('#journalCameraInput').click(); });
 $('#journalChoosePhoto').addEventListener('click', () => { $('#journalPhotoInput').value = ''; $('#journalPhotoInput').click(); });
 $('#journalAddFile').addEventListener('click', () => { $('#journalFileInput').value = ''; $('#journalFileInput').click(); });
-$('#journalAddEvent').addEventListener('click', () => { closeJournalAdd(); openModal('event', null, currentRecordId); });
 $('#journalCameraInput').addEventListener('change', event => openDocumentFromFiles(event.target.files));
 $('#journalPhotoInput').addEventListener('change', event => openDocumentFromFiles(event.target.files));
 $('#journalFileInput').addEventListener('change', event => openDocumentFromFiles(event.target.files));

@@ -16,7 +16,7 @@
   <script src="task-foundation.js?v=record-task-lifecycle-v2" defer></script>
   <script src="record-documents.js?v=local-attachments-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
-  <script src="app.js?v=journal-consolidation-v3" defer></script>
+  <script src="app.js?v=journal-consolidation-v4" defer></script>
   <script src="ui-refinements.js?v=journal-consolidation-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -429,7 +429,7 @@
               <div class="record-add-menu">
                 <button id="recordEvent" type="button"><strong>Event</strong><small>Something that happened</small></button>
                 <button id="recordAddTask" type="button"><strong>Task</strong><small>Something that needs doing</small></button>
-                <button class="hidden" id="recordYield" type="button"><strong>Yield</strong><small>Something produced</small></button>
+                <button id="recordAddJournal" type="button"><strong>Journal Entry</strong><small>Add a note, photo, or document</small></button>
                 <button id="recordAddLedger" type="button"><strong>Ledger Entry</strong><small>Record an expense or income</small></button>
               </div>
             </details>
@@ -462,16 +462,15 @@
                 <details class="record-add" id="journalAdd">
                   <summary class="btn primary">+ Journal Entry</summary>
                   <div class="record-add-menu">
-                    <button id="journalAddNote" type="button"><strong>Note</strong><small>Keep something worth remembering</small></button>
-                    <button id="journalTakePhoto" type="button"><strong>Photo · Take Photo</strong><small>Use this device's camera</small></button>
-                    <button id="journalChoosePhoto" type="button"><strong>Photo · Choose from Device</strong><small>Add an existing image</small></button>
-                    <button id="journalAddFile" type="button"><strong>Document</strong><small>Add a PDF or image</small></button>
-                    <button id="journalAddEvent" type="button"><strong>Event</strong><small>Record what happened</small></button>
+                    <button id="journalAddNote" type="button"><strong>Note</strong><small>Write an observation or note</small></button>
+                    <button id="journalTakePhoto" type="button"><strong>Take Photo</strong><small>Use this device's camera</small></button>
+                    <button id="journalChoosePhoto" type="button"><strong>Add Photo</strong><small>Choose an existing photo</small></button>
+                    <button id="journalAddFile" type="button"><strong>Add Document</strong><small>Attach a PDF or image</small></button>
                   </div>
                 </details>
               </div>
               <div class="journal-filters" role="group" aria-label="Filter Journal">
-                <button class="active" type="button" data-journal-filter="all">All</button><button type="button" data-journal-filter="tasks">Tasks</button><button type="button" data-journal-filter="yield">Yield</button><button type="button" data-journal-filter="notes">Notes</button><button type="button" data-journal-filter="photos">Photos</button><button type="button" data-journal-filter="documents">Documents</button><button type="button" data-journal-filter="events">Events</button>
+                <button class="active" type="button" data-journal-filter="all">All</button><button type="button" data-journal-filter="tasks">Tasks</button><button type="button" data-journal-filter="yield">Yield</button><button type="button" data-journal-filter="notes">Notes</button><button type="button" data-journal-filter="photos">Photos</button><button type="button" data-journal-filter="documents">Documents</button>
               </div>
               <div id="panelJournal" class="record-journal"></div>
               <input class="hidden" id="journalCameraInput" type="file" accept="image/*" capture="environment">
