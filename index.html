@@ -328,7 +328,11 @@
         <article class="card settings-section" id="settingChoreWindows">
           <span class="label">Daily rhythm</span><h2>Chore Windows</h2>
           <p class="muted">Group recurring Tasks into practical parts of the day. These are not appointments.</p>
-          <form id="choreWindowForm" class="form-grid"><label>Window name<input id="choreWindowName" maxlength="80" required></label><button class="btn primary" type="submit">Add window</button></form>
+          <form id="choreWindowForm" class="form-grid">
+            <label>Window name<input id="choreWindowName" maxlength="80" required></label>
+            <div class="grid2"><label>Start time (optional)<input id="choreWindowStartTime" type="time"></label><label>End time (optional)<input id="choreWindowEndTime" type="time"></label></div>
+            <button class="btn primary" type="submit">Add window</button>
+          </form>
           <div id="choreWindowList" class="stack"></div>
         </article>
         <article class="card cloud-card settings-section" id="settingCloud">

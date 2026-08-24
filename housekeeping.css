@@ -596,6 +596,7 @@ summary:focus-visible {
 .record-task-separator { color: rgba(118,107,93,.72); }
 .task-yield-meta { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font: 700 .72rem/1.2 Arial, sans-serif; white-space: nowrap; }
 .task-yield-meta svg { width: 14px; height: 14px; flex: 0 0 14px; fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+.task-overdue-meta { color: var(--red); font-weight: 700; }
 .meta-pills .task-yield-meta { min-height: 23px; margin-left: 2px; }
 .task-more { position: relative; justify-self: end; }
 .task-more > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 9px; color: var(--forest); cursor: pointer; list-style: none; font: 700 1rem Arial, sans-serif; letter-spacing: .08em; }
