@@ -9,7 +9,7 @@ export const attachmentCloudReady=row=>Boolean(row?.storagePath)&&(row.syncState
 
 export function toCloud(t,r,s,source='manual'){
  const c={id:cloudId(s,t,r.id),client_updated_at:iso(r.updatedAt||r.createdAt),source};
- if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=cloudId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type.toLowerCase(),name:r.name,status:r.status,identity:r.identity||{},stewardship:x,primary_photo_id:cloudId(s,'record_attachments',r.profilePhotoAttachmentId)};}
+ if(t==='records'){const x={...(r.stewardship||{})},identity={...(r.identity||{}),profilePhotoCrop:r.profilePhotoCrop||{x:50,y:50,zoom:1}};if(x.responsiblePersonId)x.responsiblePersonId=cloudId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type.toLowerCase(),name:r.name,status:r.status,identity,stewardship:x,primary_photo_id:cloudId(s,'record_attachments',r.profilePhotoAttachmentId)};}
  if(t==='record_documents')return{...c,record_id:cloudId(s,'records',r.recordId),title:r.title||null,body:r.body||null};
  if(t==='record_attachments')return{...c,document_id:cloudId(s,'record_documents',r.documentId),record_id:cloudId(s,'records',r.recordId),storage_bucket:'record-documents',storage_path:r.storagePath,file_name:r.filename,mime_type:r.mimeType,file_size_bytes:Number(r.size)};
  if(t==='homestead_people')return{...c,person_type:r.personType||'child',display_name:r.displayName,member_id:r.memberId||null};
@@ -28,7 +28,7 @@ export function toCloud(t,r,s,source='manual'){
 
 export function fromCloud(t,r,s){
  const c={id:localId(s,t,r.id),createdAt:r.created_at||r.assigned_at,updatedAt:r.updated_at||r.assigned_at,deletedAt:r.deleted_at||r.removed_at||null};
- if(t==='records'){const x={...(r.stewardship||{})};if(x.responsiblePersonId)x.responsiblePersonId=localId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type[0].toUpperCase()+r.type.slice(1),name:r.name,status:r.status,identity:r.identity||{},stewardship:x,profilePhotoAttachmentId:localId(s,'record_attachments',r.primary_photo_id)};}
+ if(t==='records'){const x={...(r.stewardship||{})},identity={...(r.identity||{})},profilePhotoCrop=identity.profilePhotoCrop;delete identity.profilePhotoCrop;if(x.responsiblePersonId)x.responsiblePersonId=localId(s,'homestead_people',x.responsiblePersonId);return{...c,type:r.type[0].toUpperCase()+r.type.slice(1),name:r.name,status:r.status,identity,stewardship:x,profilePhotoAttachmentId:localId(s,'record_attachments',r.primary_photo_id),profilePhotoCrop};}
  if(t==='record_documents')return{...c,recordId:localId(s,'records',r.record_id),title:r.title||'',body:r.body||''};
  if(t==='record_attachments')return{...c,documentId:localId(s,'record_documents',r.document_id),recordId:localId(s,'records',r.record_id),storagePath:r.storage_path,filename:r.file_name,mimeType:r.mime_type,size:Number(r.file_size_bytes),syncState:'synced',syncError:''};
  if(t==='homestead_people')return{...c,personType:r.person_type,displayName:r.display_name,memberId:r.member_id||null};

@@ -81,11 +81,14 @@ test('document domains retain dependency order and cloud references', () => {
 });
 
 test('record profile photo maps by attachment identity without duplicating the file', () => {
-  const cloud = toCloud('records', { id: 'daisy', type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, profilePhotoAttachmentId: 'file-1', createdAt: '2026-08-20T00:00:00Z' }, state);
+  const cloud = toCloud('records', { id: 'daisy', type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, profilePhotoAttachmentId: 'file-1', profilePhotoCrop: { x: 35, y: 62, zoom: 1.4 }, createdAt: '2026-08-20T00:00:00Z' }, state);
   assert.equal(cloud.primary_photo_id, 'cloud-record_attachments-file-1');
+  assert.deepEqual(cloud.identity.profilePhotoCrop, { x: 35, y: 62, zoom: 1.4 });
   assert.equal(Object.keys(cloud).some(key => /file|payload|base64/i.test(key) && key !== 'primary_photo_id'), false);
   const local = fromCloud('records', { ...cloud, type: 'animal', created_at: '2026-08-20T00:00:00Z', updated_at: '2026-08-20T00:00:00Z' }, state);
   assert.equal(local.profilePhotoAttachmentId, 'file-1');
+  assert.deepEqual(local.profilePhotoCrop, { x: 35, y: 62, zoom: 1.4 });
+  assert.equal('profilePhotoCrop' in local.identity, false);
 });
 
 test('setting a profile photo waits for attachment metadata creation', () => {
