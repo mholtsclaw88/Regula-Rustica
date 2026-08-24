@@ -159,9 +159,14 @@ const clockTimeText = value => {
   const [hours, minutes] = value.split(':').map(Number);
   return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 };
-const choreWindowTimeText = choreWindow => choreWindow.startTime || choreWindow.endTime
-  ? `${clockTimeText(choreWindow.startTime) || 'Start not set'}–${clockTimeText(choreWindow.endTime) || 'end of day'}`
-  : '';
+const choreWindowTimeText = choreWindow => {
+  const start = clockTimeText(choreWindow.startTime);
+  const end = clockTimeText(choreWindow.endTime);
+  if (start && end) return `${start}–${end}`;
+  if (start) return `From ${start}`;
+  if (end) return `Until ${end}`;
+  return '';
+};
 
 function createNextLocalOccurrence(task) {
   if (!window.RegulaRusticaTasks.recurrenceEnabled(task)) return;
@@ -1543,18 +1548,9 @@ function renderChoreWindows() {
     const row = document.createElement('div');
     row.className = 'routine-management-row';
     const timeRange = choreWindowTimeText(choreWindow);
-    row.innerHTML = `<div><strong>${escapeHtml(choreWindow.name)}</strong><div class="meta">${timeRange ? `${escapeHtml(timeRange)} · ` : ''}Order ${choreWindow.displayOrder}${choreWindow.systemKey ? ' · Default' : ''}${choreWindow.enabled ? '' : ' · Disabled'}</div></div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost toggle">${choreWindow.enabled ? 'Disable' : 'Enable'}</button></div>`;
-    row.querySelector('.edit').addEventListener('click', () => {
-      const name = prompt('Chore Window name', choreWindow.name)?.trim();
-      if (!name) return;
-      const order = Number(prompt('Display order', String(choreWindow.displayOrder)));
-      const startTime = prompt('Start time (HH:MM, optional)', choreWindow.startTime || '')?.trim() ?? choreWindow.startTime;
-      const endTime = prompt('End time (HH:MM, optional)', choreWindow.endTime || '')?.trim() ?? choreWindow.endTime;
-      if ((startTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)) || (endTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime)) || (startTime && endTime && endTime < startTime)) {
-        alert('Use valid times, with the end time after the start time.'); return;
-      }
-      choreWindow.name = name; choreWindow.displayOrder = Number.isFinite(order) ? order : choreWindow.displayOrder; choreWindow.startTime = startTime; choreWindow.endTime = endTime; choreWindow.updatedAt = nowIso(); saveData();
-    });
+    const indicators = [choreWindow.systemKey ? 'Default' : '', choreWindow.enabled ? '' : 'Disabled'].filter(Boolean);
+    row.innerHTML = `<div><strong>${escapeHtml(choreWindow.name)}</strong><div class="meta">${[timeRange, ...indicators].filter(Boolean).map(escapeHtml).join(' · ')}</div></div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost toggle">${choreWindow.enabled ? 'Disable' : 'Enable'}</button></div>`;
+    row.querySelector('.edit').addEventListener('click', () => openModal('chore-window', choreWindow.id));
     row.querySelector('.toggle').addEventListener('click', () => { choreWindow.enabled = !choreWindow.enabled; choreWindow.updatedAt = nowIso(); saveData(); });
     root.append(row);
   });
@@ -1749,12 +1745,31 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   calendarDefaultDate = defaultDate;
   const root = $('#modalFields');
   root.innerHTML = '';
-  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'What happened?', note: 'Add note', document: 'Add Journal Entry', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit Yield' : `Record ${window.RegulaRusticaTasks.YIELD_TYPES[defaultType]?.label || 'Yield'}` };
+  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'What happened?', note: 'Add note', document: 'Add Journal Entry', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit Yield' : `Record ${window.RegulaRusticaTasks.YIELD_TYPES[defaultType]?.label || 'Yield'}`, 'chore-window': id ? 'Edit Chore Window' : 'Add Chore Window' };
   $('#modalTitle').textContent = titles[nextMode];
   $('#modalDelete').classList.toggle('hidden', !(id && ['calendar', 'yield'].includes(nextMode)));
   $('#modalCompleteWithoutYield').classList.add('hidden');
   $('#modalCompleteWithoutYield').textContent = 'Complete Without Yield';
   $('#modalSubmit').textContent = 'Save';
+
+  if (nextMode === 'chore-window') {
+    const choreWindow = data.choreWindows.find(item => item.id === id) || {};
+    const nameField = field('Name', 'name', 'text', choreWindow.name);
+    const nameInput = nameField.querySelector('input');
+    nameInput.required = true;
+    nameInput.maxLength = 80;
+    root.append(nameField);
+    const times = document.createElement('div');
+    times.className = 'grid2';
+    times.append(field('Start time (optional)', 'startTime', 'time', choreWindow.startTime));
+    times.append(field('End time (optional)', 'endTime', 'time', choreWindow.endTime));
+    root.append(times);
+    const error = document.createElement('p');
+    error.className = 'form-error hidden';
+    error.id = 'choreWindowError';
+    error.setAttribute('role', 'alert');
+    root.append(error);
+  }
 
   if (nextMode === 'task') {
     const task = data.tasks.find(item => item.id === id) || {};
@@ -1886,6 +1901,33 @@ $('#modalForm').addEventListener('submit', async event => {
       window.RegulaRusticaHousekeeping.reopenTask(task, data.yieldEntries, { timestamp: nowIso() });
       saveData();
     }
+    $('#modal').close();
+    return;
+  }
+
+  if (modalMode === 'chore-window') {
+    const error = $('#choreWindowError');
+    const name = form.name?.trim() || '';
+    const startTime = form.startTime || '';
+    const endTime = form.endTime || '';
+    error.classList.add('hidden');
+    if (!name) {
+      error.textContent = 'Enter a name for this Chore Window.';
+      error.classList.remove('hidden');
+      return;
+    }
+    if (startTime && endTime && endTime < startTime) {
+      error.textContent = 'End time cannot be before start time.';
+      error.classList.remove('hidden');
+      return;
+    }
+    const existing = data.choreWindows.find(item => item.id === editId);
+    if (existing) Object.assign(existing, { name, startTime, endTime, updatedAt: nowIso() });
+    else {
+      const nextOrder = Math.max(0, ...data.choreWindows.map(item => Number(item.displayOrder || 0))) + 10;
+      data.choreWindows.push(window.RegulaRusticaTasks.normalizeWindow({ id: uid(), name, startTime, endTime, displayOrder: nextOrder, enabled: true, createdAt: nowIso() }));
+    }
+    saveData();
     $('#modal').close();
     return;
   }
@@ -2047,6 +2089,7 @@ $('#addEggYield').addEventListener('click', () => openModal('yield', null, null,
 $('#addMeatYield')?.addEventListener('click', () => openModal('yield',null,null,'meat'));
 $('#addHarvestYield')?.addEventListener('click', () => openModal('yield',null,null,'harvest'));
 $('#addForageYield')?.addEventListener('click', () => openModal('yield',null,null,'forage'));
+$('#addChoreWindow').addEventListener('click', () => openModal('chore-window'));
 const closeRecordAdd = () => {
   $('#recordAdd').open = false;
   $('#recordAddYield').setAttribute('aria-expanded', 'false');
@@ -2218,20 +2261,6 @@ $('#childForm').addEventListener('submit', event => {
   if (!displayName) return;
   data.people.push(normalizePerson({ id: uid(), personType: 'child', displayName, createdAt: nowIso() }));
   $('#childName').value = '';
-  saveData();
-});
-$('#choreWindowForm').addEventListener('submit', event => {
-  event.preventDefault();
-  const name = $('#choreWindowName').value.trim();
-  if (!name) return;
-  const startTime = $('#choreWindowStartTime').value;
-  const endTime = $('#choreWindowEndTime').value;
-  if (startTime && endTime && endTime < startTime) { alert('The Chore Window end time cannot be before its start time.'); return; }
-  const nextOrder = Math.max(0, ...data.choreWindows.map(window => Number(window.displayOrder || 0))) + 10;
-  data.choreWindows.push(window.RegulaRusticaTasks.normalizeWindow({ id: uid(), name, startTime, endTime, displayOrder: nextOrder, enabled: true, createdAt: nowIso() }));
-  $('#choreWindowName').value = '';
-  $('#choreWindowStartTime').value = '';
-  $('#choreWindowEndTime').value = '';
   saveData();
 });
 $('#exportData').addEventListener('click', exportData);

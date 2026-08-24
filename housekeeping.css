@@ -118,6 +118,7 @@
 .today-section:not([open]) { padding-top: 12px; padding-bottom: 12px; }
 .today-section.complete { border-color:#b8cbbd; background:rgba(232,240,233,.55); }
 .routine-management-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+.form-error { margin:0; color:var(--red); font:700 .8rem Arial,sans-serif; }
 .routine-management-row.suggested { padding:12px; border:1px dashed #c9bfae; border-radius:12px; background:rgba(249,245,235,.65); }
 
 .calendar-filters {
