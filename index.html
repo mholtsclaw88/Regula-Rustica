@@ -9,14 +9,14 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="housekeeping.css?v=journal-consolidation-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=journal-consolidation-v2">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=record-task-lifecycle-v2" defer></script>
   <script src="task-foundation.js?v=record-task-lifecycle-v2" defer></script>
   <script src="record-documents.js?v=local-attachments-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
-  <script src="app.js?v=journal-consolidation-v4" defer></script>
+  <script src="app.js?v=journal-consolidation-v5" defer></script>
   <script src="ui-refinements.js?v=journal-consolidation-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -429,6 +429,8 @@
               <div class="record-add-menu">
                 <button id="recordEvent" type="button"><strong>Event</strong><small>Something that happened</small></button>
                 <button id="recordAddTask" type="button"><strong>Task</strong><small>Something that needs doing</small></button>
+                <button id="recordAddYield" type="button" aria-expanded="false" aria-controls="recordAddYieldMenu"><strong>Yield</strong><small>Record something produced or harvested</small></button>
+                <div class="record-yield-submenu hidden" id="recordAddYieldMenu" aria-label="Eligible Yield types"></div>
                 <button id="recordAddJournal" type="button"><strong>Journal Entry</strong><small>Add a note, photo, or document</small></button>
                 <button id="recordAddLedger" type="button"><strong>Ledger Entry</strong><small>Record an expense or income</small></button>
               </div>

@@ -1152,8 +1152,25 @@ function renderRecord() {
   $('#recordStatus').textContent = record.status;
   $('#recordIdentity').textContent = identityText(record);
   $('#recordStewardship').textContent = stewardshipText(record);
-  const yieldEligible = window.RegulaRusticaTasks.eligibleYieldTypes(record).length > 0;
+  const eligibleYieldTypes = window.RegulaRusticaTasks.eligibleYieldTypes(record);
+  const yieldEligible = eligibleYieldTypes.length > 0;
   $('#recordSectionAddYield').classList.toggle('hidden', !yieldEligible);
+  const recordAddYield = $('#recordAddYield');
+  const recordAddYieldMenu = $('#recordAddYieldMenu');
+  recordAddYield.classList.toggle('hidden', !yieldEligible);
+  recordAddYield.setAttribute('aria-expanded', 'false');
+  recordAddYieldMenu.classList.add('hidden');
+  recordAddYieldMenu.innerHTML = '';
+  eligibleYieldTypes.forEach(type => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.innerHTML = `<strong>${escapeHtml(window.RegulaRusticaTasks.YIELD_TYPES[type].label)}</strong>`;
+    button.addEventListener('click', () => {
+      closeRecordAdd();
+      openModal('yield', null, record.id, type);
+    });
+    recordAddYieldMenu.append(button);
+  });
 
   const taskPanel = $('#panelTasks');
   taskPanel.innerHTML = '';
@@ -1997,11 +2014,20 @@ $('#addEggYield').addEventListener('click', () => openModal('yield', null, null,
 $('#addMeatYield')?.addEventListener('click', () => openModal('yield',null,null,'meat'));
 $('#addHarvestYield')?.addEventListener('click', () => openModal('yield',null,null,'harvest'));
 $('#addForageYield')?.addEventListener('click', () => openModal('yield',null,null,'forage'));
-const closeRecordAdd = () => { $('#recordAdd').open = false; };
+const closeRecordAdd = () => {
+  $('#recordAdd').open = false;
+  $('#recordAddYield').setAttribute('aria-expanded', 'false');
+  $('#recordAddYieldMenu').classList.add('hidden');
+};
 $('#recordEvent').addEventListener('click', () => { closeRecordAdd(); openModal('event', null, currentRecordId); });
 const openCurrentRecordYield = () => { const type=window.RegulaRusticaTasks.eligibleYieldTypes(recordById(currentRecordId))[0]; if(type)openModal('yield',null,currentRecordId,type); };
 $('#recordSectionAddYield').addEventListener('click', openCurrentRecordYield);
 $('#recordAddTask').addEventListener('click', () => { closeRecordAdd(); openModal('task', null, currentRecordId); });
+$('#recordAddYield').addEventListener('click', () => {
+  const menu = $('#recordAddYieldMenu');
+  const expanded = !menu.classList.toggle('hidden');
+  $('#recordAddYield').setAttribute('aria-expanded', String(expanded));
+});
 $('#recordAddLedger').addEventListener('click', () => { closeRecordAdd(); openModal('ledger', null, currentRecordId); });
 $('#recordEdit').addEventListener('click', () => openModal('record', currentRecordId));
 const closeJournalAdd = () => { $('#journalAdd').open = false; };
