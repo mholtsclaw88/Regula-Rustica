@@ -120,6 +120,7 @@ export class LocalSyncState {
 
   complete(operation, serverRow) {
     const entity = this.entity(operation.table, operation.localId);
+    if (serverRow?.id) entity.cloudId = serverRow.id;
     entity.cloudVersion = serverRow?.version ?? entity.cloudVersion;
     entity.cloudRow = serverRow || entity.cloudRow;
     this.state.outbox = this.state.outbox.filter(item => item.id !== operation.id);

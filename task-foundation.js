@@ -8,9 +8,39 @@ function animalKind(record){const purpose=text(record,'purpose'),species=text(re
 function landKind(record){const use=`${text(record,'landType')} ${text(record,'subtype')} ${text(record,'currentUse')} ${String(record?.name||'').toLowerCase()}`;if(/garden|orchard/.test(use))return'garden';if(/pasture|hay|forage/.test(use))return'pasture';return'land';}
 function eligibleYieldTypes(record){if(!record)return[];if(record.type==='Animal'){const kind=animalKind(record);if(kind==='dairy')return['milk','meat'];if(kind==='laying')return['eggs','meat'];if(kind==='meat_poultry'||kind==='pig')return['meat'];}if(record.type==='Land'){const kind=landKind(record);if(kind==='garden')return['harvest'];if(kind==='pasture')return['forage'];}return[];}
 function suggestedTasks(record){if(!record||record.type==='Work')return[];let rows=[];if(record.type==='Animal')rows=CATALOG[animalKind(record)]||GENERAL_ANIMAL;if(record.type==='Land')rows=CATALOG[landKind(record)]||CATALOG.land;if(record.type==='Equipment')rows=CATALOG.equipment;if(record.type==='Structure')rows=CATALOG.structure;return rows.map(([key,title,frequency,windowKey,yieldType])=>({key,title,frequency,windowKey:windowKey||null,yieldType:yieldType||null}));}
-const activeSuggestedTask=(task,recordId,key)=>!task.deletedAt&&!task.completed&&task.status!=='completed'&&task.recordId===recordId&&task.suggestionKey===key;
-const suggestionEnabled=(tasks,recordId,key)=>tasks.some(task=>activeSuggestedTask(task,recordId,key));
-function reactivateSuggestedTask(tasks,recordId,key,values={}){const active=tasks.find(task=>activeSuggestedTask(task,recordId,key));if(active)return active;const inactive=tasks.filter(task=>task.deletedAt&&task.recordId===recordId&&task.suggestionKey===key).sort((a,b)=>String(b.updatedAt||b.createdAt).localeCompare(String(a.updatedAt||a.createdAt)))[0];if(!inactive)return null;Object.assign(inactive,values,{deletedAt:null,completed:false,status:'open',completedAt:null});return inactive;}
-function normalizeWindow(value={}){const createdAt=value.createdAt||new Date().toISOString();return{id:value.id,systemKey:value.systemKey||null,name:value.name||'Chore Window',displayOrder:Number(value.displayOrder||0),enabled:value.enabled!==false,daypart:value.daypart||null,createdAt,updatedAt:value.updatedAt||createdAt,deletedAt:value.deletedAt||null};}
+const taskDate=task=>task?.dueDate||task?.availableFrom||'';
+const recurrenceSeriesId=task=>task?.recurrenceRule?.seriesId||null;
+const recurrenceEnabled=task=>Boolean(task?.recurrenceRule&&task.recurrenceRule.enabled!==false);
+const latestTask=tasks=>[...tasks].sort((a,b)=>taskDate(b).localeCompare(taskDate(a))||String(b.createdAt||b.updatedAt||b.id).localeCompare(String(a.createdAt||a.updatedAt||a.id)))[0]||null;
+
+function assignRecurrenceSeries(tasks,{migrateLegacyDisable=false}={}){
+  const recurring=tasks.filter(task=>task.recurrenceRule);
+  const byId=new Map(tasks.map(task=>[task.id,task]));
+  const rootId=task=>{let cursor=task,root=task.id,seen=new Set();while(cursor?.parentTaskId&&!seen.has(cursor.parentTaskId)){seen.add(cursor.parentTaskId);const parent=byId.get(cursor.parentTaskId);if(!parent)break;root=parent.id;cursor=parent;}return root;};
+  recurring.forEach(task=>{task.recurrenceRule={...task.recurrenceRule,seriesId:task.recurrenceRule.seriesId||rootId(task),enabled:task.recurrenceRule.enabled!==false};});
+  const suggestions=new Map();
+  recurring.filter(task=>task.recordId&&task.suggestionKey).forEach(task=>{const key=`${task.recordId}\u0000${task.suggestionKey}`;if(!suggestions.has(key))suggestions.set(key,[]);suggestions.get(key).push(task);});
+  suggestions.forEach(group=>{const canonical=[...group].sort((a,b)=>String(a.createdAt||a.id).localeCompare(String(b.createdAt||b.id)))[0].recurrenceRule.seriesId;group.forEach(task=>{task.recurrenceRule={...task.recurrenceRule,seriesId:canonical};});if(migrateLegacyDisable){const latest=latestTask(group);if(latest?.deletedAt&&!group.some(task=>!task.deletedAt&&!task.completed))latest.recurrenceRule={...latest.recurrenceRule,enabled:false};}});
+  return tasks;
+}
+
+function seriesTasks(tasks,task){const seriesId=recurrenceSeriesId(task);return seriesId?tasks.filter(candidate=>recurrenceSeriesId(candidate)===seriesId):tasks.filter(candidate=>candidate.recordId===task.recordId&&candidate.suggestionKey===task.suggestionKey);}
+function suggestionEnabled(tasks,recordId,key){const latest=latestTask(tasks.filter(task=>task.recordId===recordId&&task.suggestionKey===key));return recurrenceEnabled(latest);}
+function reactivateSuggestedTask(tasks,recordId,key,values={}){const matching=tasks.filter(task=>task.recordId===recordId&&task.suggestionKey===key);if(suggestionEnabled(tasks,recordId,key))return latestTask(matching);const candidate=latestTask(matching.filter(task=>!task.completed))||null;if(!candidate)return null;const recurrenceRule={...(candidate.recurrenceRule||{}),...(values.recurrenceRule||{}),enabled:true};Object.assign(candidate,values,{recurrenceRule,deletedAt:null,completed:false,status:'open',completedAt:null});return candidate;}
+function disableSuggestedSeries(tasks,task,timestamp=new Date().toISOString()){const matching=seriesTasks(tasks,task);const open=matching.filter(candidate=>!candidate.completed&&!candidate.deletedAt);const anchor=latestTask(open)||task;if(!anchor?.recurrenceRule)return null;matching.filter(candidate=>candidate!==anchor&&!candidate.completed&&!candidate.deletedAt).forEach(candidate=>{candidate.deletedAt=timestamp;candidate.updatedAt=timestamp;});anchor.recurrenceRule={...anchor.recurrenceRule,enabled:false};anchor.deletedAt=null;anchor.completed=false;anchor.status='open';anchor.completedAt=null;anchor.updatedAt=timestamp;return anchor;}
+
+function stabilizeRecurringTasks(tasks,{targetDate,nextDueDate,makeId,now=new Date().toISOString(),migrateLegacyDisable=false}={}){
+  assignRecurrenceSeries(tasks,{migrateLegacyDisable});
+  let changed=false,created=0,deduplicated=0;
+  const activeByDate=new Map();
+  tasks.filter(task=>task.recurrenceRule&&!task.deletedAt&&taskDate(task)).sort((a,b)=>Number(Boolean(b.completed))-Number(Boolean(a.completed))||String(a.createdAt||a.id).localeCompare(String(b.createdAt||b.id))).forEach(task=>{const key=`${recurrenceSeriesId(task)}\u0000${taskDate(task)}`;if(!activeByDate.has(key)){activeByDate.set(key,task);return;}task.deletedAt=now;task.updatedAt=now;changed=true;deduplicated+=1;});
+  const groups=new Map();
+  tasks.filter(task=>task.recurrenceRule&&recurrenceSeriesId(task)).forEach(task=>{const id=recurrenceSeriesId(task);if(!groups.has(id))groups.set(id,[]);groups.get(id).push(task);});
+  groups.forEach(group=>{const latest=latestTask(group);if(!latest||!recurrenceEnabled(latest)||latest.recurrenceRule.mode==='after_completion'||!targetDate||!taskDate(latest))return;let cursor=latest,candidate='';for(let guard=0;guard<10000;guard+=1){const next=nextDueDate?.(cursor,targetDate);if(!next||next>targetDate)break;candidate=next;cursor={...cursor,availableFrom:'',dueDate:next};}if(!candidate||group.some(task=>taskDate(task)===candidate&&!task.deletedAt))return;const id=makeId();const createdTask={...latest,id,parentTaskId:latest.id,availableFrom:'',dueDate:candidate,completed:false,status:'open',completedAt:null,deletedAt:null,recurrenceRule:{...latest.recurrenceRule},createdAt:now,updatedAt:now};tasks.push(createdTask);group.push(createdTask);changed=true;created+=1;});
+  return{changed,created,deduplicated};
+}
+
+const normalizeTime=value=>/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value||''))?String(value):'';
+function normalizeWindow(value={}){const createdAt=value.createdAt||new Date().toISOString();return{id:value.id,systemKey:value.systemKey||null,name:value.name||'Chore Window',displayOrder:Number(value.displayOrder||0),enabled:value.enabled!==false,daypart:value.daypart||null,startTime:normalizeTime(value.startTime||value.start_time),endTime:normalizeTime(value.endTime||value.end_time),createdAt,updatedAt:value.updatedAt||createdAt,deletedAt:value.deletedAt||null};}
 const DEFAULT_WINDOWS=[{id:'chore-window-morning',systemKey:'morning',name:'Morning',displayOrder:10,daypart:'morning',enabled:true},{id:'chore-window-evening',systemKey:'evening',name:'Evening',displayOrder:20,daypart:'evening',enabled:true}];
-return{YIELD_TYPES,eligibleYieldTypes,suggestedTasks,suggestionEnabled,reactivateSuggestedTask,normalizeWindow,DEFAULT_WINDOWS,animalKind,landKind};}));
+return{YIELD_TYPES,eligibleYieldTypes,suggestedTasks,suggestionEnabled,reactivateSuggestedTask,disableSuggestedSeries,assignRecurrenceSeries,stabilizeRecurringTasks,recurrenceSeriesId,recurrenceEnabled,normalizeWindow,DEFAULT_WINDOWS,animalKind,landKind};}));

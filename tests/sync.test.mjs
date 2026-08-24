@@ -88,7 +88,7 @@ test('durable outbox survives reload', () => {
 
 test('recurrence normalization keeps scheduling separate from completion behavior', () => {
   assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', interval: 1, completionAction: 'milk_morning' }), {
-    mode: 'fixed_schedule', frequency: 'daily', interval: 1
+    mode: 'fixed_schedule', frequency: 'daily', interval: 1, enabled: true
   });
   assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', routineType: 'egg_collection' }).routineType, undefined);
 });
@@ -241,10 +241,10 @@ test('task date windows and recurrence survive cloud conversion', () => {
 
 test('recurrence rules normalize supported schedules and reject unsupported ones', () => {
   assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'weekly', mode: 'after_completion', interval: '2' }), {
-    frequency: 'weekly', mode: 'after_completion', interval: 2
+    frequency: 'weekly', mode: 'after_completion', interval: 2, enabled: true
   });
   assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'daily', interval: 0 }), {
-    frequency: 'daily', mode: 'fixed_schedule', interval: 1
+    frequency: 'daily', mode: 'fixed_schedule', interval: 1, enabled: true
   });
   assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'monthly', interval: Infinity }).interval, 1);
   assert.equal(housekeepingData.normalizeRecurrenceRule({ frequency: 'yearly' }), null);
@@ -389,6 +389,16 @@ test('successful idempotent retry cannot duplicate a row', async () => {
   const operation = h.state.enqueue({ table: 'records', localId: item.id, type: 'create', payload: toCloud('records', item, h.state) });
   const first = await h.cloud.apply(operation); const second = await h.cloud.apply(operation);
   assert.deepEqual(second, first); assert.equal(h.cloud.rows.records.length, 1);
+});
+
+test('a server-deduplicated recurring occurrence rebinds its local cloud identity', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const localId = 'local-occurrence';
+  const operation = state.enqueue({ table: 'tasks', localId, type: 'create', payload: {} });
+  const existingCloudId = crypto.randomUUID();
+  state.complete(operation, { id: existingCloudId, version: 3 });
+  assert.equal(state.entity('tasks', localId).cloudId, existingCloudId);
+  assert.equal(state.localIdForCloud('tasks', existingCloudId), localId);
 });
 
 test('same-version update succeeds', async () => {

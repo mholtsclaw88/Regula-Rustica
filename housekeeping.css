@@ -118,6 +118,7 @@
 .today-section:not([open]) { padding-top: 12px; padding-bottom: 12px; }
 .today-section.complete { border-color:#b8cbbd; background:rgba(232,240,233,.55); }
 .routine-management-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+.form-error { margin:0; color:var(--red); font:700 .8rem Arial,sans-serif; }
 .routine-management-row.suggested { padding:12px; border:1px dashed #c9bfae; border-radius:12px; background:rgba(249,245,235,.65); }
 
 .calendar-filters {
@@ -596,6 +597,7 @@ summary:focus-visible {
 .record-task-separator { color: rgba(118,107,93,.72); }
 .task-yield-meta { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font: 700 .72rem/1.2 Arial, sans-serif; white-space: nowrap; }
 .task-yield-meta svg { width: 14px; height: 14px; flex: 0 0 14px; fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+.task-overdue-meta { color: var(--red); font-weight: 700; }
 .meta-pills .task-yield-meta { min-height: 23px; margin-left: 2px; }
 .task-more { position: relative; justify-self: end; }
 .task-more > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 9px; color: var(--forest); cursor: pointer; list-style: none; font: 700 1rem Arial, sans-serif; letter-spacing: .08em; }
