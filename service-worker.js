@@ -1,6 +1,6 @@
-const CACHE = 'regula-rustica-mobile-primary-nav-v2';
+const CACHE = 'regula-rustica-mobile-primary-nav-v4';
 const ASSETS = [
-  './', './index.html', './styles.css?v=mobile-primary-nav-v2', './housekeeping.css?v=journal-consolidation-v2', './cloud-auth.css', './housekeeping-data.js?v=record-task-lifecycle-v2', './task-foundation.js?v=record-task-lifecycle-v2', './record-documents.js?v=local-attachments-v1', './journal-foundation.js?v=journal-consolidation-v3', './records-relationships.js', './ui-refinements.js?v=mobile-primary-nav-v2', './ui-refinements-core.js?v=journal-documents-v1', './ledger-receipt-modal.js?v=ledger-form-v1', './ledger-allocations.js?v=ledger-form-v1', './ledger-allocation-display.js?v=reporting-v1', './app.js?v=journal-consolidation-v5', './cloud-auth.js',
+  './', './index.html', './styles.css?v=mobile-primary-nav-v4', './housekeeping.css?v=journal-consolidation-v2', './cloud-auth.css', './housekeeping-data.js?v=record-task-lifecycle-v2', './task-foundation.js?v=record-task-lifecycle-v2', './record-documents.js?v=local-attachments-v1', './journal-foundation.js?v=journal-consolidation-v3', './records-relationships.js', './ui-refinements.js?v=mobile-primary-nav-v4', './ui-refinements-core.js?v=journal-documents-v1', './ledger-receipt-modal.js?v=ledger-form-v1', './ledger-allocations.js?v=ledger-form-v1', './ledger-allocation-display.js?v=reporting-v1', './app.js?v=journal-consolidation-v5', './cloud-auth.js',
   './cloud-invitations.mjs', './sync/runtime.mjs?v=unified-tasks-v1', './sync/local-state.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
 ];
