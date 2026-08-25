@@ -8,8 +8,8 @@ const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
 const RECORD_TYPES = ['Animal', 'Land', 'Equipment', 'Structure', 'Work'];
-const CURRENT_SCHEMA_VERSION = 11;
-const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, CURRENT_SCHEMA_VERSION];
+const CURRENT_SCHEMA_VERSION = 12;
+const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, CURRENT_SCHEMA_VERSION];
 let startupMigrationBefore = null;
 
 const RECORD_CONFIG = {
@@ -151,10 +151,29 @@ function taskDateText(task) {
   return 'No date';
 }
 
+const isTaskVisible = task => !task.deletedAt && task.recurrenceRule?.enabled !== false;
+const choreWindowForTask = task => data.choreWindows.find(choreWindow => !choreWindow.deletedAt && choreWindow.id === task.choreWindowId) || null;
+const taskIsOverdue = (task, now = new Date()) => window.RegulaRusticaHousekeeping.taskIsOverdue(task, choreWindowForTask(task), now);
+const clockTimeText = value => {
+  if (!value) return '';
+  const [hours, minutes] = value.split(':').map(Number);
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+};
+const choreWindowTimeText = choreWindow => {
+  const start = clockTimeText(choreWindow.startTime);
+  const end = clockTimeText(choreWindow.endTime);
+  if (start && end) return `${start}–${end}`;
+  if (start) return `From ${start}`;
+  if (end) return `Until ${end}`;
+  return '';
+};
+
 function createNextLocalOccurrence(task) {
-  if (!task.recurrenceRule || data.tasks.some(item => !item.deletedAt && item.parentTaskId === task.id)) return;
+  if (!window.RegulaRusticaTasks.recurrenceEnabled(task)) return;
   const dueDate = window.RegulaRusticaHousekeeping.nextRecurringDueDate(task, today());
   if (!dueDate) return;
+  const seriesId = window.RegulaRusticaTasks.recurrenceSeriesId(task);
+  if (data.tasks.some(item => isTaskVisible(item) && window.RegulaRusticaTasks.recurrenceSeriesId(item) === seriesId && window.RegulaRusticaHousekeeping.taskWorkDate(item) === dueDate)) return;
   const timestamp = nowIso();
   data.tasks.push(normalizeTask({
     id: uid(),
@@ -276,6 +295,13 @@ function normalizeData(source = {}) {
     });
   }
   const tasks = asArray(source.tasks).map(normalizeTask);
+  window.RegulaRusticaTasks.stabilizeRecurringTasks(tasks, {
+    targetDate: today(),
+    nextDueDate: window.RegulaRusticaHousekeeping.nextRecurringDueDate,
+    makeId: uid,
+    now: nowIso(),
+    migrateLegacyDisable: sourceVersion < CURRENT_SCHEMA_VERSION
+  });
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
@@ -672,13 +698,14 @@ function stewardshipText(record) {
 function createSuggestedTask(record, suggestion) {
   if (window.RegulaRusticaTasks.suggestionEnabled(data.tasks, record.id, suggestion.key)) return;
   const timestamp = nowIso();
-  const reactivated = window.RegulaRusticaTasks.reactivateSuggestedTask(data.tasks, record.id, suggestion.key, { dueDate: today(), updatedAt: timestamp });
+  const choreWindow = data.choreWindows.find(item => item.systemKey === suggestion.windowKey && !item.deletedAt);
+  const recurrenceRule = { frequency: suggestion.frequency, interval: 1, mode: 'fixed_schedule', enabled: true };
+  const reactivated = window.RegulaRusticaTasks.reactivateSuggestedTask(data.tasks, record.id, suggestion.key, { dueDate: today(), choreWindowId: choreWindow?.id || null, yieldType: suggestion.yieldType, recurrenceRule, updatedAt: timestamp });
   if (reactivated) {
     saveData();
     return;
   }
-  const choreWindow = data.choreWindows.find(item => item.systemKey === suggestion.windowKey && !item.deletedAt);
-  data.tasks.push(normalizeTask({id:uid(),recordId:record.id,title:suggestion.title,dueDate:today(),recurrenceRule:{frequency:suggestion.frequency,interval:1,mode:'fixed_schedule'},choreWindowId:choreWindow?.id||null,yieldType:suggestion.yieldType,suggestionKey:suggestion.key,createdAt:timestamp,updatedAt:timestamp}));
+  data.tasks.push(normalizeTask({id:uid(),recordId:record.id,title:suggestion.title,dueDate:today(),recurrenceRule,choreWindowId:choreWindow?.id||null,yieldType:suggestion.yieldType,suggestionKey:suggestion.key,createdAt:timestamp,updatedAt:timestamp}));
   saveData();
 }
 
@@ -702,13 +729,15 @@ function completeTask(task) {
 
 function openTaskYield(task) {
   const yieldType = task.yieldType;
-  const workDate = window.RegulaRusticaHousekeeping.taskWorkDate(task) || today();
+  const defaults = window.RegulaRusticaHousekeeping.yieldDefaultsForTask(task, data.choreWindows);
+  const workDate = defaults.date || today();
   openModal('yield', null, task.recordId, yieldType, workDate);
   yieldCompletionTaskId = task.id;
   $('#modalTitle').textContent = `Record ${window.RegulaRusticaTasks.YIELD_TYPES[yieldType]?.label || 'Yield'} & complete Task`;
   $('#modalSubmit').textContent = 'Record Yield & Complete';
   $('#modalCompleteWithoutYield').classList.remove('hidden');
-  $('#modalFields [name=occurredAt]').value = `${workDate}T12:00`;
+  $('#modalFields [name=occurredAt]').value = `${workDate}T${defaults.time || '12:00'}`;
+  if (defaults.session) $('#modalFields [name=session]').value = defaults.session;
 }
 
 function openTaskReopen(task, linkedYields) {
@@ -756,6 +785,7 @@ function sharedTaskRow(task, { suggestionActions = false } = {}) {
   const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
   const metadata = [taskDateText(task), recurrence, assignedTo, task.recordId ? recordName(task.recordId) : '', task.priority !== 'normal' ? task.priority : '']
     .filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
+  if (taskIsOverdue(task)) metadata.unshift('<span class="task-overdue-meta">Overdue</span>');
   const yieldIndicator = taskYieldIndicator(task);
   if (yieldIndicator) metadata.push(yieldIndicator);
   const metadataHtml = metadata.join('<span class="record-task-separator" aria-hidden="true">·</span>');
@@ -797,8 +827,7 @@ function sharedTaskRow(task, { suggestionActions = false } = {}) {
   });
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
   row.querySelector('.disable')?.addEventListener('click', () => {
-    task.deletedAt = nowIso();
-    task.updatedAt = task.deletedAt;
+    window.RegulaRusticaTasks.disableSuggestedSeries(data.tasks, task, nowIso());
     saveData();
   });
   row.querySelector('.del').addEventListener('click', () => {
@@ -818,7 +847,7 @@ function renderToday() {
   const workDate = today();
   const root = $('#todayTasks');
   root.innerHTML = '';
-  const activeTodayTasks = data.tasks.filter(task => !task.deletedAt && (
+  const activeTodayTasks = data.tasks.filter(task => isTaskVisible(task) && (
     (!task.completed && (
       (!task.availableFrom && !task.dueDate)
       || (task.availableFrom && task.availableFrom <= workDate)
@@ -826,8 +855,8 @@ function renderToday() {
     )) || (task.completed && task.completedAt && localDateTime(task.completedAt).slice(0, 10) === workDate)
   ));
   const tasks = activeTodayTasks
-    .filter(task => !task.choreWindowId && !task.completed)
-    .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
+    .filter(task => !task.completed && (!task.choreWindowId || taskIsOverdue(task)))
+    .sort((a, b) => Number(taskIsOverdue(b)) - Number(taskIsOverdue(a)) || (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
   tasks.forEach(task => root.appendChild(taskRow(task)));
   $('#todayEmpty').classList.toggle('hidden', tasks.length > 0);
   $('#todayTaskCount').textContent = tasks.length;
@@ -836,7 +865,7 @@ function renderToday() {
   const choreRoot = $('#todayChoreWindows');
   choreRoot.innerHTML = '';
   data.choreWindows.filter(window => !window.deletedAt && window.enabled).sort((a, b) => a.displayOrder - b.displayOrder).forEach(choreWindow => {
-    const due = data.tasks.filter(task => !task.deletedAt && task.choreWindowId === choreWindow.id && (task.dueDate || task.availableFrom || today()) <= today());
+    const due = data.tasks.filter(task => isTaskVisible(task) && task.choreWindowId === choreWindow.id && window.RegulaRusticaHousekeeping.taskInCurrentChoreWindow(task, choreWindow));
     if (!due.length) return;
     const completed = due.filter(task => task.completed).length;
     const yields = due.map(task => window.RegulaRusticaHousekeeping.matchingYieldForTask(data.yieldEntries, task)).filter(Boolean);
@@ -844,7 +873,8 @@ function renderToday() {
     const section = document.createElement('details');
     section.className = `card today-section chore-window${completed === due.length ? ' complete' : ''}`;
     section.open = completed !== due.length;
-    section.innerHTML = `<summary><span><span class="label">Chore Window</span><strong>${escapeHtml(choreWindow.name)} Chores</strong><small>${completed} of ${due.length} complete${summary ? ` · ${escapeHtml(summary)}` : ''}</small></span><span class="caret" aria-hidden="true">⌄</span></summary><div class="stack chore-occurrences"></div><button class="btn secondary complete-window" type="button">Complete ${escapeHtml(choreWindow.name)} Chores</button>`;
+    const timeRange = choreWindowTimeText(choreWindow);
+    section.innerHTML = `<summary><span><span class="label">Chore Window</span><strong>${escapeHtml(choreWindow.name)} Chores</strong><small>${timeRange ? `${escapeHtml(timeRange)} · ` : ''}${completed} of ${due.length} complete${summary ? ` · ${escapeHtml(summary)}` : ''}</small></span><span class="caret" aria-hidden="true">⌄</span></summary><div class="stack chore-occurrences"></div><button class="btn secondary complete-window" type="button">Complete ${escapeHtml(choreWindow.name)} Chores</button>`;
     due.forEach(task => section.querySelector('.chore-occurrences').append(taskRow(task)));
     section.querySelector('.complete-window').disabled = completed === due.length;
     section.querySelector('.complete-window').addEventListener('click', () => {
@@ -949,7 +979,7 @@ function renderRecords() {
   records
     .forEach(record => {
       const nextTask = data.tasks
-        .filter(task => !task.deletedAt && task.recordId === record.id && !task.completed)
+        .filter(task => isTaskVisible(task) && task.recordId === record.id && !task.completed)
         .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'))[0];
       const card = document.createElement('article');
       card.className = 'record-card';
@@ -1175,7 +1205,7 @@ function renderRecord() {
   const taskPanel = $('#panelTasks');
   taskPanel.innerHTML = '';
   const activeTasks = data.tasks
-    .filter(task => !task.deletedAt && task.recordId === record.id && !task.completed)
+    .filter(task => isTaskVisible(task) && task.recordId === record.id && !task.completed)
     .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
   activeTasks.forEach(task => taskPanel.appendChild(recordTaskRow(task)));
   if (!taskPanel.children.length) taskPanel.innerHTML = '<p class="muted record-empty">No active tasks.</p>';
@@ -1246,7 +1276,7 @@ function renderTasks() {
   activePeople().forEach(person => assigneeFilter.add(new Option(`${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
   if ([...assigneeFilter.options].some(option => option.value === selectedAssignee)) assigneeFilter.value = selectedAssignee;
 
-  let tasks = data.tasks.filter(task => !task.deletedAt);
+  let tasks = data.tasks.filter(isTaskVisible);
   const status = document.querySelector('[name="taskStatusFilter"]:checked')?.value || 'open';
   const linkedRecord = recordFilter.value;
   const timing = document.querySelector('[name="taskTimingFilter"]:checked')?.value || 'all';
@@ -1261,10 +1291,11 @@ function renderTasks() {
   if (timing === 'upcoming') tasks = tasks.filter(task => task.availableFrom && task.availableFrom > today());
   if (timing === 'dated') tasks = tasks.filter(task => task.availableFrom || task.dueDate);
   if (timing === 'unscheduled') tasks = tasks.filter(task => !task.availableFrom && !task.dueDate);
-  if (sort === 'due') tasks.sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
-  if (sort === 'available') tasks.sort((a, b) => (a.availableFrom || '9999-12-31').localeCompare(b.availableFrom || '9999-12-31'));
-  if (sort === 'record') tasks.sort((a, b) => (recordName(a.recordId) || 'Standalone').localeCompare(recordName(b.recordId) || 'Standalone'));
-  if (sort === 'created') tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const overdueFirst = (a, b) => Number(taskIsOverdue(b)) - Number(taskIsOverdue(a));
+  if (sort === 'due') tasks.sort((a, b) => overdueFirst(a, b) || (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
+  if (sort === 'available') tasks.sort((a, b) => overdueFirst(a, b) || (a.availableFrom || '9999-12-31').localeCompare(b.availableFrom || '9999-12-31'));
+  if (sort === 'record') tasks.sort((a, b) => overdueFirst(a, b) || (recordName(a.recordId) || 'Standalone').localeCompare(recordName(b.recordId) || 'Standalone'));
+  if (sort === 'created') tasks.sort((a, b) => overdueFirst(a, b) || b.createdAt.localeCompare(a.createdAt));
   root.innerHTML = '';
   tasks.forEach(task => root.appendChild(taskRow(task)));
   if (!tasks.length) root.innerHTML = '<div class="empty-panel">No tasks match these filters.</div>';
@@ -1353,7 +1384,7 @@ function renderCalendar() {
   const showCompleted = $('#calendarShowCompleted').checked;
   const visibleTasks = data.tasks
     .filter(task => {
-      if (task.deletedAt || (task.completed && !showCompleted)) return false;
+      if (!isTaskVisible(task) || (task.completed && !showCompleted)) return false;
       return showTasks;
     })
     .sort((a, b) => {
@@ -1516,13 +1547,10 @@ function renderChoreWindows() {
   data.choreWindows.filter(window => !window.deletedAt).sort((a, b) => a.displayOrder - b.displayOrder).forEach(choreWindow => {
     const row = document.createElement('div');
     row.className = 'routine-management-row';
-    row.innerHTML = `<div><strong>${escapeHtml(choreWindow.name)}</strong><div class="meta">Order ${choreWindow.displayOrder}${choreWindow.systemKey ? ' · Default' : ''}${choreWindow.enabled ? '' : ' · Disabled'}</div></div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost toggle">${choreWindow.enabled ? 'Disable' : 'Enable'}</button></div>`;
-    row.querySelector('.edit').addEventListener('click', () => {
-      const name = prompt('Chore Window name', choreWindow.name)?.trim();
-      if (!name) return;
-      const order = Number(prompt('Display order', String(choreWindow.displayOrder)));
-      choreWindow.name = name; choreWindow.displayOrder = Number.isFinite(order) ? order : choreWindow.displayOrder; choreWindow.updatedAt = nowIso(); saveData();
-    });
+    const timeRange = choreWindowTimeText(choreWindow);
+    const indicators = [choreWindow.systemKey ? 'Default' : '', choreWindow.enabled ? '' : 'Disabled'].filter(Boolean);
+    row.innerHTML = `<div><strong>${escapeHtml(choreWindow.name)}</strong><div class="meta">${[timeRange, ...indicators].filter(Boolean).map(escapeHtml).join(' · ')}</div></div><div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost toggle">${choreWindow.enabled ? 'Disable' : 'Enable'}</button></div>`;
+    row.querySelector('.edit').addEventListener('click', () => openModal('chore-window', choreWindow.id));
     row.querySelector('.toggle').addEventListener('click', () => { choreWindow.enabled = !choreWindow.enabled; choreWindow.updatedAt = nowIso(); saveData(); });
     root.append(row);
   });
@@ -1717,12 +1745,31 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   calendarDefaultDate = defaultDate;
   const root = $('#modalFields');
   root.innerHTML = '';
-  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'What happened?', note: 'Add note', document: 'Add Journal Entry', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit Yield' : `Record ${window.RegulaRusticaTasks.YIELD_TYPES[defaultType]?.label || 'Yield'}` };
+  const titles = { task: id ? 'Edit task' : 'Add task', record: id ? 'Edit record' : 'Add record', event: 'What happened?', note: 'Add note', document: 'Add Journal Entry', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit Yield' : `Record ${window.RegulaRusticaTasks.YIELD_TYPES[defaultType]?.label || 'Yield'}`, 'chore-window': id ? 'Edit Chore Window' : 'Add Chore Window' };
   $('#modalTitle').textContent = titles[nextMode];
   $('#modalDelete').classList.toggle('hidden', !(id && ['calendar', 'yield'].includes(nextMode)));
   $('#modalCompleteWithoutYield').classList.add('hidden');
   $('#modalCompleteWithoutYield').textContent = 'Complete Without Yield';
   $('#modalSubmit').textContent = 'Save';
+
+  if (nextMode === 'chore-window') {
+    const choreWindow = data.choreWindows.find(item => item.id === id) || {};
+    const nameField = field('Name', 'name', 'text', choreWindow.name);
+    const nameInput = nameField.querySelector('input');
+    nameInput.required = true;
+    nameInput.maxLength = 80;
+    root.append(nameField);
+    const times = document.createElement('div');
+    times.className = 'grid2';
+    times.append(field('Start time (optional)', 'startTime', 'time', choreWindow.startTime));
+    times.append(field('End time (optional)', 'endTime', 'time', choreWindow.endTime));
+    root.append(times);
+    const error = document.createElement('p');
+    error.className = 'form-error hidden';
+    error.id = 'choreWindowError';
+    error.setAttribute('role', 'alert');
+    root.append(error);
+  }
 
   if (nextMode === 'task') {
     const task = data.tasks.find(item => item.id === id) || {};
@@ -1858,6 +1905,33 @@ $('#modalForm').addEventListener('submit', async event => {
     return;
   }
 
+  if (modalMode === 'chore-window') {
+    const error = $('#choreWindowError');
+    const name = form.name?.trim() || '';
+    const startTime = form.startTime || '';
+    const endTime = form.endTime || '';
+    error.classList.add('hidden');
+    if (!name) {
+      error.textContent = 'Enter a name for this Chore Window.';
+      error.classList.remove('hidden');
+      return;
+    }
+    if (startTime && endTime && endTime < startTime) {
+      error.textContent = 'End time cannot be before start time.';
+      error.classList.remove('hidden');
+      return;
+    }
+    const existing = data.choreWindows.find(item => item.id === editId);
+    if (existing) Object.assign(existing, { name, startTime, endTime, updatedAt: nowIso() });
+    else {
+      const nextOrder = Math.max(0, ...data.choreWindows.map(item => Number(item.displayOrder || 0))) + 10;
+      data.choreWindows.push(window.RegulaRusticaTasks.normalizeWindow({ id: uid(), name, startTime, endTime, displayOrder: nextOrder, enabled: true, createdAt: nowIso() }));
+    }
+    saveData();
+    $('#modal').close();
+    return;
+  }
+
   if (modalMode === 'task') {
     if (!form.title.trim()) return;
     if (form.availableFrom && form.dueDate && form.dueDate < form.availableFrom) {
@@ -1866,6 +1940,7 @@ $('#modalForm').addEventListener('submit', async event => {
     }
     const existing = data.tasks.find(task => task.id === editId);
     const recurrenceRule = window.RegulaRusticaHousekeeping.normalizeRecurrenceRule({
+      ...(existing?.recurrenceRule || {}),
       frequency: form.recurrenceFrequency,
       mode: form.recurrenceMode,
       interval: form.recurrenceInterval
@@ -2014,6 +2089,7 @@ $('#addEggYield').addEventListener('click', () => openModal('yield', null, null,
 $('#addMeatYield')?.addEventListener('click', () => openModal('yield',null,null,'meat'));
 $('#addHarvestYield')?.addEventListener('click', () => openModal('yield',null,null,'harvest'));
 $('#addForageYield')?.addEventListener('click', () => openModal('yield',null,null,'forage'));
+$('#addChoreWindow').addEventListener('click', () => openModal('chore-window'));
 const closeRecordAdd = () => {
   $('#recordAdd').open = false;
   $('#recordAddYield').setAttribute('aria-expanded', 'false');
@@ -2185,15 +2261,6 @@ $('#childForm').addEventListener('submit', event => {
   if (!displayName) return;
   data.people.push(normalizePerson({ id: uid(), personType: 'child', displayName, createdAt: nowIso() }));
   $('#childName').value = '';
-  saveData();
-});
-$('#choreWindowForm').addEventListener('submit', event => {
-  event.preventDefault();
-  const name = $('#choreWindowName').value.trim();
-  if (!name) return;
-  const nextOrder = Math.max(0, ...data.choreWindows.map(window => Number(window.displayOrder || 0))) + 10;
-  data.choreWindows.push(window.RegulaRusticaTasks.normalizeWindow({ id: uid(), name, displayOrder: nextOrder, enabled: true, createdAt: nowIso() }));
-  $('#choreWindowName').value = '';
   saveData();
 });
 $('#exportData').addEventListener('click', exportData);

@@ -9,14 +9,14 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=mobile-primary-nav-v6">
-  <link rel="stylesheet" href="housekeeping.css?v=journal-consolidation-v2">
+  <link rel="stylesheet" href="housekeeping.css?v=chore-window-editor-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=record-task-lifecycle-v2" defer></script>
   <script src="task-foundation.js?v=record-task-lifecycle-v2" defer></script>
   <script src="record-documents.js?v=local-attachments-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
-  <script src="app.js?v=journal-consolidation-v5" defer></script>
+  <script src="app.js?v=chore-window-editor-v1" defer></script>
   <script src="ui-refinements.js?v=mobile-primary-nav-v4" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -328,7 +328,7 @@
         <article class="card settings-section" id="settingChoreWindows">
           <span class="label">Daily rhythm</span><h2>Chore Windows</h2>
           <p class="muted">Group recurring Tasks into practical parts of the day. These are not appointments.</p>
-          <form id="choreWindowForm" class="form-grid"><label>Window name<input id="choreWindowName" maxlength="80" required></label><button class="btn primary" type="submit">Add window</button></form>
+          <button class="btn primary" id="addChoreWindow" type="button">+ Add Chore Window</button>
           <div id="choreWindowList" class="stack"></div>
         </article>
         <article class="card cloud-card settings-section" id="settingCloud">

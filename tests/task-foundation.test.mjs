@@ -13,13 +13,14 @@ test('garden and hay records receive structured harvest choices', () => {
   assert.deepEqual(tasks.eligibleYieldTypes({type:'Land',identity:{landType:'Hay Field'},name:'North Hay'}), ['forage']);
 });
 
-test('suggestions are templates and only an active equivalent suppresses Enable', () => {
+test('suggestions stay enabled while their recurring series is active', () => {
   const record={id:'cow',type:'Animal',identity:{purpose:'Dairy'}};
   const suggestion=tasks.suggestedTasks(record).find(item=>item.key==='dairy-milk-morning');
   assert.equal(suggestion.yieldType,'milk');
-  assert.equal(tasks.suggestionEnabled([{recordId:'cow',suggestionKey:suggestion.key,deletedAt:'2026-08-17'}],'cow',suggestion.key),false);
-  assert.equal(tasks.suggestionEnabled([{recordId:'cow',suggestionKey:suggestion.key,deletedAt:null}],'cow',suggestion.key),true);
-  assert.equal(tasks.suggestionEnabled([{recordId:'cow',suggestionKey:suggestion.key,deletedAt:null,completed:true,status:'completed'}],'cow',suggestion.key),false);
+  const rule={frequency:'daily',mode:'fixed_schedule',interval:1,seriesId:'series',enabled:true};
+  assert.equal(tasks.suggestionEnabled([{recordId:'cow',suggestionKey:suggestion.key,recurrenceRule:rule,deletedAt:null}],'cow',suggestion.key),true);
+  assert.equal(tasks.suggestionEnabled([{recordId:'cow',suggestionKey:suggestion.key,recurrenceRule:rule,deletedAt:null,completed:true,status:'completed'}],'cow',suggestion.key),true);
+  assert.equal(tasks.suggestionEnabled([{recordId:'cow',suggestionKey:suggestion.key,recurrenceRule:{...rule,enabled:false},deletedAt:null}],'cow',suggestion.key),false);
 });
 
 test('Dairy suggestions include both milking windows and Milk Yield metadata', () => {
@@ -30,27 +31,22 @@ test('Dairy suggestions include both milking windows and Milk Yield metadata', (
   ]);
 });
 
-test('completed stale suggestions can be enabled without duplicating an open Task', () => {
-  const completed={id:'done',recordId:'cow',suggestionKey:'dairy-milk-morning',deletedAt:null,completed:true,status:'completed'};
-  const list=[completed];
-  assert.equal(tasks.suggestionEnabled(list,'cow','dairy-milk-morning'),false);
-  assert.equal(tasks.reactivateSuggestedTask(list,'cow','dairy-milk-morning'),null);
-
-  const open={id:'open',recordId:'cow',suggestionKey:'dairy-milk-morning',deletedAt:null,completed:false,status:'open'};
-  list.push(open);
-  assert.equal(tasks.suggestionEnabled(list,'cow','dairy-milk-morning'),true);
-  assert.equal(tasks.reactivateSuggestedTask(list,'cow','dairy-milk-morning').id,'open');
+test('completed Suggested Task occurrences keep their series enabled', () => {
+  const completed={id:'done',recordId:'cow',suggestionKey:'dairy-milk-morning',dueDate:'2026-08-18',recurrenceRule:{frequency:'daily',mode:'fixed_schedule',interval:1,seriesId:'series',enabled:true},deletedAt:null,completed:true,status:'completed'};
+  assert.equal(tasks.suggestionEnabled([completed],'cow','dairy-milk-morning'),true);
+  assert.equal(tasks.reactivateSuggestedTask([completed],'cow','dairy-milk-morning').id,'done');
 });
 
 test('a disabled or deleted suggestion reactivates once without duplicates', () => {
-  const disabled={id:'old',recordId:'cow',suggestionKey:'health',deletedAt:'2026-08-17',completed:true,status:'completed',completedAt:'2026-08-17',updatedAt:'2026-08-17'};
-  const older={...disabled,id:'older',updatedAt:'2026-08-16'};
+  const rule={frequency:'daily',mode:'fixed_schedule',interval:1,seriesId:'series',enabled:false};
+  const disabled={id:'old',recordId:'cow',suggestionKey:'health',dueDate:'2026-08-18',recurrenceRule:rule,deletedAt:null,completed:false,status:'open',completedAt:null,updatedAt:'2026-08-18'};
+  const older={...disabled,id:'older',dueDate:'2026-08-17',completed:true,status:'completed',recurrenceRule:{...rule,enabled:true},updatedAt:'2026-08-17'};
   const list=[older,disabled];
-  const first=tasks.reactivateSuggestedTask(list,'cow','health',{dueDate:'2026-08-18',updatedAt:'2026-08-18'});
-  const second=tasks.reactivateSuggestedTask(list,'cow','health',{dueDate:'2026-08-19',updatedAt:'2026-08-19'});
+  const first=tasks.reactivateSuggestedTask(list,'cow','health',{dueDate:'2026-08-19',recurrenceRule:{frequency:'daily',mode:'fixed_schedule',interval:1},updatedAt:'2026-08-19'});
+  const second=tasks.reactivateSuggestedTask(list,'cow','health',{dueDate:'2026-08-20',updatedAt:'2026-08-20'});
   assert.equal(first.id,'old');
   assert.equal(second.id,'old');
-  assert.equal(list.filter(task=>!task.deletedAt&&task.suggestionKey==='health').length,1);
+  assert.equal(first.recurrenceRule.enabled,true);
   assert.equal(first.completed,false);
   assert.equal(first.status,'open');
 });

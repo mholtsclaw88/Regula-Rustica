@@ -33,11 +33,14 @@
     const frequency = ['daily', 'weekly', 'monthly'].includes(rule?.frequency) ? rule.frequency : '';
     if (!frequency) return null;
     const candidateInterval = Math.floor(Number(rule?.interval) || 1);
-    return {
+    const normalized = {
       mode: rule?.mode === 'after_completion' ? 'after_completion' : 'fixed_schedule',
       frequency,
-      interval: Number.isFinite(candidateInterval) ? Math.max(1, candidateInterval) : 1
+      interval: Number.isFinite(candidateInterval) ? Math.max(1, candidateInterval) : 1,
+      enabled: rule?.enabled !== false
     };
+    if (rule?.seriesId) normalized.seriesId = String(rule.seriesId);
+    return normalized;
   }
 
   function taskWorkDate(task = {}) {
@@ -71,6 +74,38 @@
     return entries.find(entry => !entry.deletedAt && entry.type === yieldType
       && entry.recordId === task.recordId
       && localDate(entry.occurredAt) === taskWorkDate(task)) || null;
+  }
+
+  function choreWindowEndPassed(choreWindow = {}, workDate = '', now = new Date()) {
+    if (!workDate) return false;
+    const currentDate = localDate(now);
+    if (workDate < currentDate) return true;
+    if (workDate > currentDate) return false;
+    const boundary = choreWindow.endTime
+      ? new Date(`${workDate}T${choreWindow.endTime}:00`)
+      : new Date(`${workDate}T23:59:59.999`);
+    return new Date(now).getTime() > boundary.getTime();
+  }
+
+  function taskIsOverdue(task = {}, choreWindow = null, now = new Date()) {
+    if (task.completed || task.deletedAt || task.recurrenceRule?.enabled === false) return false;
+    const workDate = taskWorkDate(task);
+    if (!workDate) return false;
+    if (choreWindow) return choreWindowEndPassed(choreWindow, workDate, now);
+    return Boolean(task.dueDate && task.dueDate < localDate(now));
+  }
+
+  function taskInCurrentChoreWindow(task = {}, choreWindow = {}, now = new Date()) {
+    return taskWorkDate(task) === localDate(now) && (task.completed || !taskIsOverdue(task, choreWindow, now));
+  }
+
+  function yieldDefaultsForTask(task = {}, choreWindows = []) {
+    const choreWindow = choreWindows.find(item => !item.deletedAt && item.id === task.choreWindowId) || null;
+    return {
+      date: taskWorkDate(task),
+      session: ['morning', 'evening', 'other'].includes(choreWindow?.daypart) ? choreWindow.daypart : null,
+      time: choreWindow?.startTime || null
+    };
   }
 
   function linkedYieldsForTask(entries = [], taskId) {
@@ -172,7 +207,8 @@
 
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
-    taskWorkDate, matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
+    taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, yieldDefaultsForTask,
+    matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
     linkedYieldsForTask, reopenTask,
     taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment,
     reportingDateRange, matchesReportingDate

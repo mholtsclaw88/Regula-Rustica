@@ -35,6 +35,8 @@
       displayOrder: Number(value.displayOrder ?? value.display_order ?? 100),
       enabled: value.enabled !== false,
       daypart: value.daypart || null,
+      startTime: value.startTime || value.start_time || '',
+      endTime: value.endTime || value.end_time || '',
       createdAt,
       updatedAt: iso(value.updatedAt || value.updated_at || createdAt),
       deletedAt: value.deletedAt || value.deleted_at || null
