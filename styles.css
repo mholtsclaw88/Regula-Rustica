@@ -19,11 +19,13 @@
  .mobile-top-actions button.active{border-color:rgba(230,221,200,.7);background:rgba(255,255,255,.12)}
  .mobile-top-actions button:focus-visible,.mobile-primary-nav button:focus-visible{outline:3px solid rgba(164,123,60,.7);outline-offset:2px}
  .mobile-top-actions span{display:none}
- .mobile-top-actions svg{width:20px;height:20px}
+ .mobile-top-actions svg{width:24px;height:24px}
  .mobile-primary-nav{position:fixed;right:0;bottom:0;left:0;z-index:35;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:5px 4px calc(5px + env(safe-area-inset-bottom,0px));border-top:1px solid #c7b999;background:rgba(255,253,247,.98);box-shadow:0 -5px 18px rgba(34,45,36,.12);font-family:Arial,sans-serif}
  .mobile-primary-nav button{display:flex;min-width:0;height:54px;padding:4px 2px;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;border-radius:9px;background:transparent;color:var(--muted);cursor:pointer}
  .mobile-primary-nav button.active{background:#e7eee7;color:var(--forest)}
- .mobile-primary-nav svg{width:23px;height:23px}
+ .mobile-primary-nav svg{width:27px;height:27px}
  .mobile-primary-nav span{max-width:100%;overflow:hidden;font-size:.64rem;font-weight:700;line-height:1.1;text-overflow:ellipsis;white-space:nowrap}
- .mobile-top-actions svg,.mobile-primary-nav svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+ .mobile-top-actions svg,.mobile-primary-nav svg{fill:none;stroke:currentColor;stroke-width:1.45;stroke-linecap:round;stroke-linejoin:round}
+ .mobile-top-actions svg .icon-detail,.mobile-primary-nav svg .icon-detail{stroke-width:.9;opacity:.88}
+ .mobile-top-actions svg .icon-strong,.mobile-primary-nav svg .icon-strong{stroke-width:2.7}
 }
