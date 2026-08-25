@@ -535,6 +535,7 @@ const SEED_DATA = {
 let data = loadData();
 let persistedData = structuredClone(data);
 let currentRecordId = null;
+let currentRecordSection = 'overview';
 let priorView = 'records';
 let modalMode = '';
 let editId = null;
@@ -548,6 +549,8 @@ let attachmentSyncPromise = null;
 let journalFilter = 'all';
 let profileCropAttachmentId = null;
 let profileCropDraft = normalizeProfileCrop();
+const ROUTABLE_VIEWS = new Set(['today', 'records', 'tasks', 'calendar', 'yield', 'ledger', 'settings']);
+const RECORD_SECTIONS = new Set(['overview', 'tasks', 'yield', 'journal', 'ledger']);
 
 function recordById(id) {
   return data.records.find(record => record.id === id);
@@ -608,16 +611,35 @@ function addEvent(recordId, eventType, details = '', options = {}) {
   }));
 }
 
-function showView(id) {
+function setRoute(hash, { replace = false } = {}) {
+  if (window.location.hash === hash) return;
+  window.history[replace ? 'replaceState' : 'pushState'](null, '', hash);
+}
+
+function showView(id, { route = true, replace = false, scroll = true } = {}) {
+  if (!ROUTABLE_VIEWS.has(id)) id = 'today';
   $$('.view,.record-shell').forEach(element => element.classList.remove('active'));
   $$('.nav button').forEach(button => button.classList.toggle('active', button.dataset.view === id));
   $(`#${id}`).classList.add('active');
   priorView = id;
   if (id === 'records') renderRecords();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (route) setRoute(`#${id}`, { replace });
+  if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function openRecord(id) {
+function activateRecordSection(section, { route = true, replace = false } = {}) {
+  currentRecordSection = RECORD_SECTIONS.has(section) ? section : 'overview';
+  $$('.record-section-nav button').forEach(button => {
+    const active = button.dataset.recordSection === currentRecordSection;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === currentRecordSection));
+  if (route && currentRecordId) setRoute(`#record/${encodeURIComponent(currentRecordId)}/${currentRecordSection}`, { replace });
+}
+
+function openRecord(id, section = 'overview', { route = true, replace = false, scroll = true } = {}) {
+  if (!recordById(id)) return showView('records', { route, replace, scroll });
   currentRecordId = id;
   journalFilter = 'all';
   $$('[data-journal-filter]').forEach(button => {
@@ -628,14 +650,24 @@ function openRecord(id) {
   $$('.view,.record-shell').forEach(element => element.classList.remove('active'));
   $$('.nav button').forEach(button => button.classList.remove('active'));
   $('#recordView').classList.add('active');
-  $$('.record-section-nav button').forEach(button => {
-    const active = button.dataset.recordSection === 'overview';
-    button.classList.toggle('active', active);
-    button.setAttribute('aria-selected', String(active));
-  });
-  $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === 'overview'));
+  activateRecordSection(section, { route: false });
   renderRecord();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (route) setRoute(`#record/${encodeURIComponent(currentRecordId)}/${currentRecordSection}`, { replace });
+  if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function restoreRoute() {
+  const route = window.location.hash.slice(1);
+  if (!route) return showView('today', { route: false, scroll: false });
+  const [kind, encodedRecordId, section] = route.split('/');
+  if (kind === 'record' && encodedRecordId) {
+    let recordId = '';
+    try { recordId = decodeURIComponent(encodedRecordId); } catch (error) { console.warn('Invalid Record route.', error); }
+    if (recordById(recordId)) return openRecord(recordId, section, { route: false, scroll: false });
+    return showView('records', { replace: true, scroll: false });
+  }
+  if (ROUTABLE_VIEWS.has(kind)) return showView(kind, { route: false, scroll: false });
+  showView('today', { replace: true, scroll: false });
 }
 
 function displayValue(value) {
@@ -2103,12 +2135,7 @@ $('#profileCropForm').addEventListener('submit', event => {
 $('.record-section-nav').addEventListener('click', event => {
   const button = event.target.closest('button[data-record-section]');
   if (!button) return;
-  $$('.record-section-nav button').forEach(item => {
-    const active = item === button;
-    item.classList.toggle('active', active);
-    item.setAttribute('aria-selected', String(active));
-  });
-  $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === button.dataset.recordSection));
+  activateRecordSection(button.dataset.recordSection);
 });
 $('#backToList').addEventListener('click', () => showView(priorView));
 const cancelModal = () => { pendingDocumentFiles = []; $('#modal').close(); };
@@ -2219,6 +2246,8 @@ window.addEventListener('regula-rustica:cloud-context', () => {
 
 window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments };
 renderAll();
+restoreRoute();
+window.addEventListener('popstate', restoreRoute);
 if (startupMigrationBefore) setTimeout(() => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {
   detail: { before: startupMigrationBefore, after: structuredClone(data), source: 'migration' }
 })), 0);
