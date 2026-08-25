@@ -8,8 +8,10 @@
  .top>div{grid-column:2;grid-row:1;min-width:0;text-align:center}
  .brand-small,.motto{display:none}
  .top h1{margin:0;color:#f2e8d1;font-size:1.34rem;line-height:1.1;letter-spacing:.015em;white-space:nowrap}
- body.mobile-home .top{min-height:72px;padding-top:7px;padding-bottom:8px}
- body.mobile-home .motto{display:block;margin:4px -16px 0;color:#e8dfca;font-size:clamp(.61rem,2.55vw,.72rem);line-height:1.2;white-space:nowrap}
+ body.mobile-home .top{min-height:76px;padding-top:5px;padding-bottom:6px;grid-template-rows:44px auto}
+ body.mobile-home .top>div{display:contents}
+ body.mobile-home .top h1{grid-column:2;grid-row:1;align-self:center}
+ body.mobile-home .motto{display:block;grid-column:1/-1;grid-row:2;margin:1px 0 0;color:#e8dfca;font-size:clamp(.94rem,3.85vw,.98rem);line-height:1.18;text-align:center;white-space:normal}
  #globalAddTask{display:none!important}
  body>.nav{display:none}
  main{padding-top:11px}
