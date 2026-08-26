@@ -62,7 +62,8 @@ test('Responsible Person choices include active members and children', () => {
   const options = relationships.activePersonOptions({ people: [
     { id: 'member', personType: 'member', displayName: 'Alex' },
     { id: 'child', personType: 'child', displayName: 'Clare' },
-    { id: 'removed', personType: 'member', displayName: 'Former', deletedAt: stamp }
+    { id: 'removed', personType: 'member', displayName: 'Former', deletedAt: stamp },
+    { id: 'inactive', personType: 'child', displayName: 'Inactive', status: 'inactive' }
   ] });
 
   assert.deepEqual(options, [
@@ -71,11 +72,27 @@ test('Responsible Person choices include active members and children', () => {
   ]);
 });
 
+test('Responsible Person choices avoid duplicate household members', () => {
+  const options = relationships.activePersonOptions({ people: [
+    { id: 'member-local', memberId: 'membership-one', personType: 'member', displayName: 'Alex Keeper' },
+    { id: 'member-cloud-copy', memberId: 'membership-one', personType: 'member', displayName: 'Alex Keeper' },
+    { id: 'child', personType: 'child', displayName: 'Clare' }
+  ] });
+
+  assert.deepEqual(options.map(option => option.value), ['member-local', 'child']);
+});
+
 test('structured Responsible Person assignment replaces legacy free text', () => {
   assert.deepEqual(
     relationships.withResponsiblePerson({ location: 'North barn', responsible: 'Legacy name' }, 'member'),
     { location: 'North barn', responsiblePersonId: 'member' }
   );
+});
+
+test('structured Responsible Person assignment survives JSON persistence', () => {
+  const saved = relationships.withResponsiblePerson({ location: 'North barn' }, 'member');
+  const reloaded = JSON.parse(JSON.stringify({ stewardship: saved }));
+  assert.equal(reloaded.stewardship.responsiblePersonId, 'member');
 });
 
 test('reverse location contents derive animals and equipment only', () => {

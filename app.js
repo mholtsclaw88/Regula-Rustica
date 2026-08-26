@@ -8,8 +8,8 @@ const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
 const RECORD_TYPES = ['Animal', 'Land', 'Equipment', 'Structure', 'Work'];
-const CURRENT_SCHEMA_VERSION = 12;
-const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, CURRENT_SCHEMA_VERSION];
+const CURRENT_SCHEMA_VERSION = 13;
+const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, 12, CURRENT_SCHEMA_VERSION];
 let startupMigrationBefore = null;
 
 const RECORD_CONFIG = {
@@ -154,11 +154,7 @@ function taskDateText(task) {
 const isTaskVisible = task => !task.deletedAt && task.recurrenceRule?.enabled !== false;
 const choreWindowForTask = task => data.choreWindows.find(choreWindow => !choreWindow.deletedAt && choreWindow.id === task.choreWindowId) || null;
 const taskIsOverdue = (task, now = new Date()) => window.RegulaRusticaHousekeeping.taskIsOverdue(task, choreWindowForTask(task), now);
-const clockTimeText = value => {
-  if (!value) return '';
-  const [hours, minutes] = value.split(':').map(Number);
-  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-};
+const clockTimeText = value => window.RegulaRusticaTasks.formatClockTime(value);
 const choreWindowTimeText = choreWindow => {
   const start = clockTimeText(choreWindow.startTime);
   const end = clockTimeText(choreWindow.endTime);
@@ -281,7 +277,7 @@ function historicalYield(event) {
   return candidate ? normalizeYieldEntry(candidate) : null;
 }
 
-function normalizeData(source = {}) {
+function normalizeData(source = {}, options = {}) {
   const sourceVersion = Number(source.schemaVersion || source.version || 0);
   const events = asArray(source.events).map(normalizeEvent);
   const yieldEntries = asArray(source.yieldEntries).map(normalizeYieldEntry);
@@ -317,7 +313,8 @@ function normalizeData(source = {}) {
     ledger: asArray(source.ledger).map(normalizeLedgerEntry),
     calendarEvents: asArray(source.calendarEvents).map(normalizeCalendarEvent),
     yieldEntries,
-    choreWindows: (asArray(source.choreWindows).length ? asArray(source.choreWindows) : window.RegulaRusticaTasks.DEFAULT_WINDOWS).map(window.RegulaRusticaTasks.normalizeWindow),
+    choreWindows: (asArray(source.choreWindows).length ? asArray(source.choreWindows) : window.RegulaRusticaTasks.DEFAULT_WINDOWS)
+      .map(value => window.RegulaRusticaTasks.normalizeWindow(value, { applyBuiltInDefaults: options.applyBuiltInDefaults !== false })),
     ...(source.legacy ? { legacy: source.legacy } : {})
   };
 }
@@ -421,7 +418,7 @@ function loadData() {
   if (currentRaw) {
     try {
       const current = JSON.parse(currentRaw);
-      const beforeMigration = normalizeData({ ...current, schemaVersion: CURRENT_SCHEMA_VERSION });
+      const beforeMigration = normalizeData({ ...current, schemaVersion: CURRENT_SCHEMA_VERSION }, { applyBuiltInDefaults: false });
       const normalized = isSupportedData(current) ? normalizeData(current) : migrateData(current, STORAGE_KEY);
       if (current.schemaVersion !== CURRENT_SCHEMA_VERSION) {
         safelyStoreBackup(MIGRATION_BACKUP_KEY, currentRaw);

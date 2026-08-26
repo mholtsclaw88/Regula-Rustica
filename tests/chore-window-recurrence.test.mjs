@@ -76,9 +76,9 @@ test('Disable and re-enable preserve one Suggested Task series', () => {
 });
 
 test('Chore Window overdue classification separates prior and current occurrences', () => {
-  const window = { id: 'morning', startTime: '06:00', endTime: '09:00' };
-  const beforeEnd = new Date('2026-08-19T08:30:00');
-  const afterEnd = new Date('2026-08-19T09:30:00');
+  const window = { id: 'morning', startTime: '06:00', endTime: '10:00' };
+  const beforeEnd = new Date('2026-08-19T09:30:00');
+  const afterEnd = new Date('2026-08-19T10:30:00');
   const prior = occurrence();
   const current = occurrence({ id: 'task-2', dueDate: '2026-08-19' });
   assert.equal(housekeeping.taskInCurrentChoreWindow(current, window, beforeEnd), true);
@@ -96,9 +96,32 @@ test('Chore Window without endTime uses end of day', () => {
 });
 
 test('Yield defaults use the original occurrence date and Chore Window session/time', () => {
-  const windows = [{ id: 'morning', daypart: 'morning', startTime: '06:00', endTime: '09:00' }];
+  const windows = [
+    { id: 'morning', daypart: 'morning', startTime: '06:00', endTime: '10:00' },
+    { id: 'evening', daypart: 'evening', startTime: '18:00', endTime: '22:00' }
+  ];
   assert.deepEqual(housekeeping.yieldDefaultsForTask(occurrence(), windows), { date: '2026-08-18', session: 'morning', time: '06:00' });
+  assert.deepEqual(housekeeping.yieldDefaultsForTask(occurrence({ choreWindowId: 'evening' }), windows), { date: '2026-08-18', session: 'evening', time: '18:00' });
   assert.deepEqual(housekeeping.yieldDefaultsForTask(occurrence({ choreWindowId: null }), windows), { date: '2026-08-18', session: null, time: null });
+});
+
+test('built-in Chore Windows receive safe daily defaults', () => {
+  const [morning, evening] = tasks.DEFAULT_WINDOWS.map(tasks.normalizeWindow);
+  assert.deepEqual([morning.startTime, morning.endTime], ['06:00', '10:00']);
+  assert.deepEqual([evening.startTime, evening.endTime], ['18:00', '22:00']);
+  assert.match(tasks.formatClockTime(morning.startTime, 'en-US'), /6:00 AM/);
+  assert.match(tasks.formatClockTime(evening.startTime, 'en-US'), /6:00 PM/);
+});
+
+test('built-in default migration corrects blank and noon times but preserves intentional values', () => {
+  const blankMorning = tasks.normalizeWindow({ id: 'morning', systemKey: 'morning', startTime: '', endTime: '' });
+  const noonEvening = tasks.normalizeWindow({ id: 'evening', systemKey: 'evening', startTime: '12:00', endTime: '12:00' });
+  const customMorning = tasks.normalizeWindow({ id: 'custom-morning', systemKey: 'morning', startTime: '05:30', endTime: '09:15' });
+  const customWindow = tasks.normalizeWindow({ id: 'lunch', systemKey: null, startTime: '12:00', endTime: '13:00' });
+  assert.deepEqual([blankMorning.startTime, blankMorning.endTime], ['06:00', '10:00']);
+  assert.deepEqual([noonEvening.startTime, noonEvening.endTime], ['18:00', '22:00']);
+  assert.deepEqual([customMorning.startTime, customMorning.endTime], ['05:30', '09:15']);
+  assert.deepEqual([customWindow.startTime, customWindow.endTime], ['12:00', '13:00']);
 });
 
 test('Chore Window times round-trip through sync mapping', () => {

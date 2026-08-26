@@ -32,7 +32,8 @@ async function dataApi() {
       RegulaRusticaTasks: {
         DEFAULT_WINDOWS: [],
         YIELD_TYPES: { milk: {}, eggs: {}, harvest: {}, hay_forage: {}, meat_harvest: {} },
-        normalizeWindow: value => value
+        normalizeWindow: value => value,
+        stabilizeRecurringTasks: () => ({ changed: false, created: 0, deduplicated: 0 })
       }
     }
   };
@@ -99,9 +100,9 @@ test('v10 non-Animal identity fields survive persistence and reload', async () =
   assert.equal(work.identity.linkedRecordId, 'land-one');
 });
 
-test('v5 through v9 backups remain supported and legacy data still migrates', async () => {
+test('v5 through v12 backups remain supported and legacy data still migrates', async () => {
   const api = await dataApi();
-  for (const schemaVersion of [5, 6, 7, 8, 9]) {
+  for (const schemaVersion of [5, 6, 7, 8, 9, 10, 11, 12]) {
     const imported = api.prepareImportedData({
       ...currentData([record('Animal', { purpose: 'Dairy' }, { location: 'Milking barn' })]),
       schemaVersion
