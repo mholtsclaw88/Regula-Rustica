@@ -158,6 +158,7 @@
 
     function makeSelectLabel(labelText, name, options, selected = '') {
       const label = document.createElement('label');
+      label.className = `form-field${/\(optional\)/i.test(labelText) ? ' form-field-optional' : ''}`;
       label.dataset.recordsRelationships = 'true';
       label.append(document.createTextNode(labelText));
       const select = document.createElement('select');
@@ -224,12 +225,18 @@
         const species = root.querySelector('[name=species]')?.value || record.identity?.species || '';
         const parentWrap = document.createElement('div');
         parentWrap.dataset.recordsRelationships = 'true';
-        parentWrap.className = 'form-grid rr-parentage';
+        parentWrap.className = 'form-field-row rr-parentage';
         parentWrap.append(
           makeSelectLabel('Dam (optional)', 'rrDam', animalOptions(data, record.id, species), pendingDam ?? parents.dam),
           makeSelectLabel('Sire (optional)', 'rrSire', animalOptions(data, record.id, species), pendingSire ?? parents.sire)
         );
-        root.append(parentWrap);
+        const relationshipHeading = document.createElement('h3');
+        relationshipHeading.dataset.recordsRelationships = 'true';
+        relationshipHeading.className = 'form-section';
+        relationshipHeading.textContent = 'Relationships';
+        const stewardshipHeading = [...root.querySelectorAll('.form-section')].find(item => item.textContent === 'Stewardship');
+        if (stewardshipHeading) stewardshipHeading.before(relationshipHeading, parentWrap);
+        else root.append(relationshipHeading, parentWrap);
         const managed = root.querySelector('[name=managedAs]');
         const update = () => parentWrap.classList.toggle('hidden', managed?.value === 'Group');
         managed?.addEventListener('change', update);

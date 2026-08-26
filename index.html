@@ -9,17 +9,17 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=mobile-primary-nav-v6">
-  <link rel="stylesheet" href="housekeeping.css?v=chore-window-editor-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=data-entry-forms-v2">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=record-task-lifecycle-v2" defer></script>
   <script src="task-foundation.js?v=disabled-recurring-visibility-v1" defer></script>
   <script src="record-documents.js?v=local-attachments-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
-  <script src="records-relationships.js?v=daily-workflow-debug-v1" defer></script>
+  <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=multi-record-ledger-v1" defer></script>
-  <script src="ui-refinements.js?v=mobile-primary-nav-v4" defer></script>
+  <script src="app.js?v=data-entry-forms-v2" defer></script>
+  <script src="ui-refinements.js?v=data-entry-forms-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
   <script src="sync/runtime.mjs?v=unified-tasks-v1" type="module"></script>
@@ -493,7 +493,8 @@
 
   <dialog id="modal">
     <form id="modalForm">
-      <div class="row"><h2 id="modalTitle">Add</h2><button type="button" class="btn ghost" id="modalClose" aria-label="Close">✕</button></div>
+      <div class="form-modal-header row"><div><h2 id="modalTitle">Add</h2><p class="muted form-modal-subtitle" id="modalSubtitle"></p></div><button type="button" class="btn ghost" id="modalClose" aria-label="Close">✕</button></div>
+      <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
       <div id="modalFields" class="form-grid"></div>
       <div class="dialog-actions">
         <button type="button" class="btn danger hidden" id="modalDelete">Delete</button>

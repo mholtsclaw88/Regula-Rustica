@@ -83,8 +83,8 @@
         <span class="receipt-form-status">${existing ? 'Receipt image attached.' : 'On a phone, this can open the camera. On desktop, choose an image file.'}</span>
       </div>
       <input class="receipt-file" type="file" accept="image/*" capture="environment">`;
-    const allocations = root.querySelector('.ledger-allocation-field');
-    if (allocations) root.insertBefore(wrap, allocations);
+    const slot = root.querySelector('.ledger-receipt-slot');
+    if (slot) slot.appendChild(wrap);
     else root.appendChild(wrap);
 
     const input = wrap.querySelector('.receipt-file');
