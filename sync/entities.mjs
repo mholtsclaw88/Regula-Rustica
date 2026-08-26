@@ -1,5 +1,3 @@
-import '../records-relationships.js';
-
 export const DOMAIN_ORDER = ['homestead_people','records','record_documents','record_attachments','chore_windows','tasks','record_relationships','task_assignments','chronicle_entries','calendar_events','yield_entries','notes','ledger_entries','ledger_allocations'];
 export const COLLECTIONS = {records:'records',record_documents:'documents',record_attachments:'attachments',homestead_people:'people',chore_windows:'choreWindows',tasks:'tasks',record_relationships:'relationships',task_assignments:'assignments',chronicle_entries:'events',calendar_events:'calendarEvents',yield_entries:'yieldEntries',notes:'notes',ledger_entries:'ledger',ledger_allocations:'ledgerAllocations'};
 const iso=v=>v||new Date().toISOString();

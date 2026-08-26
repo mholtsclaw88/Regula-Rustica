@@ -114,8 +114,17 @@
   }
 
   function activePersonOptions(data = {}) {
+    const seen = new Set();
     return (data.people || [])
-      .filter(person => !person.deletedAt)
+      .filter(person => {
+        const status = String(person.status || '').toLowerCase();
+        if (!person.id || person.deletedAt || person.removedAt || person.active === false
+          || ['inactive', 'archived', 'removed', 'suspended'].includes(status)) return false;
+        const key = person.memberId ? `member:${person.memberId}` : `person:${person.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .sort((a, b) => String(a.displayName || '').localeCompare(String(b.displayName || '')))
       .map(person => ({
         label: `${person.displayName || 'Unnamed person'}${person.personType === 'child' ? ' (child)' : ''}`,
