@@ -13,11 +13,11 @@
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=record-task-lifecycle-v2" defer></script>
-  <script src="task-foundation.js?v=daily-workflow-debug-v1" defer></script>
+  <script src="task-foundation.js?v=disabled-recurring-visibility-v1" defer></script>
   <script src="record-documents.js?v=local-attachments-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="records-relationships.js?v=daily-workflow-debug-v1" defer></script>
-  <script src="app.js?v=daily-workflow-debug-v1" defer></script>
+  <script src="app.js?v=disabled-recurring-visibility-v1" defer></script>
   <script src="ui-refinements.js?v=mobile-primary-nav-v4" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -125,6 +125,7 @@
           <div class="choice-pills">
             <label><input type="radio" name="taskStatusFilter" value="open" checked>Open</label>
             <label><input type="radio" name="taskStatusFilter" value="done">Completed</label>
+            <label><input type="radio" name="taskStatusFilter" value="disabled">Disabled</label>
             <label><input type="radio" name="taskStatusFilter" value="all">All</label>
           </div>
         </fieldset>
