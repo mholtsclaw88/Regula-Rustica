@@ -239,6 +239,28 @@ test('task date windows and recurrence survive cloud conversion', () => {
   assert.deepEqual(payload.recurrence_rule, task.recurrenceRule);
 });
 
+test('a skipped recurring occurrence survives cloud pull as a tombstone', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const cloudId = crypto.randomUUID();
+  const localId = crypto.randomUUID();
+  state.bind(crypto.randomUUID());
+  state.entity('tasks', localId).cloudId = cloudId;
+  state.save();
+  const local = fromCloud('tasks', {
+    id: cloudId, record_id: null, parent_task_id: null, chore_window_id: null,
+    title: 'Morning milking', description: null, status: 'open', priority: 'normal',
+    available_from: null, due_date: '2026-08-19', completed_at: null,
+    recurrence_rule: { mode: 'fixed_schedule', frequency: 'daily', interval: 1, enabled: true, seriesId: 'series-1' },
+    yield_type: 'milk', suggestion_key: 'dairy-milk-morning',
+    created_at: '2026-08-18T10:00:00.000Z', updated_at: '2026-08-19T10:00:00.000Z',
+    deleted_at: '2026-08-19T10:00:00.000Z'
+  }, state);
+  assert.equal(local.id, localId);
+  assert.equal(local.deletedAt, '2026-08-19T10:00:00.000Z');
+  assert.equal(local.dueDate, '2026-08-19');
+  assert.equal(local.recurrenceRule.seriesId, 'series-1');
+});
+
 test('recurrence rules normalize supported schedules and reject unsupported ones', () => {
   assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'weekly', mode: 'after_completion', interval: '2' }), {
     frequency: 'weekly', mode: 'after_completion', interval: 2, enabled: true

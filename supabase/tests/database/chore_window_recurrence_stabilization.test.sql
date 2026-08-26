@@ -16,13 +16,13 @@ select ok(
   'series/date recurrence index is unique'
 );
 select ok(
-  pg_get_functiondef('public.complete_recurring_task(uuid,text,uuid)'::regprocedure) like '%recurrence_rule->>''seriesId''%'
+  pg_get_functiondef('public.complete_recurring_task(uuid,text,uuid)'::regprocedure) ~ 'recurrence_rule\s*->>\s*''seriesId'''
   and pg_get_functiondef('public.complete_recurring_task(uuid,text,uuid)'::regprocedure) like '%on conflict do nothing%',
   'recurring completion reuses an existing series occurrence safely'
 );
 select ok(
-  pg_get_functiondef('public.apply_task_sync_operation(text,uuid,text,uuid,text,integer,timestamp with time zone,jsonb)'::regprocedure) like '%recurrence_rule->>''seriesId''%'
-  and pg_get_functiondef('public.apply_task_sync_operation(text,uuid,text,uuid,text,integer,timestamp with time zone,jsonb)'::regprocedure) like '%due_date=task_due%',
+  pg_get_functiondef('public.apply_task_sync_operation(text,uuid,text,uuid,text,integer,timestamp with time zone,jsonb)'::regprocedure) ~ 'recurrence_rule\s*->>\s*''seriesId'''
+  and pg_get_functiondef('public.apply_task_sync_operation(text,uuid,text,uuid,text,integer,timestamp with time zone,jsonb)'::regprocedure) ~ 'due_date\s*=\s*task_due',
   'Task sync resolves concurrent creates by series and date'
 );
 select ok(
