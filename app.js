@@ -231,6 +231,19 @@ function normalizeLedgerEntry(entry = {}) {
   };
 }
 
+function normalizeLedgerAllocation(allocation = {}) {
+  const createdAt = allocation.createdAt || nowIso();
+  return {
+    id: allocation.id || uid(),
+    ledgerEntryId: allocation.ledgerEntryId || null,
+    recordId: allocation.recordId || null,
+    amount: Number(allocation.amount || 0),
+    createdAt,
+    updatedAt: allocation.updatedAt || createdAt,
+    deletedAt: allocation.deletedAt || null
+  };
+}
+
 function normalizeCalendarEvent(event = {}) {
   const createdAt = event.createdAt || nowIso();
   return {
@@ -311,6 +324,7 @@ function normalizeData(source = {}, options = {}) {
     documents: asArray(source.documents).map(normalizeDocument),
     attachments: asArray(source.attachments).map(normalizeAttachment),
     ledger: asArray(source.ledger).map(normalizeLedgerEntry),
+    ledgerAllocations: asArray(source.ledgerAllocations).map(normalizeLedgerAllocation),
     calendarEvents: asArray(source.calendarEvents).map(normalizeCalendarEvent),
     yieldEntries,
     choreWindows: (asArray(source.choreWindows).length ? asArray(source.choreWindows) : window.RegulaRusticaTasks.DEFAULT_WINDOWS)
@@ -389,6 +403,7 @@ function migrateData(source = {}, sourceKey = 'imported legacy data') {
     events,
     notes: source.notes,
     ledger: source.ledger,
+    ledgerAllocations: source.ledgerAllocations,
     legacy: { sourceKey, migratedAt, snapshot: source }
   });
 }
@@ -1259,11 +1274,18 @@ function renderRecord() {
 
   const ledgerPanel = $('#panelLedger');
   ledgerPanel.innerHTML = '';
-  data.ledger
-    .filter(entry => !entry.deletedAt && entry.recordId === record.id)
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .forEach(entry => ledgerPanel.appendChild(ledgerRow(entry)));
-  if (!ledgerPanel.children.length) ledgerPanel.innerHTML = '<p class="muted record-empty">No ledger entries.</p>';
+  const recordLedgerItems = window.RegulaRusticaLedgerAllocations.entriesForRecord(data, record.id)
+    .sort((a, b) => b.entry.date.localeCompare(a.entry.date));
+  if (recordLedgerItems.length) {
+    const totals = window.RegulaRusticaLedgerAllocations.totalsForRecord(recordLedgerItems);
+    const summary = document.createElement('div');
+    summary.className = 'stats stats-spaced record-ledger-totals';
+    summary.innerHTML = `<div class="stat"><strong class="money-out">${formatMoney(totals.expenses)}</strong><span>Expenses</span></div><div class="stat"><strong class="money-in">${formatMoney(totals.income)}</strong><span>Income</span></div><div class="stat"><strong>${formatMoney(totals.net)}</strong><span>Net</span></div>`;
+    ledgerPanel.append(summary);
+    recordLedgerItems.forEach(item => ledgerPanel.appendChild(ledgerRow(item.entry, { amount: item.amount, allocated: item.allocated, recordId: record.id })));
+  } else {
+    ledgerPanel.innerHTML = '<p class="muted record-empty">No ledger entries.</p>';
+  }
 }
 
 function renderTasks() {
@@ -1514,10 +1536,17 @@ function renderYield() {
   if (!root.children.length) root.innerHTML = '<div class="empty-panel">No yield matches this filter.</div>';
 }
 
-function ledgerRow(entry) {
+function ledgerRow(entry, options = {}) {
   const row = document.createElement('div');
   row.className = 'task';
-  row.innerHTML = `<div class="task-body"><strong>${escapeHtml(entry.description)}</strong><div class="meta">${formatDate(entry.date)}${entry.recordId ? ` · ${escapeHtml(recordName(entry.recordId))}` : ''}</div></div><strong class="${entry.type === 'income' ? 'money-in' : 'money-out'}">${entry.type === 'income' ? '+' : '−'}${formatMoney(entry.amount)}</strong><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button>`;
+  const amount = options.amount ?? entry.amount;
+  const recordContext = Boolean(options.recordId);
+  const allocationSummary = window.RegulaRusticaLedgerAllocations.entryAllocationSummary(data, entry);
+  const allocationText = !recordContext && allocationSummary.items.length
+    ? `Allocated ${formatMoney(allocationSummary.allocated)} · ${allocationSummary.items.map(item => item.record?.name).filter(Boolean).join(', ')}${allocationSummary.unallocated > .004 ? ` · ${formatMoney(allocationSummary.unallocated)} unallocated` : ''}`
+    : '';
+  const meta = [formatDate(entry.date), recordContext && options.allocated ? 'Allocated share' : '', !recordContext && entry.recordId ? recordName(entry.recordId) : ''].filter(Boolean).join(' · ');
+  row.innerHTML = `<div class="task-body"><strong>${escapeHtml(entry.description)}</strong><div class="meta">${escapeHtml(meta)}</div>${allocationText ? `<div class="meta allocation-ledger-summary">${escapeHtml(allocationText)}</div>` : ''}</div><strong class="${entry.type === 'income' ? 'money-in' : 'money-out'}">${entry.type === 'income' ? '+' : '−'}${formatMoney(amount)}</strong><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button>`;
   row.querySelector('.edit').addEventListener('click', () => openModal('ledger', entry.id, entry.recordId));
   row.querySelector('.del').addEventListener('click', () => {
     if (confirm('Delete this ledger entry?')) {
