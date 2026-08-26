@@ -321,62 +321,54 @@ input[type="checkbox"] { width: 22px; height: 22px; }
 }
 .form-modal-rule::before { left: 0; }
 .form-modal-rule::after { right: 0; }
-#modalFields { gap: 13px; }
+#modalFields { gap: 11px; }
 .form-section {
   grid-column: 1 / -1;
-  position: relative;
-  margin: 13px 0 0;
-  padding: 0 20px 7px 0;
+  margin: 10px 0 0;
+  padding: 0 0 5px;
   border-bottom: 1px solid rgba(164, 123, 60, .42);
   color: var(--forest2);
   font: 700 .71rem Arial, sans-serif;
   letter-spacing: .15em;
   text-transform: uppercase;
 }
-.form-section::after {
-  content: '◆';
-  position: absolute;
-  right: 1px;
-  bottom: 4px;
-  color: var(--gold);
-  font-size: .5rem;
-}
 #modalFields > .form-section:first-child { margin-top: 0; }
 .form-field-row {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
   align-items: start;
 }
 .form-field-row > .recurrence-details {
   grid-column: 1 / -1;
   margin-top: 1px;
-  padding: 12px;
+  padding: 10px;
   border-left: 2px solid rgba(164, 123, 60, .45);
   background: rgba(244, 239, 226, .48);
 }
 .recurrence-details .muted { grid-column: 1 / -1; margin: 0; line-height: 1.4; }
 .form-field,
-#modalFields > label { min-width: 0; color: var(--forest); }
+#modalFields > label { min-width: 0; gap: 4px; color: var(--forest); }
 .form-field-optional { color: #53675b; }
 #modalFields input:not([type='checkbox']):not([type='range']),
 #modalFields select,
 #modalFields textarea {
-  min-height: 44px;
+  min-height: 42px;
+  padding: 8px 9px;
   border-color: #cfc2a8;
   background: #fffdf8;
 }
-#modalFields textarea { min-height: 104px; line-height: 1.45; }
-#modalForm[data-form-mode='document'] textarea[name='body'] { min-height: 170px; }
-.form-modal-long #modalFields { padding-bottom: 78px; }
+#modalFields textarea { min-height: 92px; line-height: 1.45; }
+#modalForm[data-form-mode='document'] textarea[name='body'] { min-height: 152px; }
+.form-modal-long #modalFields { padding-bottom: 74px; }
 .form-extension-slot { grid-column: 1 / -1; min-width: 0; }
 .form-modal-long .dialog-actions {
   position: sticky;
   z-index: 3;
   bottom: -20px;
-  margin: 18px -20px -20px;
-  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  margin: 15px -20px -20px;
+  padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(164, 123, 60, .42);
   background: rgba(255, 253, 247, .97);
   box-shadow: 0 -8px 18px rgba(54, 44, 29, .06);
@@ -391,12 +383,12 @@ input[type="checkbox"] { width: 22px; height: 22px; }
 }
 @media (max-width: 560px) {
   #modal { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
-  #modalForm { max-height: calc(100dvh - 12px); padding: 16px; }
-  .form-field-row { grid-template-columns: 1fr; gap: 11px; }
+  #modalForm { max-height: calc(100dvh - 12px); padding: 14px; }
+  .form-field-row { grid-template-columns: 1fr; gap: 9px; }
   .form-modal-long .dialog-actions {
-    bottom: -16px;
-    margin: 16px -16px -16px;
-    padding: 11px 16px calc(11px + env(safe-area-inset-bottom));
+    bottom: -14px;
+    margin: 14px -14px -14px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
   }
   .form-modal-long .dialog-actions .danger { width: 100%; margin: 0 0 3px; }
   .form-modal-long .dialog-actions #modalCancel,

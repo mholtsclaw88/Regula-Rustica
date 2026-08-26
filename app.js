@@ -1801,7 +1801,7 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   $('#modalSubtitle').textContent = subtitles[nextMode] || '';
   $('#modalSubtitle').classList.toggle('hidden', !subtitles[nextMode]);
   $('#modalForm').dataset.formMode = nextMode;
-  $('#modalForm').classList.toggle('form-modal-long', ['task', 'record', 'yield', 'ledger', 'document'].includes(nextMode));
+  $('#modalForm').classList.toggle('form-modal-long', ['task', 'record', 'yield', 'ledger'].includes(nextMode));
   $('#modalDelete').classList.toggle('hidden', !(id && ['calendar', 'yield'].includes(nextMode)));
   $('#modalCompleteWithoutYield').classList.add('hidden');
   $('#modalCompleteWithoutYield').textContent = 'Complete without recording Yield';
