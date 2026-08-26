@@ -1,7 +1,7 @@
 'use strict';
 (function(){
  function load(src,onload,marker){if(marker&&document.querySelector(`script[${marker}]`))return;const script=document.createElement('script');script.src=src;if(marker)script.setAttribute(marker,'true');if(onload)script.addEventListener('load',onload,{once:true});document.head.appendChild(script);}
- function loadLedgerTools(){load('ledger-receipt-modal.js?v=ledger-form-v1',null,'data-ledger-receipt-modal');load('ledger-allocations.js?v=ledger-form-v1',null,'data-ledger-allocations');load('ledger-allocation-display.js?v=reporting-v1',null,'data-ledger-allocation-display');}
+ function loadLedgerTools(){load('ledger-receipt-modal.js?v=ledger-form-v1',null,'data-ledger-receipt-modal');load('ledger-allocations.js?v=ledger-form-v1',null,'data-ledger-allocations');}
  function addRecordUxStyles(){if(document.querySelector('#record-mobile-section-styles'))return;const style=document.createElement('style');style.id='record-mobile-section-styles';style.textContent=`
   .record-mobile-sections{display:none}
   .task-yield-chronicle .combined-yield-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem}

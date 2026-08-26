@@ -100,6 +100,24 @@ test('v10 non-Animal identity fields survive persistence and reload', async () =
   assert.equal(work.identity.linkedRecordId, 'land-one');
 });
 
+test('current Ledger allocations survive normalize, persistence, and reload', async () => {
+  const api = await dataApi();
+  const source = currentData([record('Land', { landType: 'Pasture' })]);
+  source.ledger = [{ id: 'entry-1', type: 'expense', date: '2026-08-26', amount: 90, description: 'Shared fencing' }];
+  source.ledgerAllocations = [
+    { id: 'allocation-1', ledgerEntryId: 'entry-1', recordId: 'land-one', amount: 30, createdAt: '2026-08-26T12:00:00Z' },
+    { id: 'allocation-2', ledgerEntryId: 'entry-1', recordId: 'animal-one', amount: 20, createdAt: '2026-08-26T12:00:00Z' }
+  ];
+  const normalized = api.normalizeData(source);
+  api.localStorage.setItem(api.storageKey, JSON.stringify(normalized));
+  const reloaded = api.loadData();
+  assert.equal(reloaded.ledger.length, 1);
+  assert.deepEqual(Array.from(reloaded.ledgerAllocations, allocation => [allocation.id, allocation.ledgerEntryId, allocation.recordId, allocation.amount]), [
+    ['allocation-1', 'entry-1', 'land-one', 30],
+    ['allocation-2', 'entry-1', 'animal-one', 20]
+  ]);
+});
+
 test('v5 through v12 backups remain supported and legacy data still migrates', async () => {
   const api = await dataApi();
   for (const schemaVersion of [5, 6, 7, 8, 9, 10, 11, 12]) {
