@@ -261,6 +261,35 @@ test('a skipped recurring occurrence survives cloud pull as a tombstone', () => 
   assert.equal(local.recurrenceRule.seriesId, 'series-1');
 });
 
+test('a disabled recurring series round-trips through cloud mapping', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const localId = crypto.randomUUID();
+  const cloudId = crypto.randomUUID();
+  state.bind(crypto.randomUUID());
+  state.entity('tasks', localId).cloudId = cloudId;
+  state.save();
+  const recurrenceRule = { mode: 'fixed_schedule', frequency: 'daily', interval: 1, enabled: false, seriesId: 'series-disabled' };
+  const payload = toCloud('tasks', {
+    id: localId, title: 'Evening milking', status: 'open', priority: 'normal',
+    dueDate: '2026-08-19', completed: false, recurrenceRule,
+    createdAt: '2026-08-18T10:00:00.000Z', updatedAt: '2026-08-19T10:00:00.000Z', deletedAt: null
+  }, state);
+  assert.deepEqual(payload.recurrence_rule, recurrenceRule);
+  assert.equal(payload.deleted_at ?? null, null);
+  const local = fromCloud('tasks', {
+    id: cloudId, record_id: null, parent_task_id: null, chore_window_id: null,
+    title: 'Evening milking', description: null, status: 'open', priority: 'normal',
+    available_from: null, due_date: '2026-08-19', completed_at: null,
+    recurrence_rule: recurrenceRule, yield_type: 'milk', suggestion_key: 'dairy-milk-evening',
+    created_at: '2026-08-18T10:00:00.000Z', updated_at: '2026-08-19T10:00:00.000Z', deleted_at: null
+  }, state);
+  assert.equal(local.id, localId);
+  assert.deepEqual(local.recurrenceRule, recurrenceRule);
+  assert.equal(local.deletedAt, null);
+  assert.equal(local.completed, false);
+  assert.equal(local.recurrenceRule.enabled, false);
+});
+
 test('recurrence rules normalize supported schedules and reject unsupported ones', () => {
   assert.deepEqual(housekeepingData.normalizeRecurrenceRule({ frequency: 'weekly', mode: 'after_completion', interval: '2' }), {
     frequency: 'weekly', mode: 'after_completion', interval: 2, enabled: true

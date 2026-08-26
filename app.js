@@ -777,19 +777,24 @@ function taskYieldIndicator(task) {
 
 function sharedTaskRow(task, { suggestionActions = false } = {}) {
   const row = document.createElement('div');
-  row.className = `task record-task-row shared-task-row${task.completed ? ' done' : ''}`;
+  const disabledSeries = window.RegulaRusticaTasks.isDisabledRecurringTask(task);
+  row.className = `task record-task-row shared-task-row${task.completed ? ' done' : ''}${disabledSeries ? ' disabled-series' : ''}`;
   const assignedTo = assigneeName(task.id);
   const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
-  const metadata = [taskDateText(task), recurrence, assignedTo, task.recordId ? recordName(task.recordId) : '', task.priority !== 'normal' ? task.priority : '']
+  const choreWindow = choreWindowForTask(task)?.name || '';
+  const metadata = [taskDateText(task), recurrence, choreWindow, assignedTo, task.recordId ? recordName(task.recordId) : '', task.priority !== 'normal' ? task.priority : '']
     .filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
-  if (taskIsOverdue(task)) metadata.unshift('<span class="task-overdue-meta">Overdue</span>');
+  if (disabledSeries) metadata.unshift('<span>Disabled</span>');
+  else if (taskIsOverdue(task)) metadata.unshift('<span class="task-overdue-meta">Overdue</span>');
   const yieldIndicator = taskYieldIndicator(task);
   if (yieldIndicator) metadata.push(yieldIndicator);
   const metadataHtml = metadata.join('<span class="record-task-separator" aria-hidden="true">·</span>');
-  const recurringActions = window.RegulaRusticaTasks.recurringOccurrenceActions(task).length
-    ? '<button class="recurrence-actions" type="button">Skip / disable…</button>'
-    : '<button class="del" type="button">Delete</button>';
-  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${recurringActions}</div></details>`;
+  const recurringActions = disabledSeries
+    ? '<button class="reenable" type="button">Re-enable</button>'
+    : window.RegulaRusticaTasks.recurringOccurrenceActions(task).length
+      ? '<button class="recurrence-actions" type="button">Skip / disable…</button>'
+      : '<button class="del" type="button">Delete</button>';
+  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${disabledSeries ? 'disabled' : ''} aria-label="${disabledSeries ? 'Disabled' : 'Complete'} ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${recurringActions}</div></details>`;
   row.querySelector('.shared-task-check').addEventListener('change', event => {
     if (event.target.checked && task.yieldType && !task.completed) {
       const existingYield = window.RegulaRusticaHousekeeping.matchingYieldForTask(data.yieldEntries, task);
@@ -825,6 +830,12 @@ function sharedTaskRow(task, { suggestionActions = false } = {}) {
     saveData();
   });
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
+  row.querySelector('.reenable')?.addEventListener('click', () => {
+    const timestamp = nowIso();
+    const dueDate = task.dueDate && task.dueDate >= today() ? task.dueDate : today();
+    window.RegulaRusticaTasks.reactivateRecurringSeries(data.tasks, task, { dueDate, updatedAt: timestamp });
+    saveData();
+  });
   row.querySelector('.recurrence-actions')?.addEventListener('click', () => openModal('task-lifecycle', task.id, task.recordId));
   row.querySelector('.del')?.addEventListener('click', () => {
     if (confirm('Delete this task?')) {
@@ -1271,13 +1282,12 @@ function renderTasks() {
   activePeople().forEach(person => assigneeFilter.add(new Option(`${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
   if ([...assigneeFilter.options].some(option => option.value === selectedAssignee)) assigneeFilter.value = selectedAssignee;
 
-  let tasks = data.tasks.filter(isTaskVisible);
   const status = document.querySelector('[name="taskStatusFilter"]:checked')?.value || 'open';
+  let tasks = window.RegulaRusticaTasks.filterTasksByStatus(data.tasks, status);
   const linkedRecord = recordFilter.value;
   const timing = document.querySelector('[name="taskTimingFilter"]:checked')?.value || 'all';
   const assignedPerson = assigneeFilter.value;
   const sort = $('#taskSort').value;
-  tasks = tasks.filter(task => status === 'all' || (status === 'open' ? !task.completed : task.completed));
   if (linkedRecord === 'standalone') tasks = tasks.filter(task => !task.recordId);
   else if (linkedRecord !== 'all') tasks = tasks.filter(task => task.recordId === linkedRecord);
   if (assignedPerson === 'unassigned') tasks = tasks.filter(task => !assignmentForTask(task.id));

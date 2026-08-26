@@ -145,6 +145,61 @@ test('Disable preserves completed history and skipped tombstones across re-enabl
   assert.equal(new Set(list.map(task => task.recurrenceRule.seriesId)).size, 1);
 });
 
+test('Disabled recurring Tasks persist and remain separate from Open work', () => {
+  const disabled = occurrence({ recurrenceRule: rule('series-1', false) });
+  const completed = occurrence({ id: 'completed', completed: true, status: 'completed', dueDate: '2026-08-17' });
+  const open = occurrence({ id: 'open', recurrenceRule: rule('series-2') });
+  const skipped = occurrence({ id: 'skipped', recurrenceRule: rule('series-3'), deletedAt: '2026-08-18T12:00:00Z' });
+  const reloaded = JSON.parse(JSON.stringify([disabled, completed, open, skipped]));
+  assert.deepEqual(tasks.filterTasksByStatus(reloaded, 'open').map(task => task.id), ['open']);
+  assert.deepEqual(tasks.filterTasksByStatus(reloaded, 'disabled').map(task => task.id), ['task-1']);
+  assert.deepEqual(tasks.filterTasksByStatus(reloaded, 'done').map(task => task.id), ['completed']);
+  assert.deepEqual(tasks.filterTasksByStatus(reloaded, 'all').map(task => task.id), ['task-1', 'completed', 'open']);
+  assert.equal(tasks.isDisabledRecurringTask(reloaded[0]), true);
+});
+
+test('Generic re-enable reuses the disabled series without resurrecting history', () => {
+  const list = [
+    occurrence({ id: 'completed', completed: true, status: 'completed', dueDate: '2026-08-17' }),
+    occurrence({ id: 'skipped', dueDate: '2026-08-18', deletedAt: '2026-08-18T12:00:00Z' }),
+    occurrence({ id: 'disabled', dueDate: '2026-08-19', recurrenceRule: rule('series-1', false) })
+  ];
+  const restored = tasks.reactivateRecurringSeries(list, list[2], { dueDate: '2026-08-20', updatedAt: '2026-08-20T10:00:00Z' });
+  assert.equal(restored.id, 'disabled');
+  assert.equal(restored.recurrenceRule.enabled, true);
+  assert.equal(restored.dueDate, '2026-08-20');
+  assert.equal(list[0].completed, true);
+  assert.equal(list[1].deletedAt, '2026-08-18T12:00:00Z');
+  assert.equal(list.filter(task => !task.deletedAt && !task.completed).length, 1);
+  assert.equal(new Set(list.map(task => task.recurrenceRule.seriesId)).size, 1);
+});
+
+test('A later skipped tombstone cannot restart a disabled series', () => {
+  const list = [
+    occurrence({ id: 'disabled', dueDate: '2026-08-19', recurrenceRule: rule('series-1', false) }),
+    occurrence({ id: 'skipped', dueDate: '2026-08-20', deletedAt: '2026-08-20T12:00:00Z' })
+  ];
+  assert.equal(tasks.suggestionEnabled(list, 'record-1', 'dairy-milk-morning'), false);
+  const result = tasks.stabilizeRecurringTasks(list, {
+    targetDate: '2026-08-21', nextDueDate: housekeeping.nextRecurringDueDate,
+    makeId: () => 'must-not-exist', now: '2026-08-21T10:00:00Z'
+  });
+  assert.equal(result.created, 0);
+  assert.equal(list.length, 2);
+});
+
+test('Morning, Evening, and Egg suggestions recover their existing disabled series', () => {
+  for (const [key, seriesId] of [['dairy-milk-morning', 'morning'], ['dairy-milk-evening', 'evening'], ['laying-collect-eggs', 'eggs']]) {
+    const disabled = occurrence({ id: `${seriesId}-task`, suggestionKey: key, recurrenceRule: rule(seriesId, false) });
+    const list = [disabled];
+    const restored = tasks.reactivateSuggestedTask(list, 'record-1', key, { dueDate: '2026-08-20' });
+    assert.equal(restored.id, disabled.id);
+    assert.equal(restored.recurrenceRule.seriesId, seriesId);
+    assert.equal(restored.recurrenceRule.enabled, true);
+    assert.equal(list.length, 1);
+  }
+});
+
 test('overdue recurring occurrence can be skipped without affecting today', () => {
   const list = [occurrence(), occurrence({ id: 'today', dueDate: '2026-08-19' })];
   tasks.skipRecurringOccurrence(list[0], '2026-08-19T11:00:00Z');
