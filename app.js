@@ -1607,6 +1607,8 @@ function renderAll() {
 
 function field(labelText, name, type = 'text', value = '', options = []) {
   const label = document.createElement('label');
+  label.className = 'form-field';
+  if (/\(optional\)/i.test(labelText)) label.classList.add('form-field-optional');
   label.textContent = labelText;
   let input;
   if (type === 'textarea') input = document.createElement('textarea');
@@ -1628,14 +1630,22 @@ function field(labelText, name, type = 'text', value = '', options = []) {
 }
 
 function formSection(title) {
-  const heading = document.createElement('div');
+  const heading = document.createElement('h3');
   heading.className = 'form-section';
   heading.textContent = title;
   return heading;
 }
 
+function formRow(...items) {
+  const row = document.createElement('div');
+  row.className = 'form-field-row';
+  items.filter(Boolean).forEach(item => row.append(item));
+  return row;
+}
+
 function addRecordSelect(root, labelText, name, selected = '', excludeId = '') {
   const label = document.createElement('label');
+  label.className = `form-field${/\(optional\)/i.test(labelText) ? ' form-field-optional' : ''}`;
   label.textContent = labelText;
   const select = document.createElement('select');
   select.name = name;
@@ -1651,6 +1661,7 @@ function addRecordSelect(root, labelText, name, selected = '', excludeId = '') {
 
 function addPersonSelect(root, selected = '') {
   const label = document.createElement('label');
+  label.className = 'form-field form-field-optional';
   label.textContent = 'Assigned to (optional)';
   const select = document.createElement('select');
   select.name = 'personId';
@@ -1670,7 +1681,7 @@ function addRecurrenceFields(root, recurrenceRule) {
   repeat.querySelector('option[value=""]').textContent = 'Does not repeat';
   root.append(repeat);
   const details = document.createElement('div');
-  details.className = 'form-grid';
+  details.className = 'form-field-row recurrence-details';
   details.append(field('Repeat every', 'recurrenceInterval', 'number', rule?.interval || 1));
   details.querySelector('[name=recurrenceInterval]').min = '1';
   details.querySelector('[name=recurrenceInterval]').step = '1';
@@ -1690,6 +1701,7 @@ function addRecurrenceFields(root, recurrenceRule) {
 
 function addYieldRecordSelect(root, type, selected = '') {
   const label = document.createElement('label');
+  label.className = 'form-field';
   label.textContent = 'Record';
   const select = document.createElement('select');
   select.name = 'recordId';
@@ -1704,7 +1716,6 @@ function addYieldRecordSelect(root, type, selected = '') {
 function appendRecordFields(root, record, type) {
   const identity = record.identity || {};
   const stewardship = record.stewardship || {};
-  root.append(formSection('Identity'));
   const status = RECORD_CONFIG[type].statuses.includes(record.status) ? record.status : RECORD_CONFIG[type].statuses[0];
   root.append(field('Status', 'status', 'select', status, RECORD_CONFIG[type].statuses));
 
@@ -1713,6 +1724,7 @@ function appendRecordFields(root, record, type) {
     root.append(field('Species', 'species', 'text', identity.species));
     root.append(field('Breed', 'breed', 'text', identity.breed));
     root.append(field('Purpose', 'purpose', 'select', identity.purpose || 'Mixed', ['Dairy', 'Meat', 'Breeding', 'Eggs', 'Honey', 'Fiber', 'Draft', 'Companion', 'Mixed']));
+    root.append(formSection('Details'));
     root.append(field('Sex (individual, optional)', 'sex', 'text', identity.sex));
     root.append(field('Birth date (optional)', 'birthDate', 'date', identity.birthDate));
     root.append(field('Tag, band, or ID (optional)', 'identifier', 'text', identity.identifier));
@@ -1727,6 +1739,7 @@ function appendRecordFields(root, record, type) {
   }
   if (type === 'Equipment') {
     root.append(field('Equipment type', 'equipmentType', 'text', identity.equipmentType));
+    root.append(formSection('Details'));
     root.append(field('Make (optional)', 'make', 'text', identity.make));
     root.append(field('Model (optional)', 'model', 'text', identity.model));
     root.append(field('Serial number (optional)', 'serialNumber', 'text', identity.serialNumber));
@@ -1734,12 +1747,15 @@ function appendRecordFields(root, record, type) {
   }
   if (type === 'Structure') {
     root.append(field('Structure type', 'structureType', 'text', identity.structureType));
+    root.append(formSection('Details'));
     root.append(field('Location (optional)', 'structureLocation', 'text', identity.location));
   }
   if (type === 'Work') {
     root.append(field('Work type', 'workType', 'text', identity.workType));
+    root.append(formSection('Details'));
     root.append(field('Start date (optional)', 'startDate', 'date', identity.startDate));
     root.append(field('Target completion date (optional)', 'targetDate', 'date', identity.targetDate));
+    root.append(formSection('Relationships'));
     addRecordSelect(root, 'Linked record (optional)', 'linkedRecordId', identity.linkedRecordId, record.id);
     // TODO(v5+): add full Work-to-record conversion once Chronicle and ledger relinking can be guaranteed without duplication.
   }
@@ -1780,7 +1796,12 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   const root = $('#modalFields');
   root.innerHTML = '';
   const titles = { task: id ? 'Edit task' : 'Add task', 'task-lifecycle': 'Recurring task', record: id ? 'Edit record' : 'Add record', event: 'What happened?', note: 'Add note', document: 'Add Journal Entry', ledger: id ? 'Edit ledger entry' : 'Record expense or income', calendar: id ? 'Edit calendar event' : 'Add calendar event', yield: id ? 'Edit Yield' : `Record ${window.RegulaRusticaTasks.YIELD_TYPES[defaultType]?.label || 'Yield'}`, 'chore-window': id ? 'Edit Chore Window' : 'Add Chore Window' };
+  const subtitles = { task: 'Create work for the homestead', record: 'Describe what is entrusted to your care', yield: 'Record what the homestead produced', ledger: 'Record one clear financial transaction', document: 'Write in this Record’s Journal' };
   $('#modalTitle').textContent = titles[nextMode];
+  $('#modalSubtitle').textContent = subtitles[nextMode] || '';
+  $('#modalSubtitle').classList.toggle('hidden', !subtitles[nextMode]);
+  $('#modalForm').dataset.formMode = nextMode;
+  $('#modalForm').classList.toggle('form-modal-long', ['task', 'record', 'yield', 'ledger'].includes(nextMode));
   $('#modalDelete').classList.toggle('hidden', !(id && ['calendar', 'yield'].includes(nextMode)));
   $('#modalCompleteWithoutYield').classList.add('hidden');
   $('#modalCompleteWithoutYield').textContent = 'Complete without recording Yield';
@@ -1833,22 +1854,34 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   if (nextMode === 'task') {
     const task = data.tasks.find(item => item.id === id) || {};
     const assignment = assignmentForTask(task.id);
+    root.append(formSection('Task'));
     root.append(field('Task', 'title', 'text', task.title));
-    root.append(field('Details (optional)', 'description', 'textarea', task.description));
-    root.append(field('Start date (optional)', 'availableFrom', 'date', task.availableFrom));
-    root.append(field('Due date (optional)', 'dueDate', 'date', task.dueDate));
-    addRecurrenceFields(root, task.recurrenceRule);
-    root.append(field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']));
-    addPersonSelect(root, assignment?.personId || personForAssignment(assignment)?.id);
-    addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || task.recordId);
-    const windowLabel=document.createElement('label');windowLabel.textContent='Chore Window (optional)';const windowSelect=document.createElement('select');windowSelect.name='choreWindowId';windowSelect.add(new Option('None',''));data.choreWindows.filter(item=>!item.deletedAt&&item.enabled).sort((a,b)=>a.displayOrder-b.displayOrder).forEach(item=>windowSelect.add(new Option(item.name,item.id)));windowSelect.value=task.choreWindowId||'';windowLabel.append(windowSelect);root.append(windowLabel);
-    root.append(field('On completion', 'yieldType', 'select', task.yieldType || '', ['', ...Object.keys(window.RegulaRusticaTasks.YIELD_TYPES)]));
+    const taskPeople = formRow();
+    addRecordSelect(taskPeople, 'Linked record (optional)', 'recordId', recordId || task.recordId);
+    addPersonSelect(taskPeople, assignment?.personId || personForAssignment(assignment)?.id);
+    root.append(taskPeople, formSection('Schedule'));
+    root.append(formRow(
+      field('Start date (optional)', 'availableFrom', 'date', task.availableFrom),
+      field('Due date (optional)', 'dueDate', 'date', task.dueDate)
+    ));
+    const scheduleFields = formRow();
+    const windowLabel=document.createElement('label');windowLabel.className='form-field form-field-optional';windowLabel.textContent='Chore Window (optional)';const windowSelect=document.createElement('select');windowSelect.name='choreWindowId';windowSelect.add(new Option('None',''));data.choreWindows.filter(item=>!item.deletedAt&&item.enabled).sort((a,b)=>a.displayOrder-b.displayOrder).forEach(item=>windowSelect.add(new Option(item.name,item.id)));windowSelect.value=task.choreWindowId||'';windowLabel.append(windowSelect);scheduleFields.append(windowLabel);
+    addRecurrenceFields(scheduleFields, task.recurrenceRule);
+    root.append(scheduleFields, formSection('Details'));
+    root.append(field('Notes (optional)', 'description', 'textarea', task.description));
+    root.append(formRow(
+      field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']),
+      field('On completion', 'yieldType', 'select', task.yieldType || '', ['', ...Object.keys(window.RegulaRusticaTasks.YIELD_TYPES)])
+    ));
   }
   if (nextMode === 'note') root.append(field('What should I remember?', 'text', 'textarea'));
   if (nextMode === 'document') {
+    root.append(formSection('Entry'));
     root.append(field('Title (optional)', 'title', 'text'));
-    root.append(field('Note (optional)', 'body', 'textarea'));
+    root.append(field('Journal entry (optional)', 'body', 'textarea'));
+    root.append(formSection('Attachments'));
     const fileLabel = document.createElement('label');
+    fileLabel.className = 'form-field form-field-optional';
     fileLabel.textContent = 'Attachments (optional)';
     const fileInput = document.createElement('input');
     fileInput.type = 'file'; fileInput.multiple = true; fileInput.accept = 'application/pdf,image/jpeg,image/png,image/webp,image/gif';
@@ -1864,11 +1897,22 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   }
   if (nextMode === 'ledger') {
     const entry = data.ledger.find(item => item.id === id) || {};
-    root.append(field('Type', 'type', 'select', entry.type || 'expense', ['expense', 'income']));
-    root.append(field('Date', 'date', 'date', entry.date || today()));
-    root.append(field('Amount', 'amount', 'number', entry.amount));
+    root.append(formSection('Transaction'));
     root.append(field('Description', 'description', 'text', entry.description));
+    root.append(field('Amount', 'amount', 'number', entry.amount));
+    root.append(formSection('Details'));
+    root.append(formRow(
+      field('Date', 'date', 'date', entry.date || today()),
+      field('Type', 'type', 'select', entry.type || 'expense', ['expense', 'income'])
+    ));
+    root.append(formSection('Allocation'));
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || entry.recordId);
+    const allocationSlot = document.createElement('div');
+    allocationSlot.className = 'form-extension-slot ledger-allocation-slot';
+    root.append(allocationSlot, formSection('Receipt'));
+    const receiptSlot = document.createElement('div');
+    receiptSlot.className = 'form-extension-slot ledger-receipt-slot';
+    root.append(receiptSlot);
   }
   if (nextMode === 'event') {
     const record = recordById(recordId);
@@ -1895,6 +1939,7 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   if (nextMode === 'yield') {
     const entry = data.yieldEntries.find(item => item.id === id) || {};
     const type = entry.type || defaultType || 'milk';
+    root.append(formSection('Yield'));
     const typeField = field('Yield type', 'yieldTypeDisplay', 'select', type, [type]);
     typeField.querySelector('select').disabled = true;
     root.append(typeField);
@@ -1903,21 +1948,31 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     typeInput.name = 'yieldType';
     typeInput.value = type;
     root.append(typeInput);
-    addYieldRecordSelect(root, type, recordId || entry.recordId);
-    root.append(field('Date and time', 'occurredAt', 'datetime-local', localDateTime(entry.occurredAt || new Date())));
-    const defaultSession = type === 'milk' ? (new Date().getHours() < 15 ? 'morning' : 'evening') : 'other';
-    root.append(field('Session', 'session', 'select', entry.session || defaultSession, ['morning', 'evening', 'other']));
-    root.append(field('Quantity', 'quantity', 'number', entry.quantity));
     const yieldConfig=window.RegulaRusticaTasks.YIELD_TYPES[type];
-    root.append(field('Unit', 'unit', 'select', entry.unit || yieldConfig.defaultUnit, yieldConfig.units));
     if (yieldConfig.productRequired) root.append(field('Crop or product', 'product', 'text', entry.product));
+    root.append(formRow(
+      field('Quantity', 'quantity', 'number', entry.quantity),
+      field('Unit', 'unit', 'select', entry.unit || yieldConfig.defaultUnit, yieldConfig.units)
+    ));
     root.append(field('Loss or unusable amount', 'unusableQuantity', 'number', entry.unusableQuantity || 0));
+    root.append(formSection('When'));
+    const defaultSession = type === 'milk' ? (new Date().getHours() < 15 ? 'morning' : 'evening') : 'other';
+    root.append(formRow(
+      field('Date and time', 'occurredAt', 'datetime-local', localDateTime(entry.occurredAt || new Date())),
+      field('Session', 'session', 'select', entry.session || defaultSession, ['morning', 'evening', 'other'])
+    ));
+    root.append(formSection('Related To'));
+    addYieldRecordSelect(root, type, recordId || entry.recordId);
+    root.append(formSection('Notes'));
     root.append(field('Notes (optional)', 'details', 'textarea', entry.details));
   }
   if (nextMode === 'record') {
     const record = data.records.find(item => item.id === id) || { type: defaultType || 'Animal', name: '', status: 'Active', identity: {}, stewardship: {} };
-    root.append(field('Record type', 'type', 'select', record.type, RECORD_TYPES));
-    root.append(field('Name', 'name', 'text', record.name));
+    root.append(formSection('Identity'));
+    root.append(formRow(
+      field('Record type', 'type', 'select', record.type, RECORD_TYPES),
+      field('Name', 'name', 'text', record.name)
+    ));
     const typeFields = document.createElement('div');
     typeFields.className = 'form-grid';
     root.appendChild(typeFields);

@@ -47,7 +47,7 @@
     row.dataset.id = item.id || '';
 
     const recordWrap = document.createElement('label');
-    recordWrap.className = 'allocation-record';
+    recordWrap.className = 'allocation-record form-field';
     recordWrap.append('Record');
     const select = document.createElement('select');
     select.setAttribute('aria-label', 'Allocated Record');
@@ -57,7 +57,7 @@
     recordWrap.append(select);
 
     const amountWrap = document.createElement('label');
-    amountWrap.className = 'allocation-amount';
+    amountWrap.className = 'allocation-amount form-field';
     amountWrap.append('Amount');
     const amount = document.createElement('input');
     amount.type = 'number';
@@ -125,7 +125,9 @@
         <button type="button" class="btn secondary allocation-add">+ Add another Record</button>
         <div class="allocation-summary"></div>
       </div>`;
-    fields.append(box);
+    const slot = fields.querySelector('.ledger-allocation-slot');
+    if (slot) slot.append(box);
+    else fields.append(box);
 
     const trigger = box.querySelector('.allocation-trigger');
     const add = box.querySelector('.allocation-add');
