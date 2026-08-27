@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=mobile-primary-nav-v6">
-  <link rel="stylesheet" href="housekeeping.css?v=data-entry-forms-v3">
+  <link rel="stylesheet" href="housekeeping.css?v=settings-ui-v2">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=record-task-lifecycle-v2" defer></script>
@@ -18,7 +18,7 @@
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=data-entry-forms-v3" defer></script>
+  <script src="app.js?v=settings-ui-v2" defer></script>
   <script src="ui-refinements.js?v=data-entry-forms-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -289,36 +289,71 @@
     </section>
 
     <section id="settings" class="view">
-      <div class="section-head"><div><span class="label">Homestead administration</span><h2>Settings</h2></div></div>
-      <nav class="settings-nav choice-pills" aria-label="Settings sections">
-        <button class="active" type="button" data-settings-target="settingIdentity">Homestead</button>
-        <button type="button" data-settings-target="settingBackup">Backup</button>
-        <button type="button" data-settings-target="settingPeople">People</button>
-        <button type="button" data-settings-target="settingChoreWindows">Chore Windows</button>
-        <button type="button" data-settings-target="settingCloud">Cloud</button>
-      </nav>
-      <div class="grid2">
-        <article class="card settings-section" id="settingIdentity">
-          <span class="label">Identity</span>
-          <h2>Your homestead</h2>
+      <div class="settings-page-head"><span class="label">Homestead administration</span><h2 tabindex="-1">Settings</h2><p class="muted">Manage the homestead, its people, daily rhythm, and the records entrusted to this device.</p></div>
+      <article class="settings-home" id="settingHome">
+        <section class="settings-summary" aria-labelledby="settingsSummaryTitle">
+          <div><span class="label">About your homestead</span><h3 id="settingsSummaryTitle">At a glance</h3></div>
+          <dl>
+            <div><dt>Homestead</dt><dd id="settingsSummaryName">My Homestead</dd></div>
+            <div><dt>People</dt><dd id="settingsSummaryPeople">0</dd></div>
+            <div><dt>Chore Windows</dt><dd id="settingsSummaryWindows">0</dd></div>
+            <div><dt>Operating mode</dt><dd id="settingsSummaryMode">Local only</dd></div>
+          </dl>
+        </section>
+        <div class="settings-category-grid" aria-label="Settings categories">
+          <button class="settings-category-card" type="button" data-settings-category="identity">
+            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M4 15 16 5l12 10v13H4zM9 13V8h4v2M12 28v-9h8v9M7 16h4v5H7zM21 16h4v5h-4z"/><path class="icon-detail" d="M2 16 16 3l14 13M10 28h12"/></svg></span>
+            <span><strong>Homestead</strong><small>Identity and general homestead information.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+          </button>
+          <button class="settings-category-card" type="button" data-settings-category="people">
+            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="11" cy="10" r="4"/><circle cx="22" cy="12" r="3.5"/><path d="M3 27c0-6 3-10 8-10s8 4 8 10M17 27c.2-4.7 2.1-7.5 5.5-7.5S28 22.3 29 27"/><path class="icon-detail" d="M8 8c1.8.8 3.8.8 6 0M20 11c1.5.6 3 .6 4.5 0"/></svg></span>
+            <span><strong>People &amp; Stewardship</strong><small>Household participants and assignable children.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+          </button>
+          <button class="settings-category-card" type="button" data-settings-category="rhythm">
+            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/><path d="M16 8v9l6 3M12 3h8M16 3v2"/><path class="icon-detail" d="M7.5 7.5 5 5M24.5 7.5 27 5M16 27v2"/></svg></span>
+            <span><strong>Daily Rhythm</strong><small>Configure Chore Windows and task timing.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+          </button>
+          <button class="settings-category-card" type="button" data-settings-category="cloud">
+            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 25h16a6 6 0 0 0 1-11.9A9 9 0 0 0 8.2 11 7 7 0 0 0 8 25Z"/><path class="icon-detail" d="M11 19h10M13 16l-3 3 3 3M19 16l3 3-3 3"/></svg></span>
+            <span><strong>Cloud &amp; Sharing</strong><small>Optional account, sync, and household invitations.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+          </button>
+          <button class="settings-category-card" type="button" data-settings-category="backup">
+            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><ellipse cx="16" cy="7" rx="11" ry="4"/><path d="M5 7v18c0 2.2 4.9 4 11 4s11-1.8 11-4V7M5 13c0 2.2 4.9 4 11 4s11-1.8 11-4M5 19c0 2.2 4.9 4 11 4s11-1.8 11-4"/><path class="icon-detail" d="M11 9c3.3.8 6.7.8 10 0"/></svg></span>
+            <span><strong>Data &amp; Backup</strong><small>Download, restore, or reset local records.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+          </button>
+          <button class="settings-category-card" type="button" data-settings-category="about">
+            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/><path d="M16 14v9M16 9v1"/><path class="icon-detail" d="M12 14h4M13 23h7"/></svg></span>
+            <span><strong>App / About</strong><small>Version and local-first operating principles.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+          </button>
+        </div>
+      </article>
+      <div class="settings-panels">
+        <article class="card settings-section hidden" id="settingIdentity" data-settings-panel="identity">
+          <button class="settings-back" type="button">← Settings</button>
+          <header class="settings-section-head"><span class="label">Identity</span><h2 tabindex="-1">Your homestead</h2><p class="muted">The name used throughout this device and its records.</p></header>
           <form id="homesteadForm" class="form-grid">
             <label>Homestead name<input id="homesteadName"></label>
             <button class="btn primary" type="submit">Save name</button>
           </form>
         </article>
-        <article class="card settings-section" id="settingBackup">
-          <span class="label">Own your records</span>
-          <h2>Backup &amp; restore</h2>
+        <article class="card settings-section hidden" id="settingBackup" data-settings-panel="backup">
+          <button class="settings-back" type="button">← Settings</button>
+          <header class="settings-section-head"><span class="label">Own your records</span><h2 tabindex="-1">Data &amp; backup</h2><p class="muted">Keep a portable copy of the homestead records entrusted to this device.</p></header>
           <p class="muted">Download a backup regularly. Records remain available in this browser, including while cloud synchronization is disconnected.</p>
+          <h3 class="settings-rule-title">Routine data actions</h3>
           <div class="quick compact-actions">
             <button class="btn secondary" id="exportData">Download backup</button>
             <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
           </div>
-          <details class="danger-zone"><summary>Advanced</summary><p class="muted">Reset replaces every local record with the sample Homestead.</p><button class="btn danger" id="resetData">Reset sample data</button></details>
+          <details class="danger-zone"><summary>Destructive actions</summary><p class="muted">Reset replaces every local record with the sample Homestead.</p><button class="btn danger" id="resetData">Reset sample data</button></details>
         </article>
-        <article class="card settings-section" id="settingPeople">
-          <span class="label">Assignable people</span>
-          <h2>Children</h2>
+        <article class="card settings-section hidden" id="settingPeople" data-settings-panel="people">
+          <button class="settings-back" type="button">← Settings</button>
+          <header class="settings-section-head"><span class="label">Household participation</span><h2 tabindex="-1">People &amp; stewardship</h2><p class="muted">See who participates and manage local child profiles used for task assignment.</p></header>
+          <h3 class="settings-rule-title">Account-backed members</h3>
+          <div id="memberList" class="settings-person-list"></div>
+          <p id="memberEmpty" class="empty">No cloud household members are stored on this device.</p>
+          <h3 class="settings-rule-title">Children without accounts</h3>
           <p class="muted">Add a child without creating an account. Children can be assigned tasks, but receive no sign-in, role, permissions, or cloud access.</p>
           <form id="childForm" class="form-grid">
             <label>Child name<input id="childName" maxlength="120" autocomplete="off" required></label>
@@ -328,15 +363,16 @@
           <p id="childEmpty" class="empty">No children have been added.</p>
           <p class="muted">Kiosk access is planned for a later sprint.</p>
         </article>
-        <article class="card settings-section" id="settingChoreWindows">
-          <span class="label">Daily rhythm</span><h2>Chore Windows</h2>
+        <article class="card settings-section hidden" id="settingChoreWindows" data-settings-panel="rhythm">
+          <button class="settings-back" type="button">← Settings</button>
+          <header class="settings-section-head"><span class="label">Daily rhythm</span><h2 tabindex="-1">Chore Windows</h2><p class="muted">Shape the practical parts of the day without turning chores into appointments.</p></header>
           <p class="muted">Group recurring Tasks into practical parts of the day. These are not appointments.</p>
           <button class="btn primary" id="addChoreWindow" type="button">+ Add Chore Window</button>
           <div id="choreWindowList" class="stack"></div>
         </article>
-        <article class="card cloud-card settings-section" id="settingCloud">
-          <span class="label">Cloud foundation</span>
-          <h2>Your account</h2>
+        <article class="card cloud-card settings-section hidden" id="settingCloud" data-settings-panel="cloud">
+          <button class="settings-back" type="button">← Settings</button>
+          <header class="settings-section-head"><span class="label">Optional connection</span><h2 tabindex="-1">Cloud &amp; sharing</h2><p class="muted">Connect an account, synchronize safely, and invite household members when useful.</p></header>
           <p class="muted">Account access and synchronization are optional. Your working records remain local-first and available offline.</p>
           <p id="cloudStatus" class="cloud-status" role="status">Checking cloud configuration…</p>
           <form id="cloudAuthForm" class="form-grid hidden">
@@ -410,6 +446,17 @@
             <label>New password<input id="cloudNewPassword" type="password" autocomplete="new-password" minlength="8" required></label>
             <button class="btn primary" type="submit">Save new password</button>
           </form>
+        </article>
+        <article class="card settings-section hidden" id="settingAbout" data-settings-panel="about">
+          <button class="settings-back" type="button">← Settings</button>
+          <header class="settings-section-head"><span class="label">App / About</span><h2 tabindex="-1">Regula Rustica</h2><p class="muted">A quiet, local-first farm ledger for the things entrusted to your care.</p></header>
+          <dl class="settings-about-list">
+            <div><dt>Application</dt><dd>Regula Rustica</dd></div>
+            <div><dt>Version</dt><dd>v5</dd></div>
+            <div><dt>Storage</dt><dd>Local-first, with optional cloud synchronization</dd></div>
+            <div><dt>Offline use</dt><dd>Available after the app has been installed or cached</dd></div>
+          </dl>
+          <p class="settings-about-note">The app remembers so you do not have to.</p>
         </article>
       </div>
     </section>
