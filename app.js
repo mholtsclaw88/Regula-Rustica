@@ -586,6 +586,7 @@ let attachmentSyncPromise = null;
 let journalFilter = 'all';
 let profileCropAttachmentId = null;
 let profileCropDraft = normalizeProfileCrop();
+let settingsSection = 'home';
 
 function recordById(id) {
   return data.records.find(record => record.id === id);
@@ -652,7 +653,36 @@ function showView(id) {
   $(`#${id}`).classList.add('active');
   priorView = id;
   if (id === 'records') renderRecords();
+  if (id === 'settings') showSettingsSection('home', false);
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function settingsOperatingMode() {
+  const context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
+  if (context?.homesteadId) return 'Cloud connected';
+  if (context?.session) return 'Signed in · local until joined';
+  return 'Local only';
+}
+
+function renderSettingsSummary() {
+  if (!$('#settingsSummaryName')) return;
+  const people = activePeople().length;
+  const windows = data.choreWindows.filter(item => !item.deletedAt && item.enabled).length;
+  $('#settingsSummaryName').textContent = data.settings.homesteadName || 'My Homestead';
+  $('#settingsSummaryPeople').textContent = `${people} ${people === 1 ? 'person' : 'people'}`;
+  $('#settingsSummaryWindows').textContent = `${windows} active`;
+  $('#settingsSummaryMode').textContent = settingsOperatingMode();
+}
+
+function showSettingsSection(section = 'home', focus = true) {
+  settingsSection = section;
+  const home = $('#settingHome');
+  if (!home) return;
+  home.classList.toggle('hidden', section !== 'home');
+  $$('[data-settings-panel]').forEach(panel => panel.classList.toggle('hidden', panel.dataset.settingsPanel !== section));
+  renderSettingsSummary();
+  if (focus) (section === 'home' ? $('.settings-page-head h2') : $(`[data-settings-panel="${section}"] h2`))?.focus?.({ preventScroll: true });
+  if (focus) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function openRecord(id) {
@@ -1330,6 +1360,20 @@ function renderTasks() {
 
 function renderPeople() {
   const root = $('#childList');
+  const memberRoot = $('#memberList');
+  if (memberRoot) {
+    memberRoot.innerHTML = '';
+    data.people
+      .filter(person => !person.deletedAt && person.personType === 'member')
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+      .forEach(person => {
+        const row = document.createElement('div');
+        row.className = 'settings-person-row';
+        row.innerHTML = `<span class="settings-person-mark" aria-hidden="true">${escapeHtml(person.displayName.slice(0, 1).toUpperCase())}</span><span><strong>${escapeHtml(person.displayName)}</strong><small>Account-backed household member · Task eligible</small></span>`;
+        memberRoot.appendChild(row);
+      });
+    $('#memberEmpty')?.classList.toggle('hidden', memberRoot.children.length > 0);
+  }
   root.innerHTML = '';
   data.people
     .filter(person => !person.deletedAt && person.personType === 'child')
@@ -1599,6 +1643,7 @@ function renderAll() {
   renderTasks();
   renderPeople();
   renderChoreWindows();
+  renderSettingsSummary();
   renderCalendar();
   renderYield();
   renderLedger();
@@ -2353,10 +2398,8 @@ $$('[name="recordTypeFilter"]').forEach(input => input.addEventListener('change'
 ['recordStatusFilter', 'recordSort'].forEach(id => $(`#${id}`).addEventListener('change', renderRecords));
 $$('[name="yieldTypeFilter"], [name="yieldDateFilter"]').forEach(input => input.addEventListener('change', renderYield));
 $$('[name="ledgerTypeFilter"], [name="ledgerDateFilter"]').forEach(input => input.addEventListener('change', renderLedger));
-$$('[data-settings-target]').forEach(button => button.addEventListener('click', () => {
-  $$('[data-settings-target]').forEach(item => item.classList.toggle('active', item === button));
-  $(`#${button.dataset.settingsTarget}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
-}));
+$$('[data-settings-category]').forEach(button => button.addEventListener('click', () => showSettingsSection(button.dataset.settingsCategory)));
+$$('.settings-back').forEach(button => button.addEventListener('click', () => showSettingsSection('home')));
 if (window.matchMedia('(max-width: 520px)').matches) $('#taskAdvancedFilters').removeAttribute('open');
 ['#calendarShowTasks', '#calendarShowEvents', '#calendarShowCompleted']
   .forEach(selector => $(selector).addEventListener('change', renderCalendar));
@@ -2395,6 +2438,7 @@ $('#resetData').addEventListener('click', () => {
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(error => console.warn('Offline support could not start.', error)));
 window.addEventListener('regula-rustica:cloud-context', () => {
   renderRecords();
+  renderSettingsSummary();
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 });
 
