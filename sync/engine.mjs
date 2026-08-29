@@ -145,6 +145,21 @@ export class SyncEngine {
   }
 
   async pull() {
+    if (typeof this.cloud.memberDirectory === 'function') {
+      const rows = await this.cloud.memberDirectory();
+      const next = structuredClone(this.readLocal());
+      next.people ||= [];
+      for (const row of rows) {
+        const converted = fromCloud('homestead_people', row, this.state);
+        const index = next.people.findIndex(item => item.id === converted.id);
+        if (index < 0) next.people.push(converted); else next.people[index] = converted;
+        const entity = this.state.entity('homestead_people', converted.id);
+        entity.cloudVersion = row.version ?? entity.cloudVersion;
+        entity.cloudRow = row;
+      }
+      this.writeLocal(next, 'sync');
+      this.state.save();
+    }
     for (const table of DOMAIN_ORDER) {
       for await (const page of this.cloud.changes(table, this.state.state.cursors[table])) {
         const next = structuredClone(this.readLocal());

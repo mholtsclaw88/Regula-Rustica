@@ -25,6 +25,7 @@ class MockCloud {
     this.underreport = false;
   }
   async counts() { return Object.fromEntries(DOMAIN_ORDER.map(table => [table, this.underreport ? 0 : this.rows[table].length])); }
+  async memberDirectory() { return this.rows.homestead_people.filter(row => row.person_type === 'member'); }
   async apply(operation) {
     this.calls.push(operation);
     if (this.fail) throw Object.assign(new Error('network unavailable'), { code: 'FETCH' });
@@ -365,6 +366,26 @@ test('account-backed directory entries do not make an empty Homestead look popul
   assert.equal(hasMeaningfulData(data), false);
   data.people.push({ id: 'child-one', personType: 'child', displayName: 'Clare' });
   assert.equal(hasMeaningfulData(data), true);
+});
+
+test('member directory reconciliation repairs a stale local people cache without resetting its cursor', async () => {
+  const membershipId = crypto.randomUUID();
+  const cloudPersonId = crypto.randomUUID();
+  const cloud = new MockCloud({ homestead_people: [{
+    id: cloudPersonId, person_type: 'member', display_name: 'Morgan Steward', member_id: membershipId,
+    version: 3, created_at: '2026-08-01T00:00:00Z', updated_at: '2026-08-20T00:00:00Z', deleted_at: null
+  }] });
+  const setup = harness(blank(), cloud);
+  setup.state.bind(crypto.randomUUID());
+  setup.state.state.initialSyncCompleted = true;
+  setup.state.state.cursors.homestead_people = { updatedAt: '2026-08-29T00:00:00Z', id: crypto.randomUUID() };
+  setup.state.save();
+
+  await setup.engine.pull();
+
+  assert.deepEqual(setup.local().people.map(person => ({
+    personType: person.personType, displayName: person.displayName, memberId: person.memberId, deletedAt: person.deletedAt
+  })), [{ personType: 'member', displayName: 'Morgan Steward', memberId: membershipId, deletedAt: null }]);
 });
 
 test('local attachment metadata waits for binary upload before entering the cloud outbox', () => {

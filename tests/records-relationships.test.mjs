@@ -58,17 +58,20 @@ test('parent choices include only active individual Animals of the same species'
   assert.deepEqual(relationships.parentAnimalOptions(records, 'calf', ' cattle ').map(option => option.value), ['cow']);
 });
 
-test('Responsible Person choices include active members and children', () => {
+test('Responsible Person choices include the owner, active invited members, and children', () => {
   const options = relationships.activePersonOptions({ people: [
-    { id: 'member', personType: 'member', displayName: 'Alex' },
+    { id: 'owner', memberId: 'membership-owner', personType: 'member', displayName: 'Morgan Steward' },
+    { id: 'member', memberId: 'membership-keeper', personType: 'member', displayName: 'Alex Keeper' },
     { id: 'child', personType: 'child', displayName: 'Clare' },
     { id: 'removed', personType: 'member', displayName: 'Former', deletedAt: stamp },
-    { id: 'inactive', personType: 'child', displayName: 'Inactive', status: 'inactive' }
+    { id: 'inactive', personType: 'child', displayName: 'Inactive', status: 'inactive' },
+    { id: 'disabled', personType: 'child', displayName: 'Disabled', active: false }
   ] });
 
   assert.deepEqual(options, [
-    { label: 'Alex', value: 'member' },
-    { label: 'Clare (child)', value: 'child' }
+    { label: 'Alex Keeper', value: 'member' },
+    { label: 'Clare (child)', value: 'child' },
+    { label: 'Morgan Steward', value: 'owner' }
   ]);
 });
 

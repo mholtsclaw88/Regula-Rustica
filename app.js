@@ -120,9 +120,12 @@ function normalizePerson(person = {}) {
     personType: person.personType === 'member' ? 'member' : 'child',
     displayName: person.displayName || person.name || 'Unnamed person',
     memberId: person.memberId || null,
+    status: person.status || 'active',
+    active: person.active !== false,
     createdAt,
     updatedAt: person.updatedAt || createdAt,
-    deletedAt: person.deletedAt || null
+    deletedAt: person.deletedAt || null,
+    removedAt: person.removedAt || null
   };
 }
 
@@ -597,7 +600,20 @@ function recordName(id) {
 }
 
 function activePeople() {
-  return data.people.filter(person => !person.deletedAt).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const seen = new Set();
+  return data.people.filter(person => {
+    const status = String(person.status || '').toLowerCase();
+    if (!person.id || person.deletedAt || person.removedAt || person.active === false
+      || ['inactive', 'archived', 'removed', 'suspended'].includes(status)) return false;
+    const key = person.memberId ? `member:${person.memberId}` : `person:${person.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a, b) => personDisplayName(a).localeCompare(personDisplayName(b)));
+}
+
+function personDisplayName(person = {}) {
+  return person.displayName || person.name || 'Unnamed person';
 }
 
 function assignmentForTask(taskId) {
@@ -1331,7 +1347,7 @@ function renderTasks() {
     .forEach(record => recordFilter.add(new Option(`${record.name} (${record.type})`, record.id)));
   if ([...recordFilter.options].some(option => option.value === selectedRecord)) recordFilter.value = selectedRecord;
   assigneeFilter.innerHTML = '<option value="all">All people</option><option value="unassigned">Unassigned</option>';
-  activePeople().forEach(person => assigneeFilter.add(new Option(`${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
+  activePeople().forEach(person => assigneeFilter.add(new Option(`${personDisplayName(person)}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
   if ([...assigneeFilter.options].some(option => option.value === selectedAssignee)) assigneeFilter.value = selectedAssignee;
 
   const status = document.querySelector('[name="taskStatusFilter"]:checked')?.value || 'open';
@@ -1712,7 +1728,7 @@ function addPersonSelect(root, selected = '') {
   select.name = 'personId';
   select.add(new Option('Unassigned', ''));
   activePeople().forEach(person => select.add(new Option(
-    `${person.displayName}${person.personType === 'child' ? ' (child)' : ''}`,
+    `${personDisplayName(person)}${person.personType === 'child' ? ' (child)' : ''}`,
     person.id
   )));
   select.value = selected || '';
