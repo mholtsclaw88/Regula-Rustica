@@ -14,7 +14,7 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-const blank = () => ({ schemaVersion: 9, settings: { homesteadName: 'Test' }, records: [], documents: [], attachments: [], people: [], choreWindows: [], routines: [], routineOccurrences: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [] });
+const blank = () => ({ schemaVersion: 9, settings: { homesteadName: 'Test' }, records: [], documents: [], attachments: [], people: [], choreWindows: [], routines: [], routineOccurrences: [], tasks: [], relationships: [], assignments: [], events: [], calendarEvents: [], yieldEntries: [], notes: [], ledger: [], ledgerAllocations: [] });
 const record = (id = crypto.randomUUID()) => ({ id, type: 'Animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', deletedAt: null });
 
 class MockCloud {
@@ -65,7 +65,7 @@ function harness(local = blank(), cloud = new MockCloud()) {
   const state = new LocalSyncState(storage);
   let current = structuredClone(local);
   const engine = new SyncEngine({ state, cloud, readLocal: () => structuredClone(current), writeLocal: value => { current = structuredClone(value); } });
-  return { state, cloud, engine, storage, local: () => current };
+  return { state, cloud, engine, storage, local: () => current, setLocal: value => { current = structuredClone(value); } };
 }
 
 test('device UUID persists across reloads', () => {
@@ -433,6 +433,21 @@ test('local attachment metadata waits for binary upload before entering the clou
   assert.equal(h.state.state.outbox.find(item => item.table === 'record_attachments')?.type, 'create');
 });
 
+test('a failed local attachment does not prevent unrelated Task metadata from syncing', async () => {
+  const before = blank(); const h = harness(before);
+  h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const after = blank();
+  after.attachments.push({ id: 'missing-photo', documentId: 'doc-1', recordId: 'daisy', storagePath: '', filename: 'photo.jpg', mimeType: 'image/jpeg', size: 1000, syncState: 'failed', syncError: 'The local attachment copy is unavailable.', createdAt: '2026-08-29T10:00:00Z', updatedAt: '2026-08-29T10:00:00Z' });
+  after.tasks.push({ id: 'independent-task', title: 'Close the gate', status: 'open', completed: false, createdAt: '2026-08-29T10:00:00Z', updatedAt: '2026-08-29T10:00:00Z' });
+
+  h.engine.queueLocalChanges(before, after);
+  await h.engine.push();
+
+  assert.equal(h.cloud.rows.tasks.length, 1);
+  assert.equal(h.state.state.outbox.some(item => item.table === 'record_attachments'), false);
+  assert.equal(after.attachments[0].syncState, 'failed');
+});
+
 test('Record responsibility retains its canonical Homestead Person mapping', () => {
   const state = new LocalSyncState(new MemoryStorage());
   const personId = 'member-one';
@@ -564,6 +579,57 @@ test('dependent changes wait behind a failed parent while unrelated domains cont
   assert.equal(h.cloud.rows.record_documents.length, 1);
 });
 
+test('an RLS rejection stays actionable and manual retry succeeds after permission is corrected', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  h.state.enqueue({ table: 'ledger_entries', localId: 'feed-cost', type: 'create', payload: { entry_type: 'expense', amount: 25 } });
+  const apply = h.cloud.apply.bind(h.cloud);
+  let denied = true;
+  h.cloud.apply = operation => denied
+    ? Promise.reject(Object.assign(new Error('Not authorized'), { code: '42501' }))
+    : apply(operation);
+
+  await h.engine.push();
+  const blocked = h.state.state.outbox[0];
+  assert.equal(blocked.status, 'blocked');
+  assert.equal(blocked.lastErrorCode, '42501');
+
+  denied = false;
+  await h.engine.push({ retryBlocked: true });
+  assert.equal(h.state.state.outbox.length, 0);
+  assert.equal(h.cloud.rows.ledger_entries.length, 1);
+});
+
+test('a conflict in one entity does not freeze an unrelated domain', async () => {
+  const cloudId = crypto.randomUUID();
+  const cloud = new MockCloud({ records: [{ id: cloudId, version: 3, name: 'Cloud Daisy' }] });
+  const h = harness(blank(), cloud); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  h.state.entity('records', 'daisy').cloudId = cloudId;
+  h.state.enqueue({ table: 'records', localId: 'daisy', type: 'update', baseVersion: 2, payload: { id: cloudId, name: 'Local Daisy' } });
+  h.state.enqueue({ table: 'chore_windows', localId: 'morning', type: 'create', payload: { name: 'Morning' } });
+
+  await h.engine.push();
+
+  assert.equal(h.state.state.conflicts.length, 1);
+  assert.equal(h.cloud.rows.chore_windows.length, 1);
+  assert.equal(h.state.state.outbox.length, 0);
+});
+
+test('offline outbox survives reload and reconnect applies the operation exactly once', async () => {
+  const storage = new MemoryStorage();
+  const firstState = new LocalSyncState(storage); const homestead = crypto.randomUUID();
+  firstState.bind(homestead); firstState.state.initialSyncCompleted = true;
+  firstState.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: { type: 'animal', name: 'Daisy', identity: {}, stewardship: {} } });
+
+  const recoveredState = new LocalSyncState(storage);
+  const cloud = new MockCloud();
+  const engine = new SyncEngine({ state: recoveredState, cloud, readLocal: blank, writeLocal: () => {} });
+  await engine.push();
+  await engine.push();
+
+  assert.equal(recoveredState.state.outbox.length, 0);
+  assert.equal(cloud.rows.records.length, 1);
+});
+
 test('successful idempotent retry cannot duplicate a row', async () => {
   const h = harness(); h.state.bind(crypto.randomUUID()); const item = record();
   const operation = h.state.enqueue({ table: 'records', localId: item.id, type: 'create', payload: toCloud('records', item, h.state) });
@@ -661,7 +727,7 @@ test('pull cursor does not advance when a page cannot be applied locally', async
   assert.equal(state.state.cursors.records, undefined);
 });
 
-test('two devices converge after one pushes and the other pulls', async () => {
+test('two devices exchange Record, Task, Yield, Ledger, edits, and soft deletion without manual mutation', async () => {
   class SharedCloud extends MockCloud {
     async *changes(table, cursor) {
       const start = cursor || { updatedAt: '1970-01-01T00:00:00.000Z', id: '00000000-0000-0000-0000-000000000000' };
@@ -679,6 +745,7 @@ test('two devices converge after one pushes and the other pulls', async () => {
   first.state.bind(homestead); first.state.state.initialSyncCompleted = true;
   const firstLocal = blank(); firstLocal.records.push(record('daisy'));
   first.engine.queueLocalChanges(blank(), firstLocal);
+  first.setLocal(firstLocal);
   await first.engine.sync();
 
   const second = harness(blank(), cloud);
@@ -686,4 +753,42 @@ test('two devices converge after one pushes and the other pulls', async () => {
   await second.engine.pull();
   assert.equal(second.local().records[0].name, 'Daisy');
   assert.equal(second.state.state.cursors.records.id, cloud.rows.records[0].id);
+
+  let before = first.local();
+  let after = structuredClone(before);
+  after.tasks.push({ id: 'milk-task', recordId: 'daisy', title: 'Morning milking', status: 'open', completed: false, dueDate: '2026-08-29', createdAt: '2026-08-29T12:01:00Z', updatedAt: '2026-08-29T12:01:00Z' });
+  first.engine.queueLocalChanges(before, after); first.setLocal(after); await first.engine.sync(); await second.engine.pull();
+  assert.equal(second.local().tasks[0].title, 'Morning milking');
+
+  before = first.local(); after = structuredClone(before);
+  Object.assign(after.tasks[0], { status: 'completed', completed: true, completedAt: '2026-08-30T12:02:00Z', updatedAt: '2026-08-30T12:02:00Z' });
+  after.yieldEntries.push({ id: 'milk-yield', taskId: 'milk-task', recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-30T12:02:00Z', quantity: 2, unit: 'gal', unusableQuantity: 0, details: '', createdAt: '2026-08-30T12:02:00Z', updatedAt: '2026-08-30T12:02:00Z' });
+  first.engine.queueLocalChanges(before, after); first.setLocal(after); await first.engine.sync(); await second.engine.pull();
+  assert.equal(cloud.rows.tasks[0].status, 'completed');
+  assert.equal(second.state.state.cursors.tasks.updatedAt, '2026-08-30T12:02:00Z');
+  assert.equal(second.local().tasks[0].completed, true);
+  assert.equal(second.local().yieldEntries[0].quantity, 2);
+
+  before = first.local(); after = structuredClone(before);
+  after.ledger.push({ id: 'feed-entry', recordId: 'daisy', type: 'expense', amount: 40, category: 'Feed', date: '2026-08-30', createdAt: '2026-08-30T12:03:00Z', updatedAt: '2026-08-30T12:03:00Z' });
+  after.ledgerAllocations.push({ id: 'feed-share', ledgerEntryId: 'feed-entry', recordId: 'daisy', amount: 40, createdAt: '2026-08-30T12:03:00Z', updatedAt: '2026-08-30T12:03:00Z' });
+  first.engine.queueLocalChanges(before, after); first.setLocal(after); await first.engine.sync(); await second.engine.pull();
+  assert.equal(second.local().ledger[0].amount, 40);
+  assert.equal(second.local().ledgerAllocations[0].amount, 40);
+
+  before = second.local(); after = structuredClone(before);
+  Object.assign(after.records[0], { name: 'Daisy II', updatedAt: '2026-08-30T12:04:00Z' });
+  second.engine.queueLocalChanges(before, after); second.setLocal(after); await second.engine.sync(); await first.engine.pull();
+  assert.equal(first.local().records[0].name, 'Daisy II');
+
+  const staleSecond = structuredClone(second.local());
+  before = first.local(); after = structuredClone(before);
+  Object.assign(after.tasks[0], { deletedAt: '2026-08-30T12:05:00Z', updatedAt: '2026-08-30T12:05:00Z' });
+  first.engine.queueLocalChanges(before, after); first.setLocal(after); await first.engine.sync();
+
+  const staleEdit = structuredClone(staleSecond);
+  Object.assign(staleEdit.tasks[0], { title: 'Stale renamed task', updatedAt: '2026-08-30T12:06:00Z' });
+  second.engine.queueLocalChanges(staleSecond, staleEdit); second.setLocal(staleEdit); await second.engine.sync();
+  assert.equal(second.state.state.conflicts.some(item => item.table === 'tasks'), true);
+  assert.equal(second.local().tasks[0].deletedAt, '2026-08-30T12:05:00Z');
 });
