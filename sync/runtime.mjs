@@ -17,6 +17,15 @@ const offlineEngine = new SyncEngine({
 let engine = offlineEngine;
 let context = null;
 let firstCase = null;
+let attachmentRun = null;
+let syncTimer = null;
+
+const DOMAIN_LABELS = Object.freeze({
+  homestead_people: 'People', records: 'Records', record_documents: 'Documents', record_attachments: 'Attachments',
+  chore_windows: 'Chore Windows', tasks: 'Tasks', record_relationships: 'Records', task_assignments: 'Tasks',
+  chronicle_entries: 'Journal', calendar_events: 'Calendar', yield_entries: 'Yield', notes: 'Journal',
+  ledger_entries: 'Ledger', ledger_allocations: 'Ledger', routines: 'Routines', routine_occurrences: 'Routines'
+});
 
 window.RegulaRusticaSync = Object.freeze({
   isInitialized: () => state.state.initialSyncCompleted
@@ -25,9 +34,14 @@ window.RegulaRusticaSync = Object.freeze({
 function message(kind, error) {
   const waiting = state.state.outbox.length;
   const conflicts = state.state.conflicts.filter(item => item.status === 'unresolved').length;
+  const blocked = state.state.outbox.filter(item => ['blocked', 'dependency'].includes(item.status));
   if (conflicts) return `${conflicts} change${conflicts === 1 ? '' : 's'} need review`;
   if (kind === 'syncing') return 'Syncing…';
   if (kind === 'offline' || !navigator.onLine) return `Offline — changes saved locally${waiting ? ` · ${waiting} waiting` : ''}`;
+  if (blocked.length) {
+    const labels = [...new Set(blocked.map(item => DOMAIN_LABELS[item.table] || item.table.replaceAll('_', ' ')))];
+    return `${blocked.length} change${blocked.length === 1 ? '' : 's'} could not sync · ${labels.join(', ')}`;
+  }
   if (kind === 'problem') return `Sync problem${error?.message ? ` — ${error.message}` : ''}`;
   if (waiting) return `${waiting} change${waiting === 1 ? '' : 's'} waiting`;
   if (!context?.homesteadId) return 'Cloud synchronization is disconnected.';
@@ -37,7 +51,7 @@ function message(kind, error) {
 
 function render(kind = 'ready', error = null) {
   status.textContent = message(kind, error);
-  status.classList.toggle('error', kind === 'problem');
+  status.classList.toggle('error', kind === 'problem' || kind === 'attention' || state.state.outbox.some(item => item.status === 'blocked'));
   syncNow.classList.toggle('hidden', !context?.homesteadId || !state.state.initialSyncCompleted);
   actions.classList.toggle('hidden', !firstCase || state.state.initialSyncCompleted);
   actions.querySelectorAll('[data-cases]').forEach(button => {
@@ -52,17 +66,49 @@ function render(kind = 'ready', error = null) {
     item.querySelectorAll('button').forEach(button => button.addEventListener('click', () => run(() => engine.resolveConflict(conflict.id, button.dataset.choice))));
     conflictList.appendChild(item);
   });
+  state.state.outbox.filter(item => ['blocked', 'dependency'].includes(item.status)).forEach(operation => {
+    const item = document.createElement('div');
+    item.className = 'sync-conflict';
+    const title = document.createElement('p');
+    const strong = document.createElement('strong');
+    strong.textContent = DOMAIN_LABELS[operation.table] || operation.table.replaceAll('_', ' ');
+    title.append(strong, ` ${operation.type || 'change'} could not sync.`);
+    const detail = document.createElement('p');
+    detail.className = 'muted';
+    detail.textContent = `Item ${operation.localId || 'unknown'} · ${operation.attempts || 0} attempt${operation.attempts === 1 ? '' : 's'} · ${operation.lastErrorCode || 'SYNC_BLOCKED'} · ${operation.lastErrorAt || 'not attempted'}`;
+    item.append(title, detail);
+    conflictList.appendChild(item);
+  });
 }
 
 async function run(action) {
   render('syncing');
-  try { await action(); render('synced'); }
+  try { await action(); render('ready'); }
   catch (error) { render(navigator.onLine ? 'problem' : 'offline', error); }
 }
 
-async function syncAttachmentsThen(action) {
-  if (window.RegulaRustica?.syncLocalAttachments) await window.RegulaRustica.syncLocalAttachments({ requireAll: true });
-  return action();
+function canSync() {
+  return navigator.onLine && context?.homesteadId && state.state.initialSyncCompleted;
+}
+
+function startAttachmentSync() {
+  if (attachmentRun || !canSync() || !window.RegulaRustica?.syncLocalAttachments) return attachmentRun;
+  attachmentRun = window.RegulaRustica.syncLocalAttachments({ requireAll: false })
+    .catch(() => null)
+    .finally(() => {
+      attachmentRun = null;
+      if (canSync()) run(() => engine.sync());
+    });
+  return attachmentRun;
+}
+
+function scheduleSync({ retryBlocked = false } = {}) {
+  if (!canSync()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    run(() => engine.sync({ retryBlocked }));
+    startAttachmentSync();
+  }, 500);
 }
 
 async function connect(nextContext) {
@@ -85,7 +131,7 @@ async function connect(nextContext) {
     writeLocal: (data, source) => window.RegulaRusticaLocal.write(data, source),
     onStatus: render
   });
-  if (state.state.initialSyncCompleted) run(() => syncAttachmentsThen(() => engine.sync()));
+  if (state.state.initialSyncCompleted) scheduleSync();
   else run(async () => {
     const inspection = await engine.inspectFirstSync(context.homesteadId);
     firstCase = inspection.case;
@@ -98,20 +144,37 @@ window.addEventListener('regula-rustica:data-saved', event => {
   if (event.detail.source === 'sync') return;
   engine.queueLocalChanges(event.detail.before, event.detail.after);
   render(navigator.onLine ? 'ready' : 'offline');
-  if (event.detail.source === 'attachment-sync') return;
-  if (navigator.onLine && context?.homesteadId && state.state.initialSyncCompleted) run(() => syncAttachmentsThen(() => engine.sync()));
+  scheduleSync();
+  if (event.detail.source !== 'attachment-sync') startAttachmentSync();
 });
-window.addEventListener('online', () => engine && state.state.initialSyncCompleted && run(() => syncAttachmentsThen(() => engine.sync())));
+window.addEventListener('online', () => scheduleSync());
 window.addEventListener('offline', () => render('offline'));
+window.addEventListener('focus', () => scheduleSync());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') scheduleSync();
+});
+setInterval(() => {
+  if (document.visibilityState === 'visible') scheduleSync();
+}, 60000);
 
-syncNow.addEventListener('click', () => context?.homesteadId && run(() => syncAttachmentsThen(() => engine.sync())));
-document.querySelector('#syncUpload').addEventListener('click', () => run(() => syncAttachmentsThen(() => engine.initialize('upload', context.homesteadId))));
-document.querySelector('#syncDownload').addEventListener('click', () => run(() => syncAttachmentsThen(() => engine.initialize('download', context.homesteadId))));
+syncNow.addEventListener('click', () => {
+  if (!context?.homesteadId) return;
+  run(() => engine.sync({ retryBlocked: true }));
+  startAttachmentSync();
+});
+document.querySelector('#syncUpload').addEventListener('click', () => run(async () => {
+  await engine.initialize('upload', context.homesteadId);
+  startAttachmentSync();
+}));
+document.querySelector('#syncDownload').addEventListener('click', () => run(() => engine.initialize('download', context.homesteadId)));
 document.querySelector('#syncUseCloud').addEventListener('click', () => {
   window.RegulaRusticaLocal.exportBackup();
   run(() => engine.initialize('cloud', context.homesteadId));
 });
-document.querySelector('#syncInitializeEmpty').addEventListener('click', () => run(() => syncAttachmentsThen(() => engine.initialize('empty', context.homesteadId))));
+document.querySelector('#syncInitializeEmpty').addEventListener('click', () => run(async () => {
+  await engine.initialize('empty', context.homesteadId);
+  startAttachmentSync();
+}));
 document.querySelector('#syncCancel').addEventListener('click', () => { firstCase = null; render('ready'); });
 
 render();
