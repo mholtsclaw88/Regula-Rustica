@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SyncEngine } from '../sync/engine.mjs';
-import { LocalSyncState } from '../sync/local-state.mjs';
+import { SyncEngine, isRetryableSyncError } from '../sync/engine.mjs';
+import { LocalSyncState, SYNC_STORAGE_KEYS } from '../sync/local-state.mjs';
 import { DOMAIN_ORDER, fromCloud, hasMeaningfulData, operationOrder, toCloud } from '../sync/entities.mjs';
+import { SYNC_RPC_ROUTES, SupabaseSyncAdapter, rpcForSyncTable } from '../sync/cloud-adapter.mjs';
 import housekeepingData from '../housekeeping-data.js';
 
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
@@ -85,6 +86,37 @@ test('durable outbox survives reload', () => {
   const storage = new MemoryStorage(); const state = new LocalSyncState(storage);
   state.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: {} });
   assert.equal(new LocalSyncState(storage).state.outbox.length, 1);
+});
+
+test('every active sync domain has one explicit server RPC route', async () => {
+  assert.deepEqual(Object.keys(SYNC_RPC_ROUTES), DOMAIN_ORDER);
+  const calls = [];
+  const adapter = new SupabaseSyncAdapter({
+    async rpc(name, payload) { calls.push([name, payload.target_table]); return { data: { status: 'applied', row: {} }, error: null }; }
+  });
+  for (const table of DOMAIN_ORDER) {
+    await adapter.apply({ table, idempotencyKey: crypto.randomUUID(), deviceId: crypto.randomUUID(), rowId: crypto.randomUUID(), type: 'create', baseVersion: null, clientUpdatedAt: new Date().toISOString(), payload: {} });
+  }
+  assert.deepEqual(calls, DOMAIN_ORDER.map(table => [SYNC_RPC_ROUTES[table], table]));
+  assert.throws(() => rpcForSyncTable('routines'), error => error.code === 'SYNC_ROUTE_MISSING');
+});
+
+test('legacy failed operations reload as retryable without losing diagnostics', () => {
+  const operation = { id: crypto.randomUUID(), table: 'records', localId: 'daisy', type: 'update', status: 'failed', attempts: 2, lastError: 'network unavailable' };
+  const storage = new MemoryStorage({
+    [SYNC_STORAGE_KEYS.state]: JSON.stringify({ ...new LocalSyncState(new MemoryStorage()).state, outbox: [operation] })
+  });
+  const recovered = new LocalSyncState(storage).state.outbox[0];
+  assert.equal(recovered.status, 'retryable');
+  assert.equal(recovered.attempts, 2);
+  assert.equal(recovered.lastError, 'network unavailable');
+});
+
+test('sync errors distinguish retryable transport failures from actionable server rejection', () => {
+  assert.equal(isRetryableSyncError(Object.assign(new Error('Failed to fetch'), { code: 'FETCH' })), true);
+  assert.equal(isRetryableSyncError(Object.assign(new Error('busy'), { status: 503 })), true);
+  assert.equal(isRetryableSyncError(Object.assign(new Error('Unsupported sync table'), { code: '22023' })), false);
+  assert.equal(isRetryableSyncError(Object.assign(new Error('forbidden'), { status: 403 })), false);
 });
 
 test('recurrence normalization keeps scheduling separate from completion behavior', () => {
@@ -456,6 +488,82 @@ test('push uses dependency-safe domain order', async () => {
   await h.engine.push(); assert.deepEqual(h.cloud.calls.map(item => item.table), DOMAIN_ORDER);
 });
 
+test('one unsupported legacy operation is blocked locally while healthy operations continue', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  h.state.enqueue({ table: 'routines', localId: 'old-routine', type: 'update', payload: {} });
+  h.state.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: { type: 'animal', name: 'Daisy', identity: {}, stewardship: {} } });
+  const apply = h.cloud.apply.bind(h.cloud);
+  h.cloud.apply = operation => operation.table === 'routines'
+    ? Promise.reject(Object.assign(new Error('No cloud synchronization route is registered for routines.'), { code: 'SYNC_ROUTE_MISSING' }))
+    : apply(operation);
+
+  await h.engine.push();
+
+  assert.equal(h.cloud.rows.records.length, 1);
+  const blocked = h.state.state.outbox.find(item => item.table === 'routines');
+  assert.equal(blocked.status, 'blocked');
+  assert.equal(blocked.lastErrorCode, 'SYNC_ROUTE_MISSING');
+  assert.equal(h.state.state.failedOperations[0].localId, 'old-routine');
+});
+
+test('a transient failure remains retryable while an unrelated change syncs and later recovers', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  h.state.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: { type: 'animal', name: 'Daisy', identity: {}, stewardship: {} } });
+  h.state.enqueue({ table: 'chore_windows', localId: 'morning', type: 'create', payload: { name: 'Morning' } });
+  const apply = h.cloud.apply.bind(h.cloud);
+  let failRecord = true;
+  h.cloud.apply = operation => failRecord && operation.table === 'records'
+    ? Promise.reject(Object.assign(new Error('network unavailable'), { code: 'FETCH' }))
+    : apply(operation);
+
+  await h.engine.push();
+  assert.equal(h.state.state.outbox.find(item => item.table === 'records').status, 'retryable');
+  assert.equal(h.cloud.rows.chore_windows.length, 1);
+
+  failRecord = false;
+  await h.engine.push();
+  assert.equal(h.state.state.outbox.length, 0);
+  assert.equal(h.cloud.rows.records.length, 1);
+});
+
+test('overlapping foreground triggers share one active sync run', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  h.state.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: { type: 'animal', name: 'Daisy', identity: {}, stewardship: {} } });
+  const apply = h.cloud.apply.bind(h.cloud);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  h.cloud.apply = async operation => { await gate; return apply(operation); };
+
+  const foreground = h.engine.sync();
+  const focus = h.engine.sync();
+  release();
+  await Promise.all([foreground, focus]);
+
+  assert.equal(h.cloud.calls.length, 1);
+  assert.equal(h.cloud.rows.records.length, 1);
+});
+
+test('dependent changes wait behind a failed parent while unrelated domains continue', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const parent = h.state.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: { type: 'animal', name: 'Daisy', identity: {}, stewardship: {} } });
+  h.state.enqueue({ table: 'record_documents', localId: 'vet-note', type: 'create', payload: { record_id: parent.rowId, title: 'Vet note' } });
+  h.state.enqueue({ table: 'chore_windows', localId: 'morning', type: 'create', payload: { name: 'Morning' } });
+  const apply = h.cloud.apply.bind(h.cloud);
+  let failParent = true;
+  h.cloud.apply = operation => failParent && operation.id === parent.id
+    ? Promise.reject(Object.assign(new Error('network unavailable'), { code: 'FETCH' }))
+    : apply(operation);
+
+  await h.engine.push();
+  assert.equal(h.state.state.outbox.find(item => item.table === 'record_documents').status, 'dependency');
+  assert.equal(h.cloud.rows.chore_windows.length, 1);
+
+  failParent = false;
+  await h.engine.push();
+  assert.equal(h.state.state.outbox.length, 0);
+  assert.equal(h.cloud.rows.record_documents.length, 1);
+});
+
 test('successful idempotent retry cannot duplicate a row', async () => {
   const h = harness(); h.state.bind(crypto.randomUUID()); const item = record();
   const operation = h.state.enqueue({ table: 'records', localId: item.id, type: 'create', payload: toCloud('records', item, h.state) });
@@ -513,4 +621,69 @@ test('operation ordering deletes dependents before parents', () => {
 test('Homestead boundary mismatch stops synchronization', async () => {
   const h = harness(); h.state.bind(crypto.randomUUID());
   assert.equal((await h.engine.inspectFirstSync(crypto.randomUUID())).case, 'boundary');
+});
+
+test('cloud pagination keeps rows with identical timestamps by using the id tie-breaker', async () => {
+  const timestamp = '2026-08-29T12:00:00.000Z';
+  const rows = Array.from({ length: 205 }, (_, index) => ({
+    id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`,
+    updated_at: timestamp
+  }));
+  class Query {
+    constructor() { this.cursor = { updatedAt: '1970-01-01T00:00:00.000Z', id: '00000000-0000-0000-0000-000000000000' }; }
+    select() { return this; }
+    or(filter) {
+      const match = filter.match(/^updated_at\.gt\.([^,]+),and\(updated_at\.eq\.([^,]+),id\.gt\.([^)]+)\)$/);
+      this.cursor = { updatedAt: match[1], id: match[3] };
+      return this;
+    }
+    order() { return this; }
+    limit() { return this; }
+    then(resolve) {
+      const page = rows.filter(row => row.updated_at > this.cursor.updatedAt || (row.updated_at === this.cursor.updatedAt && row.id > this.cursor.id)).slice(0, 200);
+      return Promise.resolve({ data: page, error: null }).then(resolve);
+    }
+  }
+  const adapter = new SupabaseSyncAdapter({ from: () => new Query() });
+  const received = [];
+  for await (const page of adapter.changes('records')) received.push(...page.rows);
+  assert.equal(received.length, 205);
+  assert.equal(new Set(received.map(row => row.id)).size, 205);
+});
+
+test('pull cursor does not advance when a page cannot be applied locally', async () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  state.bind(crypto.randomUUID());
+  const row = { id: crypto.randomUUID(), version: 1, type: 'animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {}, created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z' };
+  const cloud = { async *changes(table) { if (table === 'records') yield { rows: [row], cursor: { updatedAt: row.updated_at, id: row.id } }; } };
+  const engine = new SyncEngine({ state, cloud, readLocal: blank, writeLocal: () => { throw new Error('local write failed'); } });
+  await assert.rejects(engine.pull(), /local write failed/);
+  assert.equal(state.state.cursors.records, undefined);
+});
+
+test('two devices converge after one pushes and the other pulls', async () => {
+  class SharedCloud extends MockCloud {
+    async *changes(table, cursor) {
+      const start = cursor || { updatedAt: '1970-01-01T00:00:00.000Z', id: '00000000-0000-0000-0000-000000000000' };
+      const rows = this.rows[table]
+        .filter(row => row.updated_at > start.updatedAt || (row.updated_at === start.updatedAt && row.id > start.id))
+        .sort((a, b) => a.updated_at.localeCompare(b.updated_at) || a.id.localeCompare(b.id));
+      if (rows.length) {
+        const last = rows.at(-1);
+        yield { rows, cursor: { updatedAt: last.updated_at, id: last.id } };
+      }
+    }
+  }
+  const cloud = new SharedCloud();
+  const first = harness(blank(), cloud); const homestead = crypto.randomUUID();
+  first.state.bind(homestead); first.state.state.initialSyncCompleted = true;
+  const firstLocal = blank(); firstLocal.records.push(record('daisy'));
+  first.engine.queueLocalChanges(blank(), firstLocal);
+  await first.engine.sync();
+
+  const second = harness(blank(), cloud);
+  second.state.bind(homestead); second.state.state.initialSyncCompleted = true;
+  await second.engine.pull();
+  assert.equal(second.local().records[0].name, 'Daisy');
+  assert.equal(second.state.state.cursors.records.id, cloud.rows.records[0].id);
 });
