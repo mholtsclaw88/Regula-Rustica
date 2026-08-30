@@ -10,6 +10,9 @@ const conflictList = document.querySelector('#syncConflicts');
 const syncNow = document.querySelector('#syncNow');
 const syncRecovery = document.querySelector('#syncRecovery');
 const syncResetFromCloud = document.querySelector('#syncResetFromCloud');
+const headerStatus = document.querySelector('#headerSyncStatus');
+const headerStatusLabel = document.querySelector('#headerSyncLabel');
+const headerStatusDetail = document.querySelector('#headerSyncDetail');
 const offlineEngine = new SyncEngine({
   state,
   cloud: null,
@@ -28,6 +31,14 @@ const DOMAIN_LABELS = Object.freeze({
   chore_windows: 'Chore Windows', tasks: 'Tasks', record_relationships: 'Records', task_assignments: 'Tasks',
   chronicle_entries: 'Journal', calendar_events: 'Calendar', yield_entries: 'Yield', notes: 'Journal',
   ledger_entries: 'Ledger', ledger_allocations: 'Ledger', routines: 'Routines', routine_occurrences: 'Routines'
+});
+
+const HEADER_STATUS_ICONS = Object.freeze({
+  synced: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.8 4.5 4.5 0 0 0 7 18Z"/><path d="m9 13 2 2 4-5"/><circle cx="19" cy="18" r="2"/>',
+  syncing: '<path d="M19 8a7 7 0 0 0-12-2L5 8M5 5v3h3M5 16a7 7 0 0 0 12 2l2-2m0 3v-3h-3"/><circle cx="19" cy="19" r="2"/>',
+  issue: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.8 4.5 4.5 0 0 0 7 18Z"/><path d="M12 10v3m0 2h.01"/><circle cx="19" cy="18" r="2"/>',
+  offline: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.8 4.5 4.5 0 0 0 7 18Z"/><path d="m9 11 6 6m0-6-6 6"/><circle cx="19" cy="18" r="2"/>',
+  local: '<path d="M7 4h10v16H7zM10 17h4"/><circle cx="18" cy="18" r="3"/>'
 });
 
 window.RegulaRusticaSync = Object.freeze({
@@ -52,8 +63,32 @@ function message(kind, error) {
   return 'Synced';
 }
 
+function headerStatusSnapshot(kind) {
+  const conflicts = state.state.conflicts.some(item => item.status === 'unresolved');
+  const blocked = state.state.outbox.some(item => ['blocked', 'dependency'].includes(item.status));
+  if (!context?.homesteadId || !state.state.enabled) return { state: 'local', label: 'Local only', detail: 'Saved on this device' };
+  if (kind === 'offline' || !navigator.onLine) return { state: 'offline', label: 'Offline', detail: 'Cloud sync unavailable' };
+  if (conflicts || blocked || kind === 'problem' || kind === 'attention') return { state: 'issue', label: 'Sync issue', detail: 'Some changes could not sync' };
+  if (kind === 'syncing' || state.state.outbox.length) return { state: 'syncing', label: 'Syncing', detail: 'Changes are being synchronized' };
+  return { state: 'synced', label: 'Synced', detail: state.state.lastSuccessfulSyncAt ? 'Just now' : 'Everything is up to date' };
+}
+
+function renderHeaderStatus(kind) {
+  if (!headerStatus) return;
+  const snapshot = headerStatusSnapshot(kind);
+  headerStatus.className = `header-sync-status is-${snapshot.state}`;
+  headerStatus.dataset.state = snapshot.state;
+  headerStatus.setAttribute('aria-label', `${snapshot.label}. ${snapshot.detail}`);
+  headerStatus.title = `${snapshot.label} — ${snapshot.detail}`;
+  headerStatus.querySelector('svg').innerHTML = HEADER_STATUS_ICONS[snapshot.state];
+  headerStatusLabel.textContent = snapshot.label;
+  headerStatusDetail.textContent = snapshot.detail;
+  window.dispatchEvent(new CustomEvent('regula-rustica:sync-status', { detail: snapshot }));
+}
+
 function render(kind = 'ready', error = null) {
   status.textContent = message(kind, error);
+  renderHeaderStatus(kind);
   status.classList.toggle('error', kind === 'problem' || kind === 'attention' || state.state.outbox.some(item => item.status === 'blocked'));
   syncNow.classList.toggle('hidden', !context?.homesteadId || !state.state.initialSyncCompleted);
   const recoveryInProgress = state.state.initialSyncState?.case === 'device-cloud-recovery'
@@ -195,6 +230,10 @@ syncResetFromCloud.addEventListener('click', () => {
   if (!confirmed) return;
   window.RegulaRusticaLocal.exportBackup();
   run(() => engine.resetDeviceFromCloud(context.homesteadId));
+});
+headerStatus?.addEventListener('click', () => {
+  document.querySelector('.nav button[data-view="settings"]')?.click();
+  requestAnimationFrame(() => document.querySelector('[data-settings-category="cloud"]')?.click());
 });
 document.querySelector('#syncUpload').addEventListener('click', () => run(async () => {
   await engine.initialize('upload', context.homesteadId);

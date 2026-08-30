@@ -1064,6 +1064,10 @@ test('two devices exchange Record, Task, Yield, Ledger, edits, and soft deletion
     }
   }
   const cloud = new SharedCloud();
+  const taskCompleteAt = new Date(Date.now() + 60_000).toISOString();
+  const taskDeleteAt = new Date(Date.now() + 120_000).toISOString();
+  const staleTaskEditAt = new Date(Date.now() + 180_000).toISOString();
+  const recordUpdateAt = new Date(Date.now() + 60_000).toISOString();
   const first = harness(blank(), cloud); const homestead = crypto.randomUUID();
   first.state.bind(homestead); first.state.state.initialSyncCompleted = true;
   const firstLocal = blank(); firstLocal.records.push(record('daisy'));
@@ -1084,11 +1088,11 @@ test('two devices exchange Record, Task, Yield, Ledger, edits, and soft deletion
   assert.equal(second.local().tasks[0].title, 'Morning milking');
 
   before = first.local(); after = structuredClone(before);
-  Object.assign(after.tasks[0], { status: 'completed', completed: true, completedAt: '2026-08-30T12:02:00Z', updatedAt: '2026-08-30T12:02:00Z' });
-  after.yieldEntries.push({ id: 'milk-yield', taskId: 'milk-task', recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-30T12:02:00Z', quantity: 2, unit: 'gal', unusableQuantity: 0, details: '', createdAt: '2026-08-30T12:02:00Z', updatedAt: '2026-08-30T12:02:00Z' });
+  Object.assign(after.tasks[0], { status: 'completed', completed: true, completedAt: taskCompleteAt, updatedAt: taskCompleteAt });
+  after.yieldEntries.push({ id: 'milk-yield', taskId: 'milk-task', recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: taskCompleteAt, quantity: 2, unit: 'gal', unusableQuantity: 0, details: '', createdAt: taskCompleteAt, updatedAt: taskCompleteAt });
   first.engine.queueLocalChanges(before, after); first.setLocal(after); await first.engine.sync(); await second.engine.pull();
   assert.equal(cloud.rows.tasks[0].status, 'completed');
-  assert.equal(second.state.state.cursors.tasks.updatedAt, '2026-08-30T12:02:00Z');
+  assert.equal(second.state.state.cursors.tasks.updatedAt, cloud.rows.tasks[0].updated_at);
   assert.equal(second.local().tasks[0].completed, true);
   assert.equal(second.local().yieldEntries[0].quantity, 2);
 
@@ -1100,18 +1104,18 @@ test('two devices exchange Record, Task, Yield, Ledger, edits, and soft deletion
   assert.equal(second.local().ledgerAllocations[0].amount, 40);
 
   before = second.local(); after = structuredClone(before);
-  Object.assign(after.records[0], { name: 'Daisy II', updatedAt: '2026-08-30T12:04:00Z' });
+  Object.assign(after.records[0], { name: 'Daisy II', updatedAt: recordUpdateAt });
   second.engine.queueLocalChanges(before, after); second.setLocal(after); await second.engine.sync(); await first.engine.pull();
   assert.equal(first.local().records[0].name, 'Daisy II');
 
   const staleSecond = structuredClone(second.local());
   before = first.local(); after = structuredClone(before);
-  Object.assign(after.tasks[0], { deletedAt: '2026-08-30T12:05:00Z', updatedAt: '2026-08-30T12:05:00Z' });
+  Object.assign(after.tasks[0], { deletedAt: taskDeleteAt, updatedAt: taskDeleteAt });
   first.engine.queueLocalChanges(before, after); first.setLocal(after); await first.engine.sync();
 
   const staleEdit = structuredClone(staleSecond);
-  Object.assign(staleEdit.tasks[0], { title: 'Stale renamed task', updatedAt: '2026-08-30T12:06:00Z' });
+  Object.assign(staleEdit.tasks[0], { title: 'Stale renamed task', updatedAt: staleTaskEditAt });
   second.engine.queueLocalChanges(staleSecond, staleEdit); second.setLocal(staleEdit); await second.engine.sync();
   assert.equal(second.state.state.conflicts.some(item => item.table === 'tasks'), true);
-  assert.equal(second.local().tasks[0].deletedAt, '2026-08-30T12:05:00Z');
+  assert.equal(second.local().tasks[0].deletedAt, taskDeleteAt);
 });

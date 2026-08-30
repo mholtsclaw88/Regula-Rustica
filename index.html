@@ -8,31 +8,37 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=mobile-primary-nav-v6">
-  <link rel="stylesheet" href="housekeeping.css?v=settings-ui-v2">
+  <link rel="stylesheet" href="styles.css?v=today-daily-planner-v2">
+  <link rel="stylesheet" href="housekeeping.css?v=today-daily-planner-v2">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=record-task-lifecycle-v2" defer></script>
-  <script src="task-foundation.js?v=disabled-recurring-visibility-v1" defer></script>
+  <script src="housekeeping-data.js?v=today-daily-planner-v2" defer></script>
+  <script src="task-foundation.js?v=today-daily-planner-v2" defer></script>
   <script src="record-documents.js?v=local-attachments-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=settings-ui-v2" defer></script>
+  <script src="app.js?v=today-daily-planner-v2" defer></script>
   <script src="ui-refinements.js?v=data-entry-forms-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=device-sync-recovery-v1" type="module"></script>
+  <script src="sync/runtime.mjs?v=today-daily-planner-v2" type="module"></script>
 </head>
 <body>
   <header class="top">
-    <div>
+    <div class="top-brand">
       <div id="homesteadHeader" class="brand-small">MY HOMESTEAD</div>
       <h1>Regula Rustica</h1>
       <p class="motto">Ora et labora · Ut in omnibus glorificetur Deus</p>
     </div>
-    <button class="btn primary" id="globalAddTask">+ Task</button>
+    <div class="top-actions">
+      <button class="header-sync-status is-local" id="headerSyncStatus" type="button" aria-label="Local only" title="Local only">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4h10v16H7zM10 17h4"/><circle cx="18" cy="18" r="3"/></svg>
+        <span><strong id="headerSyncLabel">Local only</strong><small id="headerSyncDetail">Saved on this device</small></span>
+      </button>
+      <button class="btn primary" id="globalAddTask">+ Task</button>
+    </div>
   </header>
 
   <nav class="nav" aria-label="Primary navigation">
@@ -54,29 +60,39 @@
       <aside class="card today-glance" aria-labelledby="todayGlanceTitle">
         <span class="label" id="todayGlanceTitle">Today at a Glance</span>
         <div class="today-status-strip">
-          <div><strong id="todayCompletedCount">0</strong><span>Completed</span></div>
-          <div><strong id="todayRemainingCount">0</strong><span>Remaining</span></div>
-          <div><strong id="todayEventCount">0</strong><span>Events</span></div>
+          <div id="todayFirstWindow"><span id="todayFirstWindowName">Chores</span><strong id="todayFirstWindowProgress">0 of 0 complete</strong></div>
+          <div><span id="todayNextLabel">Next up</span><strong id="todayNextUp">Nothing scheduled</strong><small id="todayNextUpDetail"></small></div>
+          <div id="todayLastWindow"><span id="todayLastWindowName">Chores</span><strong id="todayLastWindowProgress">0 of 0 complete</strong></div>
+          <div><span>Today</span><strong id="todayTotals">A quiet day</strong><small id="todayEventTotal"></small></div>
         </div>
       </aside>
-      <div id="todayChoreWindows" class="today-sections"></div>
+      <section class="today-all-day hidden" id="todayAllDaySection" aria-labelledby="todayAllDayTitle">
+        <span class="label" id="todayAllDayTitle">All day</span>
+        <div id="todayAllDayEvents" class="today-all-day-events"></div>
+      </section>
+      <section class="today-schedule" aria-labelledby="todayScheduleTitle">
+        <div class="today-section-heading"><span class="label">Daily ledger</span><h3 id="todayScheduleTitle">Today's Schedule</h3></div>
+        <div id="todayTimeline" class="today-timeline"></div>
+        <p id="todayScheduleEmpty" class="empty card">No Chore Windows or timed Events today.</p>
+      </section>
       <details class="card today-section daily-section" id="todayWorkSection" open>
         <summary>
-          <span><span class="label">Daily work</span><strong>Today's Work</strong></span>
+          <span><span class="label">Work without a set time</span><strong>Other Work</strong></span>
           <span class="today-section-summary"><span id="todayTaskCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
         </summary>
         <div class="daily-section-body">
           <div id="todayTasks" class="stack"></div>
-          <p id="todayEmpty" class="empty">Nothing is due. Add the next useful task.</p>
+          <p id="todayEmpty" class="empty">No other work needs attention today.</p>
         </div>
       </details>
-      <details class="card today-section daily-section" id="todayEventsSection" open>
+      <details class="card today-section daily-section needs-attention" id="todayAttentionSection">
         <summary>
-          <span><span class="label">Shared time</span><strong>Today's Events</strong></span>
-          <span class="today-section-summary"><span id="todayEventsCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
+          <span><span class="label">Overdue work</span><strong>Needs Attention</strong></span>
+          <span class="today-section-summary"><span id="todayAttentionCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
         </summary>
         <div class="daily-section-body">
-          <div id="todayEvents" class="stack"></div><p id="todayEventsEmpty" class="empty">No Calendar Events today.</p>
+          <div id="todayAttention" class="stack"></div><p id="todayAttentionEmpty" class="empty">Nothing overdue.</p>
+          <p class="muted hidden" id="todayAttentionHistoryNote">Earlier recurring occurrences remain available in Tasks history.</p>
         </div>
       </details>
     </section>
