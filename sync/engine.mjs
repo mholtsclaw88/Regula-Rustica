@@ -263,17 +263,24 @@ export class SyncEngine {
   async resolveConflict(conflictId, choice) {
     const conflict = this.state.state.conflicts.find(item => item.id === conflictId && item.status === 'unresolved');
     if (!conflict) return;
+    if (!conflict.cloudRow?.id || conflict.cloudRow.version == null) throw new Error('The cloud version for this conflict is unavailable. Sync again before resolving it.');
+    const entity = this.state.entity(conflict.table, conflict.localId);
+    entity.cloudId = conflict.cloudRow.id;
+    entity.cloudVersion = conflict.cloudRow.version;
+    entity.cloudRow = conflict.cloudRow;
     if (choice === 'cloud') {
       const next = structuredClone(this.readLocal());
       const collection = COLLECTIONS[conflict.table];
+      next[collection] ||= [];
       const resolved = fromCloud(conflict.table, conflict.cloudRow, this.state);
-      const index = next[collection].findIndex(item => item.id === conflict.localId);
-      if (index < 0) next[collection].push(resolved); else next[collection][index] = resolved;
+      let index = next[collection].findIndex(item => item.id === conflict.localId || item.id === conflict.cloudRow.id);
+      if (index < 0) { next[collection].push(resolved); index = next[collection].length - 1; } else next[collection][index] = resolved;
+      next[collection] = next[collection].filter((item, itemIndex) => itemIndex === index || ![conflict.localId, conflict.cloudRow.id].includes(item.id));
       this.writeLocal(next, 'sync');
       conflict.status = 'kept_cloud';
     } else if (choice === 'local') {
-      this.state.entity(conflict.table, conflict.localId).cloudVersion = conflict.cloudRow.version;
-      this.state.enqueue({ table: conflict.table, localId: conflict.localId, type: 'update', payload: conflict.localPayload, baseVersion: conflict.cloudRow.version });
+      const payload = { ...conflict.localPayload, id: conflict.cloudRow.id };
+      this.state.enqueue({ table: conflict.table, localId: conflict.localId, type: 'update', payload, baseVersion: conflict.cloudRow.version });
       conflict.status = 'use_local_queued';
     } else throw new Error('Unknown conflict resolution.');
     conflict.resolvedAt = new Date().toISOString();
