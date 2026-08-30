@@ -78,7 +78,7 @@ The foundation migration creates:
 - `chronicle_entries`, `notes`, and `ledger_entries`
 - `record_documents` and `record_attachments`, with metadata synchronized separately from file bytes
 - `calendar_events` and canonical `yield_entries`
-- `chore_windows`, `routines`, and dated `routine_occurrences`
+- `chore_windows` and recurring `tasks`; legacy `routines` and `routine_occurrences` remain only for recoverable migration history
 - append-only `audit_entries`
 - idempotent `sync_operations`
 
@@ -124,7 +124,7 @@ supabase test db supabase/tests/database
 supabase db lint --local --level warning
 ```
 
-The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The 21-assertion member-invitation suite covers invitation lifecycle and Steward-only access. Sync v1 adds 21 assertions; Housekeeping adds 39; Homestead people adds 37; and the 33-assertion Task/Yield suite remains as migration compatibility coverage. The first-class Routine suite adds 35 assertions for defaults, definition/occurrence separation, assignment-aware completion, Yield completion, recurrence idempotency, tenant isolation, all four roles, soft deletion, auditing, and RLS. The Records Documents suite adds 23 assertions covering private storage, tenant paths, permissions, metadata lifecycle, auditing, synchronization, and RLS. The current database total is 314 assertions across 14 pgTAP files. Client suites cover conservative Task-backed migration, recurrence, matching, synchronization, recovery, conflicts, IndexedDB attachment persistence, and attachment retry/lifecycle helpers.
+The unchanged 48-assertion Cloud Foundation suite proves the original membership, role, isolation, invitation, recurrence, deletion, audit, and final-Steward guarantees. The 21-assertion member-invitation suite covers invitation lifecycle and Steward-only access. Sync v1 adds 21 assertions; Housekeeping adds 39; Homestead people adds 37; and the 33-assertion Task/Yield suite remains as migration compatibility coverage. The first-class Routine suite adds 35 assertions for defaults, definition/occurrence separation, assignment-aware completion, Yield completion, recurrence idempotency, tenant isolation, all four roles, soft deletion, auditing, and RLS. The Records Documents suite adds 23 assertions covering private storage, tenant paths, permissions, metadata lifecycle, auditing, synchronization, and RLS. The recurring-Task resync suite adds 8 assertions for guarded legacy retirement, completed-history preservation, descendant cleanup, and idempotency. The current database total is 324 assertions across 15 pgTAP files. Client suites cover conservative Task-backed migration, recurrence, matching, synchronization, recovery, conflicts, IndexedDB attachment persistence, and attachment retry/lifecycle helpers.
 
 ## Deliberately deferred
 

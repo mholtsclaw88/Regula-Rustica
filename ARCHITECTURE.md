@@ -246,17 +246,18 @@ Answers: **What requires attention now?**
 
 Displays:
 
-- Morning, Evening, and custom Chore Windows with due Routine occurrences
+- Morning, Evening, and custom Chore Windows with due recurring Tasks
 - Due and overdue ordinary Tasks
 - Today's Calendar Events
 - Quick add task
 - Quick add record
 - Basic counts
 
-Routines are first-class synchronized definitions, distinct from generic Tasks.
-Only their dated occurrences appear in Today and Calendar. Completed Chore
-Windows collapse quietly, and yield-backed occurrences can record Yield without
-requiring a second completion action. The Tasks page excludes Routine noise.
+Recurring work uses one synchronized Task series with dated occurrences. A
+series may be skipped for one date, disabled for later reuse, or deleted through
+a hidden soft-deleted controller while completed history remains recoverable.
+Completed Chore Windows collapse quietly, and Yield-backed Tasks can record
+Yield without requiring a second completion action.
 
 ### Records
 

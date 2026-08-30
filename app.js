@@ -154,7 +154,7 @@ function taskDateText(task) {
   return 'No date';
 }
 
-const isTaskVisible = task => !task.deletedAt && task.recurrenceRule?.enabled !== false;
+const isTaskVisible = task => !task.deletedAt && task.recurrenceRule?.enabled !== false && task.recurrenceRule?.seriesDeleted !== true;
 const choreWindowForTask = task => data.choreWindows.find(choreWindow => !choreWindow.deletedAt && choreWindow.id === task.choreWindowId) || null;
 const taskIsOverdue = (task, now = new Date()) => window.RegulaRusticaHousekeeping.taskIsOverdue(task, choreWindowForTask(task), now);
 const clockTimeText = value => window.RegulaRusticaTasks.formatClockTime(value);
@@ -307,13 +307,6 @@ function normalizeData(source = {}, options = {}) {
     });
   }
   const tasks = asArray(source.tasks).map(normalizeTask);
-  window.RegulaRusticaTasks.stabilizeRecurringTasks(tasks, {
-    targetDate: today(),
-    nextDueDate: window.RegulaRusticaHousekeeping.nextRecurringDueDate,
-    makeId: uid,
-    now: nowIso(),
-    migrateLegacyDisable: sourceVersion < CURRENT_SCHEMA_VERSION
-  });
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
@@ -475,6 +468,19 @@ function saveData(nextData = data, source = 'user') {
   window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', { detail: { before, after: structuredClone(data), source } }));
 }
 
+function materializeRecurringTasks(source = 'recurrence') {
+  const before = JSON.stringify(data.tasks);
+  window.RegulaRusticaTasks.stabilizeRecurringTasks(data.tasks, {
+    targetDate: today(),
+    nextDueDate: window.RegulaRusticaHousekeeping.nextRecurringDueDate,
+    makeId: uid,
+    now: nowIso()
+  });
+  if (before === JSON.stringify(data.tasks)) return false;
+  saveData(data, source);
+  return true;
+}
+
 async function syncLocalAttachments({ requireAll = false } = {}) {
   if (attachmentSyncPromise) return attachmentSyncPromise;
   if (!window.RegulaRusticaDocuments.canSync()) return { synced: 0, failed: 0 };
@@ -538,9 +544,13 @@ function exportData() {
 
 window.RegulaRusticaLocal = {
   read: () => structuredClone(data),
-  write: (nextData, source = 'sync') => saveData(nextData, source),
+  write: (nextData, source = 'sync') => {
+    saveData(nextData, source);
+    if (source === 'sync') materializeRecurringTasks();
+  },
   exportBackup: exportData,
-  storageKey: STORAGE_KEY
+  storageKey: STORAGE_KEY,
+  materializeRecurringTasks
 };
 
 async function importData(file) {
@@ -1914,13 +1924,15 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     const task = data.tasks.find(item => item.id === id);
     const explanation = document.createElement('p');
     explanation.className = 'muted';
-    explanation.textContent = 'Skip only this scheduled occurrence, or stop future occurrences in this recurring series.';
+    explanation.textContent = 'Skip this occurrence, disable the series for later reuse, or delete the recurring task while keeping completed history.';
     const actions = document.createElement('div');
     actions.className = 'stack';
     const skip = document.createElement('button');
     skip.type = 'button'; skip.className = 'btn secondary'; skip.textContent = 'Skip this occurrence';
     const disable = document.createElement('button');
     disable.type = 'button'; disable.className = 'btn danger'; disable.textContent = 'Disable recurring task';
+    const deleteSeries = document.createElement('button');
+    deleteSeries.type = 'button'; deleteSeries.className = 'btn danger'; deleteSeries.textContent = 'Delete recurring task';
     skip.addEventListener('click', () => {
       if (window.RegulaRusticaTasks.skipRecurringOccurrence(task, nowIso())) saveData();
       $('#modal').close();
@@ -1930,7 +1942,13 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
       saveData();
       $('#modal').close();
     });
-    actions.append(skip, disable);
+    deleteSeries.addEventListener('click', () => {
+      if (!confirm('Are you sure you want to delete this recurring task? Future occurrences will stop, and completed history will be kept.')) return;
+      window.RegulaRusticaTasks.deleteRecurringSeries(data.tasks, task, nowIso());
+      saveData();
+      $('#modal').close();
+    });
+    actions.append(skip, disable, deleteSeries);
     root.append(explanation, actions);
   }
 
@@ -2504,8 +2522,9 @@ window.addEventListener('regula-rustica:cloud-context', () => {
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 });
 
-window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments };
+window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks };
 renderAll();
+window.addEventListener('load', () => materializeRecurringTasks());
 if (startupMigrationBefore) setTimeout(() => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {
   detail: { before: startupMigrationBefore, after: structuredClone(data), source: 'migration' }
 })), 0);

@@ -67,7 +67,7 @@ Tasks may be:
 
 - Standalone
 - Linked to a record
-- Generated as the next occurrence of a Routine
+- Generated as the next occurrence of a recurring Task series
 
 A task created from inside a record should automatically link to that record.
 

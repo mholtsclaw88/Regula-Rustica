@@ -40,6 +40,7 @@
       enabled: rule?.enabled !== false
     };
     if (rule?.seriesId) normalized.seriesId = String(rule.seriesId);
+    if (rule?.seriesDeleted === true) normalized.seriesDeleted = true;
     return normalized;
   }
 
@@ -88,7 +89,7 @@
   }
 
   function taskIsOverdue(task = {}, choreWindow = null, now = new Date()) {
-    if (task.completed || task.deletedAt || task.recurrenceRule?.enabled === false) return false;
+    if (task.completed || task.deletedAt || task.recurrenceRule?.enabled === false || task.recurrenceRule?.seriesDeleted === true) return false;
     const workDate = taskWorkDate(task);
     if (!workDate) return false;
     if (choreWindow) return choreWindowEndPassed(choreWindow, workDate, now);
@@ -100,7 +101,7 @@
   }
 
   function dailyPlannerProjection({ tasks = [], choreWindows = [], calendarEvents = [], workDate = localDate(new Date()), now = new Date() } = {}) {
-    const visibleTask = task => !task.deletedAt && task.recurrenceRule?.enabled !== false;
+    const visibleTask = task => !task.deletedAt && task.recurrenceRule?.enabled !== false && task.recurrenceRule?.seriesDeleted !== true;
     const windows = choreWindows
       .filter(window => !window.deletedAt && window.enabled && window.startTime && window.endTime)
       .sort((a, b) => a.startTime.localeCompare(b.startTime) || Number(a.displayOrder || 0) - Number(b.displayOrder || 0));

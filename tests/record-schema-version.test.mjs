@@ -118,6 +118,19 @@ test('current Ledger allocations survive normalize, persistence, and reload', as
   ]);
 });
 
+test('normalization does not materialize recurring Tasks as a read side effect', async () => {
+  const api = await dataApi();
+  const source = currentData([]);
+  source.tasks = [{
+    id: 'recurring-task', title: 'Morning milking', dueDate: '2026-08-01',
+    recurrenceRule: { frequency: 'daily', interval: 1, mode: 'fixed_schedule', enabled: true },
+    createdAt: '2026-08-01T12:00:00Z', updatedAt: '2026-08-01T12:00:00Z'
+  }];
+  const normalized = api.normalizeData(source);
+  assert.equal(normalized.tasks.length, 1);
+  assert.equal(normalized.tasks[0].id, 'recurring-task');
+});
+
 test('v5 through v12 backups remain supported and legacy data still migrates', async () => {
   const api = await dataApi();
   for (const schemaVersion of [5, 6, 7, 8, 9, 10, 11, 12]) {

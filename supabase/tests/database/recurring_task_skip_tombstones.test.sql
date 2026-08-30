@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(10);
 
 select has_function(
   'public', 'complete_recurring_task', array['uuid','text','uuid'],
@@ -109,6 +109,50 @@ select is(
      and due_date = current_date + 2 and deleted_at is null),
   0::bigint,
   'another device cannot activate a skipped series/date'
+);
+reset role;
+
+insert into public.tasks (
+  id, homestead_id, title, status, priority, due_date, recurrence_rule, parent_task_id,
+  completed_at, completed_by, created_by, updated_by
+) values (
+  '92000000-0000-0000-0000-000000000005', :'homestead_id', 'Recovered parent', 'completed', 'normal', current_date - 2,
+  '{"mode":"fixed_schedule","frequency":"daily","interval":1,"enabled":true,"seriesId":"93000000-0000-0000-0000-000000000003"}', null,
+  now(), '91000000-0000-0000-0000-000000000001',
+  '91000000-0000-0000-0000-000000000001', '91000000-0000-0000-0000-000000000001'
+), (
+  '92000000-0000-0000-0000-000000000006', :'homestead_id', 'Existing skipped child', 'open', 'normal', current_date - 1,
+  '{"mode":"fixed_schedule","frequency":"daily","interval":1,"enabled":true,"seriesId":"93000000-0000-0000-0000-000000000003"}',
+  '92000000-0000-0000-0000-000000000005',
+  null, null,
+  '91000000-0000-0000-0000-000000000001', '91000000-0000-0000-0000-000000000001'
+);
+select set_config('regula.allow_deleted_state', 'true', true);
+update public.tasks set deleted_at=now(), deleted_by='91000000-0000-0000-0000-000000000001'
+where id='92000000-0000-0000-0000-000000000006';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
+select public.apply_task_sync_operation(
+  'recovered-parent-already-has-child', '94000000-0000-0000-0000-000000000003', 'tasks',
+  '92000000-0000-0000-0000-000000000007', 'create', null, now(),
+  jsonb_build_object(
+    'title', 'Device catch-up', 'status', 'open', 'priority', 'normal',
+    'due_date', current_date::text,
+    'parent_task_id', '92000000-0000-0000-0000-000000000005',
+    'recurrence_rule', jsonb_build_object(
+      'mode', 'fixed_schedule', 'frequency', 'daily', 'interval', 1, 'enabled', true,
+      'seriesId', '93000000-0000-0000-0000-000000000003'
+    )
+  )
+) as parent_result \gset
+select is(
+  (:'parent_result'::jsonb ->> 'status'), 'applied',
+  'a recovered create blocked by the one-child constraint converges without an empty conflict'
+);
+select is(
+  (:'parent_result'::jsonb -> 'row' ->> 'id'), '92000000-0000-0000-0000-000000000006',
+  'the recovered create rebinds to the existing skipped child'
 );
 reset role;
 
