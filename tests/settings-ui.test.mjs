@@ -21,8 +21,17 @@ test('existing Settings control contracts remain present exactly once', () => {
   [
     'homesteadForm', 'homesteadName', 'childForm', 'childName', 'childList',
     'addChoreWindow', 'choreWindowList', 'cloudAuthForm', 'cloudStatus',
-    'syncControls', 'exportData', 'importData', 'resetData'
+    'syncControls', 'syncRecovery', 'syncResetFromCloud', 'exportData', 'importData', 'resetData'
   ].forEach(id => assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id));
+});
+
+test('device sync recovery is explicit, confirmed, and uses the existing cloud download path', async () => {
+  const runtime = await readFile(new URL('../sync/runtime.mjs', import.meta.url), 'utf8');
+  assert.match(html, /Reset this device from cloud/);
+  assert.match(html, /Cloud data is not deleted/);
+  assert.match(runtime, /window\.confirm\('Are you sure\?/);
+  assert.match(runtime, /RegulaRusticaLocal\.exportBackup\(\)/);
+  assert.match(runtime, /engine\.resetDeviceFromCloud\(context\.homesteadId\)/);
 });
 
 test('Settings summary derives from real local and cloud state', () => {

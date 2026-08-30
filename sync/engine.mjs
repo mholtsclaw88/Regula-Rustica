@@ -149,6 +149,33 @@ export class SyncEngine {
     await this.pull();
   }
 
+  async resetDeviceFromCloud(homesteadId) {
+    if (!this.cloud || !homesteadId) throw new Error('Sign in to a cloud Homestead before resetting this device.');
+    const cloudCounts = await this.cloud.counts();
+    if (totals(cloudCounts) === 0) throw new Error('The cloud Homestead is empty. This device was not reset.');
+    this.state.prepareCloudRecovery(this.readLocal(), homesteadId);
+    try {
+      await this.downloadInitial();
+      this.state.state.initialSyncCompleted = true;
+      this.state.state.initialSyncState = {
+        ...this.state.state.initialSyncState,
+        status: 'complete',
+        completedAt: new Date().toISOString()
+      };
+      this.state.save();
+      await this.sync();
+    } catch (error) {
+      this.state.state.initialSyncCompleted = false;
+      this.state.state.initialSyncState = {
+        ...this.state.state.initialSyncState,
+        status: 'failed',
+        error: error.message
+      };
+      this.state.save();
+      throw error;
+    }
+  }
+
   async sync({ retryBlocked = false } = {}) {
     if (this.running) return this.running;
     this.running = (async () => {

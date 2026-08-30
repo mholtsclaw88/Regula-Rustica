@@ -220,6 +220,30 @@ export class LocalSyncState {
     }
     return backup;
   }
+
+  prepareCloudRecovery(data, homesteadId) {
+    const previousRecovery = this.state.initialSyncState?.case === 'device-cloud-recovery'
+      ? this.state.initialSyncState
+      : null;
+    const backup = previousRecovery?.backupId
+      ? null
+      : this.createVerifiedBackup(data, 'before-device-cloud-recovery');
+    const deviceId = this.state.deviceId;
+    this.state = {
+      ...emptySyncState(),
+      deviceId,
+      enabled: true,
+      homesteadId,
+      initialSyncState: {
+        case: 'device-cloud-recovery',
+        status: 'running',
+        backupId: previousRecovery?.backupId || backup.id,
+        startedAt: previousRecovery?.startedAt || new Date().toISOString()
+      }
+    };
+    this.save();
+    return this.state.initialSyncState;
+  }
 }
 
 export const SYNC_STORAGE_KEYS = { state: STATE_KEY, backups: BACKUP_KEY };
