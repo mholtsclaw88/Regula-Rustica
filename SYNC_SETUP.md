@@ -27,6 +27,12 @@ User actions are saved locally before a durable outbox operation is created. Syn
 
 Every active local domain has an explicit server RPC route. Retryable transport or service failures remain queued, while permanent server rejections are marked as blocked with the domain, operation, local item ID, attempt count, error code, and timestamp retained on the device. A blocked change never causes unrelated healthy changes to be skipped, and the app does not report **Synced** while blocked work remains. **Sync now** retries blocked changes after a correction is deployed. Legacy failed operations are upgraded to retryable operations without clearing the outbox.
 
+### Legacy backlog recovery
+
+The pre-unification client synchronized the now-retired local domains `routines` and `routine_occurrences`. Their server tables and `apply_routine_sync_operation` contract remain available, but they are intentionally absent from the current `DOMAIN_ORDER`. Existing failed operations are marked locally as recovery work and may use that RPC; a newly created or unknown domain cannot enter this compatibility path. Current operations continue to use the active explicit routing table.
+
+Recovery preserves each operation ID, idempotency key, target ID, payload, attempt history, and diagnostic fields. Historical Routine creates run after their Record, Chore Window, and Person dependencies; occurrences run after Routines and Tasks; historical Yield waits for a referenced occurrence. Exact replay of an operation that the server already represents is resolved through the returned cloud row without creating a duplicate. Divergent conflicts use the existing conflict review path. Unknown domains, malformed operations, permission failures, missing targets, foreign-Homestead identifiers, and ambiguous versionless updates remain preserved and visible rather than being deleted or guessed.
+
 Attachment bytes use a separate retry path from metadata. An unavailable photo or document remains usable from IndexedDB and reports its own failure; it does not prevent unrelated Records, Tasks, Yield, Calendar, Journal, or Ledger metadata from synchronizing.
 
 Pull cursors are maintained per table as `(updated_at, id)` and advance only after a complete page is saved. Deletion and restoration are explicit soft-state changes.

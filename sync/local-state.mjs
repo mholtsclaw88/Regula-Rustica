@@ -1,3 +1,5 @@
+import { LEGACY_RECOVERY_VERSION, markLegacyOperation } from './legacy-recovery.mjs';
+
 const STATE_KEY = 'regulaRusticaSyncV1';
 const BACKUP_KEY = 'regulaRusticaSyncBackupsV1';
 
@@ -16,30 +18,36 @@ export function emptySyncState() {
     outbox: [],
     conflicts: [],
     entities: {},
-    failedOperations: []
+    failedOperations: [],
+    legacyRecoveryVersion: LEGACY_RECOVERY_VERSION
   };
 }
 
 function normalizeState(value) {
   const base = emptySyncState();
   if (!value || value.schemaVersion !== 1) return base;
+  const upgradeLegacyOutbox = Number(value.legacyRecoveryVersion || 0) < LEGACY_RECOVERY_VERSION;
   return {
     ...base,
     ...value,
     deviceId: /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value.deviceId || '') ? value.deviceId : base.deviceId,
     cursors: value.cursors && typeof value.cursors === 'object' ? value.cursors : {},
-    outbox: Array.isArray(value.outbox) ? value.outbox.map(operation => ({
-      ...operation,
-      status: operation.status === 'failed' ? 'retryable' : (operation.status || 'pending'),
-      attempts: Number(operation.attempts) || 0,
-      lastAttemptAt: operation.lastAttemptAt || null,
-      lastErrorCode: operation.lastErrorCode || null,
-      lastErrorAt: operation.lastErrorAt || null,
-      blockedBy: Array.isArray(operation.blockedBy) ? operation.blockedBy : []
-    })) : [],
+    outbox: Array.isArray(value.outbox) ? value.outbox.map(operation => {
+      const normalized = {
+        ...operation,
+        status: operation.status === 'failed' ? 'retryable' : (operation.status || 'pending'),
+        attempts: Number(operation.attempts) || 0,
+        lastAttemptAt: operation.lastAttemptAt || null,
+        lastErrorCode: operation.lastErrorCode || null,
+        lastErrorAt: operation.lastErrorAt || null,
+        blockedBy: Array.isArray(operation.blockedBy) ? operation.blockedBy : []
+      };
+      return upgradeLegacyOutbox ? markLegacyOperation(normalized) : normalized;
+    }) : [],
     conflicts: Array.isArray(value.conflicts) ? value.conflicts : [],
     entities: value.entities && typeof value.entities === 'object' ? value.entities : {},
-    failedOperations: Array.isArray(value.failedOperations) ? value.failedOperations : []
+    failedOperations: Array.isArray(value.failedOperations) ? value.failedOperations : [],
+    legacyRecoveryVersion: LEGACY_RECOVERY_VERSION
   };
 }
 

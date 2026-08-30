@@ -3,7 +3,8 @@ import test from 'node:test';
 import { SyncEngine, isRetryableSyncError } from '../sync/engine.mjs';
 import { LocalSyncState, SYNC_STORAGE_KEYS } from '../sync/local-state.mjs';
 import { DOMAIN_ORDER, fromCloud, hasMeaningfulData, operationOrder, toCloud } from '../sync/entities.mjs';
-import { SYNC_RPC_ROUTES, SupabaseSyncAdapter, rpcForSyncTable } from '../sync/cloud-adapter.mjs';
+import { LEGACY_SYNC_RPC_ROUTES, SYNC_RPC_ROUTES, SupabaseSyncAdapter, rpcForSyncTable } from '../sync/cloud-adapter.mjs';
+import { legacyOperationAlreadySatisfied, markLegacyOperation } from '../sync/legacy-recovery.mjs';
 import housekeepingData from '../housekeeping-data.js';
 
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
@@ -101,15 +102,156 @@ test('every active sync domain has one explicit server RPC route', async () => {
   assert.throws(() => rpcForSyncTable('routines'), error => error.code === 'SYNC_ROUTE_MISSING');
 });
 
+test('only marked historical Routine domains use the legacy RPC compatibility gate', async () => {
+  assert.deepEqual(LEGACY_SYNC_RPC_ROUTES, {
+    routines: 'apply_routine_sync_operation',
+    routine_occurrences: 'apply_routine_sync_operation'
+  });
+  assert.equal(rpcForSyncTable('routines', { legacy: true }), 'apply_routine_sync_operation');
+  assert.equal(rpcForSyncTable('routine_occurrences', { legacy: true }), 'apply_routine_sync_operation');
+  assert.throws(() => rpcForSyncTable('routines'), error => error.code === 'SYNC_ROUTE_MISSING');
+  assert.throws(() => rpcForSyncTable('workflows', { legacy: true }), error => error.code === 'SYNC_ROUTE_MISSING');
+});
+
+test('persisted failures are marked once for recovery while new current operations are untouched', () => {
+  const current = { id: crypto.randomUUID(), table: 'tasks', localId: 'new-task', rowId: crypto.randomUUID(), type: 'create', payload: {}, attempts: 0 };
+  assert.equal(markLegacyOperation(current), current);
+  const historical = markLegacyOperation({ ...current, attempts: 600, lastErrorCode: 'SYNC_ROUTE_MISSING' });
+  assert.equal(historical.table, 'tasks');
+  assert.equal(historical.rowId, current.rowId);
+  assert.equal(historical.legacyRecovery.originalErrorCode, 'SYNC_ROUTE_MISSING');
+  assert.equal(markLegacyOperation(historical), historical);
+
+  const currentState = new LocalSyncState(new MemoryStorage()).state;
+  const storage = new MemoryStorage({
+    [SYNC_STORAGE_KEYS.state]: JSON.stringify({ ...currentState, legacyRecoveryVersion: 1, outbox: [{ ...current, attempts: 1, lastErrorCode: '42501' }] })
+  });
+  assert.equal(new LocalSyncState(storage).state.outbox[0].legacyRecovery, undefined);
+});
+
 test('legacy failed operations reload as retryable without losing diagnostics', () => {
   const operation = { id: crypto.randomUUID(), table: 'records', localId: 'daisy', type: 'update', status: 'failed', attempts: 2, lastError: 'network unavailable' };
+  const legacyState = new LocalSyncState(new MemoryStorage()).state;
+  delete legacyState.legacyRecoveryVersion;
   const storage = new MemoryStorage({
-    [SYNC_STORAGE_KEYS.state]: JSON.stringify({ ...new LocalSyncState(new MemoryStorage()).state, outbox: [operation] })
+    [SYNC_STORAGE_KEYS.state]: JSON.stringify({ ...legacyState, outbox: [operation] })
   });
   const recovered = new LocalSyncState(storage).state.outbox[0];
   assert.equal(recovered.status, 'retryable');
   assert.equal(recovered.attempts, 2);
   assert.equal(recovered.lastError, 'network unavailable');
+  assert.equal(recovered.legacyRecovery.originalTable, 'records');
+});
+
+test('legacy Routine create and update recover in dependency order and survive reload', async () => {
+  const storage = new MemoryStorage();
+  const initial = new LocalSyncState(storage); const homestead = crypto.randomUUID();
+  initial.bind(homestead); initial.state.initialSyncCompleted = true;
+  const create = initial.enqueue({ table: 'routines', localId: 'milk-daisy', type: 'create', payload: { name: 'Milk Daisy', frequency: 'daily', interval: 1 } });
+  initial.enqueue({ table: 'routines', localId: 'milk-daisy', type: 'update', payload: { name: 'Milk Daisy twice', frequency: 'daily', interval: 1 } });
+  create.attempts = 100; create.status = 'blocked'; create.lastErrorCode = 'SYNC_ROUTE_MISSING'; delete initial.state.legacyRecoveryVersion; initial.save();
+
+  const recovered = new LocalSyncState(storage);
+  const cloud = new MockCloud(); cloud.rows.routines = [];
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: blank, writeLocal: () => {} });
+  await engine.push({ retryBlocked: true });
+
+  assert.equal(recovered.state.outbox.length, 0);
+  assert.equal(cloud.rows.routines.length, 1);
+  assert.equal(cloud.rows.routines[0].name, 'Milk Daisy twice');
+  assert.deepEqual(cloud.calls.map(operation => operation.type), ['create', 'update']);
+});
+
+test('legacy Routine occurrence blocks Yield until its historical parent is recovered', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const occurrence = h.state.enqueue({ table: 'routine_occurrences', localId: 'morning-1', type: 'create', payload: { routine_id: crypto.randomUUID(), occurrence_date: '2026-08-29', status: 'completed' } });
+  const yieldOperation = h.state.enqueue({ table: 'yield_entries', localId: 'milk-1', type: 'create', payload: { routine_occurrence_id: occurrence.rowId, yield_type: 'milk', quantity: 2, unit: 'gal' } });
+  occurrence.attempts = 1; occurrence.lastErrorCode = 'SYNC_ROUTE_MISSING';
+  yieldOperation.attempts = 1; yieldOperation.lastErrorCode = '23503';
+  delete h.state.state.legacyRecoveryVersion; h.state.save();
+  const recovered = new LocalSyncState(h.storage); recovered.state.initialSyncCompleted = true;
+  const cloud = new MockCloud(); cloud.rows.routine_occurrences = [];
+  const calls = [];
+  cloud.apply = async operation => {
+    calls.push(operation.table);
+    if (operation.table === 'routine_occurrences') throw Object.assign(new Error('offline'), { code: 'FETCH' });
+    return { status: 'applied', row: { ...operation.payload, id: operation.rowId, version: 1 } };
+  };
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: blank, writeLocal: () => {} });
+  await engine.push();
+  assert.deepEqual(calls, ['routine_occurrences']);
+  assert.equal(recovered.state.outbox.find(item => item.table === 'yield_entries').status, 'dependency');
+});
+
+test('an exact historical replay already present in cloud resolves without duplication', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const operation = h.state.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: { type: 'animal', name: 'Daisy', status: 'Active', identity: {}, stewardship: {} } });
+  operation.attempts = 2; operation.lastErrorCode = 'SYNC_ROUTE_MISSING'; delete h.state.state.legacyRecoveryVersion; h.state.save();
+  const recovered = new LocalSyncState(h.storage); recovered.state.initialSyncCompleted = true;
+  h.cloud.rows.records.push({ ...operation.payload, id: operation.rowId, version: 4, updated_at: operation.clientUpdatedAt });
+  const engine = new SyncEngine({ state: recovered, cloud: h.cloud, readLocal: blank, writeLocal: () => {} });
+  await engine.push();
+  assert.equal(recovered.state.outbox.length, 0);
+  assert.equal(recovered.state.conflicts.length, 0);
+  assert.equal(h.cloud.rows.records.length, 1);
+  assert.equal(recovered.entity('records', 'daisy').cloudVersion, 4);
+});
+
+test('legacy preflight resolves absent deletes and preserves missing updates', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const removed = h.state.enqueue({ table: 'tasks', localId: 'removed-task', type: 'soft_delete', baseVersion: 2, payload: { title: 'Removed' } });
+  const missing = h.state.enqueue({ table: 'tasks', localId: 'missing-task', type: 'update', baseVersion: null, payload: { title: 'Missing' } });
+  [removed, missing].forEach(operation => { operation.attempts = 2; operation.lastErrorCode = 'SYNC_ROUTE_MISSING'; });
+  delete h.state.state.legacyRecoveryVersion; h.state.save();
+  const recovered = new LocalSyncState(h.storage); recovered.state.initialSyncCompleted = true;
+  const cloud = {
+    async inspectLegacy() { return { supported: true, row: null }; },
+    async apply() { throw new Error('preflight should decide both historical operations'); }
+  };
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: blank, writeLocal: () => {} });
+  await engine.push();
+  assert.equal(recovered.state.outbox.length, 1);
+  assert.equal(recovered.state.outbox[0].localId, 'missing-task');
+  assert.equal(recovered.state.outbox[0].lastErrorCode, 'LEGACY_TARGET_MISSING');
+});
+
+test('legacy duplicate relationship binds to the exact existing cloud row', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const payload = { source_record_id: crypto.randomUUID(), target_record_id: crypto.randomUUID(), relationship_type: 'located_on', started_at: null, ended_at: null, details: {} };
+  const operation = h.state.enqueue({ table: 'record_relationships', localId: 'old-location', type: 'create', payload });
+  operation.attempts = 2; operation.lastErrorCode = '23505'; delete h.state.state.legacyRecoveryVersion; h.state.save();
+  const recovered = new LocalSyncState(h.storage); recovered.state.initialSyncCompleted = true;
+  const existing = { ...payload, id: crypto.randomUUID(), version: 3 };
+  const cloud = {
+    async inspectLegacy() { return { supported: true, row: existing }; },
+    async apply() { throw new Error('an exact duplicate must not be created'); }
+  };
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: blank, writeLocal: () => {} });
+  await engine.push();
+  assert.equal(recovered.state.outbox.length, 0);
+  assert.equal(recovered.entity('record_relationships', 'old-location').cloudId, existing.id);
+});
+
+test('unknown and malformed historical operations remain blocked and diagnosable', async () => {
+  const h = harness(); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const unknown = h.state.enqueue({ table: 'workflows', localId: 'old-workflow', type: 'create', payload: {} });
+  unknown.attempts = 3; unknown.lastErrorCode = 'SYNC_ROUTE_MISSING';
+  const malformed = h.state.enqueue({ table: 'routines', localId: 'bad-routine', type: 'create', payload: {} });
+  malformed.attempts = 3; malformed.lastErrorCode = 'SYNC_ROUTE_MISSING'; delete malformed.payload;
+  delete h.state.state.legacyRecoveryVersion; h.state.save();
+  const recovered = new LocalSyncState(h.storage); recovered.state.initialSyncCompleted = true;
+  const cloud = { async apply(operation) { rpcForSyncTable(operation.table, { legacy: Boolean(operation.legacyRecovery) }); } };
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: blank, writeLocal: () => {} });
+  await engine.push();
+  assert.equal(recovered.state.outbox.length, 2);
+  assert.deepEqual(recovered.state.outbox.map(item => item.status), ['blocked', 'blocked']);
+  assert.deepEqual(recovered.state.outbox.map(item => item.lastErrorCode).sort(), ['LEGACY_OPERATION_MALFORMED', 'SYNC_ROUTE_MISSING']);
+});
+
+test('already-satisfied detection is exact and does not suppress divergent data', () => {
+  const operation = markLegacyOperation({ attempts: 1, table: 'tasks', type: 'update', payload: { title: 'Milk Daisy', status: 'open' } });
+  assert.equal(legacyOperationAlreadySatisfied(operation, { title: 'Milk Daisy', status: 'open', version: 7 }), true);
+  assert.equal(legacyOperationAlreadySatisfied(operation, { title: 'Milk Daisy', status: 'completed', version: 7 }), false);
 });
 
 test('sync errors distinguish retryable transport failures from actionable server rejection', () => {
