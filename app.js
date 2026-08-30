@@ -912,39 +912,42 @@ function recordTaskRow(task) { return sharedTaskRow(task, { suggestionActions: t
 
 function renderToday() {
   const workDate = today();
-  const root = $('#todayTasks');
-  root.innerHTML = '';
-  const activeTodayTasks = data.tasks.filter(task => isTaskVisible(task) && (
-    (!task.completed && (
-      (!task.availableFrom && !task.dueDate)
-      || (task.availableFrom && task.availableFrom <= workDate)
-      || (!task.availableFrom && task.dueDate <= workDate)
-    )) || (task.completed && task.completedAt && localDateTime(task.completedAt).slice(0, 10) === workDate)
-  ));
-  const tasks = activeTodayTasks
-    .filter(task => !task.completed && (!task.choreWindowId || taskIsOverdue(task)))
-    .sort((a, b) => Number(taskIsOverdue(b)) - Number(taskIsOverdue(a)) || (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'));
-  tasks.forEach(task => root.appendChild(taskRow(task)));
-  $('#todayEmpty').classList.toggle('hidden', tasks.length > 0);
-  $('#todayTaskCount').textContent = tasks.length;
-  const dailyStatus = new Map(activeTodayTasks.map(task => [task.id, task.completed]));
-
-  const choreRoot = $('#todayChoreWindows');
-  choreRoot.innerHTML = '';
-  data.choreWindows.filter(window => !window.deletedAt && window.enabled).sort((a, b) => a.displayOrder - b.displayOrder).forEach(choreWindow => {
-    const due = data.tasks.filter(task => isTaskVisible(task) && task.choreWindowId === choreWindow.id && window.RegulaRusticaHousekeeping.taskInCurrentChoreWindow(task, choreWindow));
-    if (!due.length) return;
-    const completed = due.filter(task => task.completed).length;
-    const yields = due.map(task => window.RegulaRusticaHousekeeping.matchingYieldForTask(data.yieldEntries, task)).filter(Boolean);
-    const summary = [summarizeYield(yields.filter(entry => entry.type === 'milk')), summarizeYield(yields.filter(entry => entry.type === 'eggs'))].filter(value => value !== '0').join(' · ');
-    const section = document.createElement('details');
-    section.className = `card today-section chore-window${completed === due.length ? ' complete' : ''}`;
-    section.open = completed !== due.length;
-    const timeRange = choreWindowTimeText(choreWindow);
-    section.innerHTML = `<summary><span><span class="label">Chore Window</span><strong>${escapeHtml(choreWindow.name)} Chores</strong><small>${timeRange ? `${escapeHtml(timeRange)} · ` : ''}${completed} of ${due.length} complete${summary ? ` · ${escapeHtml(summary)}` : ''}</small></span><span class="caret" aria-hidden="true">⌄</span></summary><div class="stack chore-occurrences"></div><button class="btn secondary complete-window" type="button">Complete ${escapeHtml(choreWindow.name)} Chores</button>`;
-    due.forEach(task => section.querySelector('.chore-occurrences').append(taskRow(task)));
-    section.querySelector('.complete-window').disabled = completed === due.length;
-    section.querySelector('.complete-window').addEventListener('click', () => {
+  const projection = window.RegulaRusticaHousekeeping.dailyPlannerProjection({
+    tasks: data.tasks,
+    choreWindows: data.choreWindows,
+    calendarEvents: data.calendarEvents,
+    workDate,
+    now: new Date()
+  });
+  const timeline = $('#todayTimeline');
+  timeline.innerHTML = '';
+  projection.schedule.forEach(item => {
+    const timelineItem = document.createElement('article');
+    timelineItem.className = `today-timeline-item ${item.type}${item.id === projection.currentId ? ' current' : ''}${item.id === projection.nextId ? ' next' : ''}`;
+    const time = document.createElement('time');
+    time.dateTime = item.time;
+    time.textContent = clockTimeText(item.time);
+    const marker = document.createElement('span');
+    marker.className = 'today-timeline-marker';
+    marker.setAttribute('aria-hidden', 'true');
+    marker.textContent = item.type === 'window' ? '⌂' : '✦';
+    const content = document.createElement('div');
+    content.className = 'today-timeline-content';
+    if (item.type === 'event') {
+      content.classList.add('today-event-card');
+      content.innerHTML = `<div><span class="label">Event</span><strong>${escapeHtml(item.event.title)}</strong>${item.event.location ? `<small>${escapeHtml(item.event.location)}</small>` : ''}${item.event.notes ? `<small>${escapeHtml(item.event.notes)}</small>` : ''}</div>`;
+    } else {
+      const due = item.tasks;
+      const completed = item.completed;
+      const yields = due.map(task => window.RegulaRusticaHousekeeping.matchingYieldForTask(data.yieldEntries, task)).filter(Boolean);
+      const yieldSummary = [summarizeYield(yields.filter(entry => entry.type === 'milk')), summarizeYield(yields.filter(entry => entry.type === 'eggs'))].filter(value => value !== '0').join(' · ');
+      const section = document.createElement('details');
+      section.className = `today-window-card${completed === due.length && due.length ? ' complete' : ''}`;
+      section.open = item.id === projection.currentId || item.id === projection.nextId;
+      section.innerHTML = `<summary><span><span class="label">Chore Window</span><strong>${escapeHtml(item.window.name)}</strong><small>${completed} of ${due.length} complete${yieldSummary ? ` · ${escapeHtml(yieldSummary)}` : ''}</small></span><span class="caret" aria-hidden="true">⌄</span></summary><div class="stack chore-occurrences"></div><button class="btn secondary complete-window" type="button">Complete ${escapeHtml(item.window.name)}</button>`;
+      due.forEach(task => section.querySelector('.chore-occurrences').append(taskRow(task)));
+      section.querySelector('.complete-window').disabled = !due.length || completed === due.length;
+      section.querySelector('.complete-window').addEventListener('click', () => {
       let cancelled = false;
       due.filter(task => !task.completed).forEach(task => {
         if (cancelled) return;
@@ -958,26 +961,64 @@ function renderToday() {
         }
       });
       if (!yieldCompletionTaskId) saveData();
-    });
-    choreRoot.append(section);
+      });
+      content.append(section);
+    }
+    timelineItem.append(time, marker, content);
+    timeline.append(timelineItem);
   });
+  $('#todayScheduleEmpty').classList.toggle('hidden', projection.schedule.length > 0);
 
-  const eventRoot = $('#todayEvents');
-  eventRoot.innerHTML = '';
-  const events = data.calendarEvents.filter(event => !event.deletedAt && event.startDate <= today() && event.endDate >= today());
-  events.forEach(event => {
-    const row = document.createElement('div'); row.className = 'task';
-    row.innerHTML = `<div class="task-body"><strong>${escapeHtml(event.title)}</strong><div class="meta">${event.allDay ? 'All day' : escapeHtml(calendarEventTime(event))}${event.location ? ` · ${escapeHtml(event.location)}` : ''}</div></div>`;
-    eventRoot.append(row);
+  const allDayRoot = $('#todayAllDayEvents');
+  allDayRoot.innerHTML = '';
+  projection.allDayEvents.forEach(event => {
+    const row = document.createElement('div');
+    row.className = 'today-all-day-event';
+    row.innerHTML = `<strong>${escapeHtml(event.title)}</strong>${event.location ? `<span>${escapeHtml(event.location)}</span>` : ''}`;
+    allDayRoot.append(row);
   });
-  const completedCount = [...dailyStatus.values()].filter(Boolean).length;
-  $('#todayCompletedCount').textContent = completedCount;
-  $('#todayRemainingCount').textContent = dailyStatus.size - completedCount;
-  $('#todayEventCount').textContent = events.length;
-  $('#todayEventsCount').textContent = events.length;
-  $('#todayEventsEmpty').classList.toggle('hidden', events.length > 0);
+  $('#todayAllDaySection').classList.toggle('hidden', !projection.allDayEvents.length);
 
-  ['todayWorkSection', 'todayEventsSection'].forEach(id => {
+  const root = $('#todayTasks');
+  root.innerHTML = '';
+  projection.otherWork.forEach(task => root.appendChild(taskRow(task)));
+  $('#todayEmpty').classList.toggle('hidden', projection.otherWork.length > 0);
+  $('#todayTaskCount').textContent = projection.otherWork.length;
+
+  const attentionRoot = $('#todayAttention');
+  attentionRoot.innerHTML = '';
+  projection.needsAttention.forEach(group => {
+    const row = taskRow(group.task);
+    if (group.count > 1) {
+      const meta = row.querySelector('.record-task-meta') || row.querySelector('.task-body');
+      const history = document.createElement('span');
+      history.className = 'attention-history-count';
+      history.textContent = `${group.count} overdue occurrences`;
+      meta.append(history);
+    }
+    attentionRoot.append(row);
+  });
+  $('#todayAttentionCount').textContent = projection.needsAttention.length;
+  $('#todayAttentionEmpty').classList.toggle('hidden', projection.needsAttention.length > 0);
+  $('#todayAttentionHistoryNote').classList.toggle('hidden', projection.overdueOccurrenceCount <= projection.needsAttention.length);
+
+  const firstWindow = projection.windowItems[0] || null;
+  const lastWindow = projection.windowItems.length > 1 ? projection.windowItems.at(-1) : null;
+  $('#todayFirstWindow').classList.toggle('hidden', !firstWindow);
+  $('#todayFirstWindowName').textContent = firstWindow?.window.name || 'Chores';
+  $('#todayFirstWindowProgress').textContent = firstWindow ? `${firstWindow.completed} of ${firstWindow.tasks.length} complete` : '';
+  $('#todayLastWindow').classList.toggle('hidden', !lastWindow);
+  $('#todayLastWindowName').textContent = lastWindow?.window.name || 'Chores';
+  $('#todayLastWindowProgress').textContent = lastWindow ? `${lastWindow.completed} of ${lastWindow.tasks.length} complete` : '';
+  const nextItem = projection.schedule.find(item => item.id === projection.currentId) || projection.schedule.find(item => item.id === projection.nextId) || null;
+  $('#todayNextLabel').textContent = projection.currentId ? 'Now' : 'Next up';
+  $('#todayNextUp').textContent = nextItem ? `${nextItem.type === 'window' ? nextItem.window.name : nextItem.event.title} at ${clockTimeText(nextItem.time)}` : 'Nothing scheduled';
+  $('#todayNextUpDetail').textContent = nextItem?.type === 'event' ? nextItem.event.location : nextItem?.type === 'window' ? `${nextItem.completed} of ${nextItem.tasks.length} complete` : '';
+  const choreCount = projection.windowItems.reduce((sum, item) => sum + item.tasks.length, 0);
+  $('#todayTotals').textContent = choreCount || projection.otherWork.length ? `${choreCount} chores · ${projection.otherWork.length} other task${projection.otherWork.length === 1 ? '' : 's'}` : 'A quiet day';
+  $('#todayEventTotal').textContent = `${projection.eventCount} event${projection.eventCount === 1 ? '' : 's'}`;
+
+  ['todayWorkSection', 'todayAttentionSection'].forEach(id => {
     const section = $(`#${id}`);
     const storageKey = `regula-rustica:${id}:open`;
     if (section.dataset.collapseReady) return;
@@ -1902,8 +1943,12 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     root.append(nameField);
     const times = document.createElement('div');
     times.className = 'grid2';
-    times.append(field('Start time (optional)', 'startTime', 'time', choreWindow.startTime));
-    times.append(field('End time (optional)', 'endTime', 'time', choreWindow.endTime));
+    const startField = field('Start time', 'startTime', 'time', choreWindow.startTime);
+    const endField = field('End time', 'endTime', 'time', choreWindow.endTime);
+    startField.querySelector('input').required = true;
+    endField.querySelector('input').required = true;
+    times.append(startField);
+    times.append(endField);
     root.append(times);
     const error = document.createElement('p');
     error.className = 'form-error hidden';
@@ -2091,8 +2136,9 @@ $('#modalForm').addEventListener('submit', async event => {
       error.classList.remove('hidden');
       return;
     }
-    if (startTime && endTime && endTime < startTime) {
-      error.textContent = 'End time cannot be before start time.';
+    const timeValidation = window.RegulaRusticaTasks.validateWindowTimes(startTime, endTime);
+    if (!timeValidation.valid) {
+      error.textContent = timeValidation.message;
       error.classList.remove('hidden');
       return;
     }

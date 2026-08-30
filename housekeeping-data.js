@@ -99,6 +99,82 @@
     return taskWorkDate(task) === localDate(now) && (task.completed || !taskIsOverdue(task, choreWindow, now));
   }
 
+  function dailyPlannerProjection({ tasks = [], choreWindows = [], calendarEvents = [], workDate = localDate(new Date()), now = new Date() } = {}) {
+    const visibleTask = task => !task.deletedAt && task.recurrenceRule?.enabled !== false;
+    const windows = choreWindows
+      .filter(window => !window.deletedAt && window.enabled && window.startTime && window.endTime)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime) || Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
+    const windowById = new Map(windows.map(window => [window.id, window]));
+    const windowItems = windows.map(window => {
+      const windowTasks = tasks.filter(task => visibleTask(task) && task.choreWindowId === window.id && taskWorkDate(task) === workDate);
+      return {
+        id: `window:${window.id}`,
+        type: 'window',
+        time: window.startTime,
+        endTime: window.endTime,
+        window,
+        tasks: windowTasks,
+        completed: windowTasks.filter(task => task.completed).length
+      };
+    });
+    const events = calendarEvents.filter(event => !event.deletedAt && event.startDate <= workDate && event.endDate >= workDate);
+    const allDayEvents = events.filter(event => event.allDay || !event.startTime);
+    const eventItems = events.filter(event => !event.allDay && event.startTime).map(event => ({
+      id: `event:${event.id}`,
+      type: 'event',
+      time: event.startTime,
+      endTime: event.endTime || event.startTime,
+      event
+    }));
+    const schedule = [...windowItems, ...eventItems]
+      .sort((a, b) => a.time.localeCompare(b.time) || (a.type === b.type ? a.id.localeCompare(b.id) : a.type === 'window' ? -1 : 1));
+    const timeNow = localDate(now) === workDate
+      ? `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      : '00:00';
+    const current = schedule.find(item => item.time <= timeNow && item.endTime >= timeNow) || null;
+    const next = schedule.find(item => item.time >= timeNow && item.id !== current?.id) || null;
+
+    const openTasks = tasks.filter(task => visibleTask(task) && !task.completed);
+    const isActionable = task => {
+      if (!task.availableFrom && !task.dueDate) return true;
+      if (task.availableFrom && task.availableFrom <= workDate) return true;
+      return Boolean(!task.availableFrom && task.dueDate && task.dueDate <= workDate);
+    };
+    const overdue = openTasks.filter(task => taskIsOverdue(task, windowById.get(task.choreWindowId) || null, now));
+    const otherWork = openTasks
+      .filter(task => !task.choreWindowId && isActionable(task) && !overdue.includes(task))
+      .sort((a, b) => {
+        const priority = { urgent: 0, high: 1, normal: 2, low: 3 };
+        return (priority[a.priority] ?? 2) - (priority[b.priority] ?? 2)
+          || String(a.dueDate || '9999-12-31').localeCompare(String(b.dueDate || '9999-12-31'))
+          || String(a.createdAt || a.id).localeCompare(String(b.createdAt || b.id));
+      });
+    const overdueGroups = new Map();
+    overdue.forEach(task => {
+      const series = task.recurrenceRule?.seriesId || (task.recurrenceRule ? `${task.recordId || ''}:${task.suggestionKey || task.title}:${task.choreWindowId || ''}` : null);
+      const key = series ? `series:${series}` : `task:${task.id}`;
+      const existing = overdueGroups.get(key);
+      if (!existing) overdueGroups.set(key, { task, count: 1 });
+      else {
+        existing.count += 1;
+        if (taskWorkDate(task) > taskWorkDate(existing.task)) existing.task = task;
+      }
+    });
+    const needsAttention = [...overdueGroups.values()].sort((a, b) => taskWorkDate(b.task).localeCompare(taskWorkDate(a.task)));
+
+    return {
+      schedule,
+      allDayEvents,
+      otherWork,
+      needsAttention,
+      overdueOccurrenceCount: overdue.length,
+      currentId: current?.id || null,
+      nextId: next?.id || null,
+      windowItems,
+      eventCount: events.length
+    };
+  }
+
   function yieldDefaultsForTask(task = {}, choreWindows = []) {
     const choreWindow = choreWindows.find(item => !item.deletedAt && item.id === task.choreWindowId) || null;
     return {
@@ -207,7 +283,7 @@
 
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
-    taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, yieldDefaultsForTask,
+    taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, dailyPlannerProjection, yieldDefaultsForTask,
     matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
     linkedYieldsForTask, reopenTask,
     taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment,
