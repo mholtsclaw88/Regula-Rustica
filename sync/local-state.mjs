@@ -28,7 +28,15 @@ function normalizeState(value) {
     ...value,
     deviceId: /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value.deviceId || '') ? value.deviceId : base.deviceId,
     cursors: value.cursors && typeof value.cursors === 'object' ? value.cursors : {},
-    outbox: Array.isArray(value.outbox) ? value.outbox : [],
+    outbox: Array.isArray(value.outbox) ? value.outbox.map(operation => ({
+      ...operation,
+      status: operation.status === 'failed' ? 'retryable' : (operation.status || 'pending'),
+      attempts: Number(operation.attempts) || 0,
+      lastAttemptAt: operation.lastAttemptAt || null,
+      lastErrorCode: operation.lastErrorCode || null,
+      lastErrorAt: operation.lastErrorAt || null,
+      blockedBy: Array.isArray(operation.blockedBy) ? operation.blockedBy : []
+    })) : [],
     conflicts: Array.isArray(value.conflicts) ? value.conflicts : [],
     entities: value.entities && typeof value.entities === 'object' ? value.entities : {},
     failedOperations: Array.isArray(value.failedOperations) ? value.failedOperations : []
@@ -133,12 +141,45 @@ export class LocalSyncState {
     this.save();
   }
 
-  fail(operation, error) {
-    operation.status = 'failed';
+  fail(operation, error, { retryable = false } = {}) {
+    operation.status = retryable ? 'retryable' : 'blocked';
     operation.attempts += 1;
     operation.lastError = String(error?.message || error);
+    operation.lastErrorCode = String(error?.code || error?.status || error?.statusCode || (retryable ? 'SYNC_RETRYABLE' : 'SYNC_BLOCKED'));
+    operation.lastAttemptAt = new Date().toISOString();
+    operation.lastErrorAt = operation.lastAttemptAt;
+    operation.blockedBy = [];
     this.state.failedOperations = this.state.failedOperations.filter(item => item.operationId !== operation.id);
-    this.state.failedOperations.push({ operationId: operation.id, error: operation.lastError, failedAt: new Date().toISOString() });
+    this.state.failedOperations.push({
+      operationId: operation.id,
+      table: operation.table,
+      type: operation.type,
+      localId: operation.localId,
+      attempts: operation.attempts,
+      error: operation.lastError,
+      errorCode: operation.lastErrorCode,
+      retryable,
+      failedAt: operation.lastErrorAt
+    });
+    this.save();
+  }
+
+  waitForDependencies(operation, blockers) {
+    operation.status = 'dependency';
+    operation.blockedBy = blockers.map(item => item.id);
+    operation.lastError = 'Waiting for an earlier related change.';
+    operation.lastErrorCode = 'SYNC_DEPENDENCY';
+    operation.lastErrorAt = new Date().toISOString();
+    this.save();
+  }
+
+  retryBlocked() {
+    this.state.outbox.forEach(operation => {
+      if (['blocked', 'dependency'].includes(operation.status)) {
+        operation.status = 'retryable';
+        operation.blockedBy = [];
+      }
+    });
     this.save();
   }
 

@@ -2,6 +2,41 @@ import { COLLECTIONS, DOMAIN_ORDER, attachmentCloudReady, fromCloud, hasMeaningf
 
 const totals = counts => Object.values(counts).reduce((sum, count) => sum + count, 0);
 
+const RETRYABLE_CODES = new Set(['FETCH', 'NETWORK_ERROR', '408', '425', '429', '500', '502', '503', '504', '520', '522', '524', '40001', '40P01', '53300', '57014', '57P01']);
+
+export function isRetryableSyncError(error) {
+  const code = String(error?.code || error?.status || error?.statusCode || '').toUpperCase();
+  const status = Number(error?.status || error?.statusCode || 0);
+  if (RETRYABLE_CODES.has(code) || status >= 500) return true;
+  return /failed to fetch|network|timeout|temporar|connection|offline/i.test(String(error?.message || error || ''));
+}
+
+const DEPENDENCIES = Object.freeze({
+  records: [['homestead_people', 'stewardship.responsiblePersonId'], ['record_attachments', 'primary_photo_id']],
+  record_documents: [['records', 'record_id']],
+  record_attachments: [['record_documents', 'document_id'], ['records', 'record_id']],
+  tasks: [['records', 'record_id'], ['tasks', 'parent_task_id'], ['chore_windows', 'chore_window_id']],
+  record_relationships: [['records', 'source_record_id'], ['records', 'target_record_id']],
+  task_assignments: [['tasks', 'task_id'], ['homestead_people', 'person_id']],
+  chronicle_entries: [['records', 'record_id'], ['tasks', 'task_id'], ['chronicle_entries', 'corrects_entry_id']],
+  calendar_events: [['records', 'record_id']],
+  yield_entries: [['records', 'record_id'], ['tasks', 'task_id']],
+  notes: [['records', 'record_id']],
+  ledger_entries: [['records', 'record_id']],
+  ledger_allocations: [['ledger_entries', 'ledger_entry_id'], ['records', 'record_id']]
+});
+
+const valueAt = (value, path) => path.split('.').reduce((current, key) => current?.[key], value);
+
+function dependencyBlockers(operation, outbox) {
+  if (operation.type === 'soft_delete') return [];
+  return (DEPENDENCIES[operation.table] || []).flatMap(([table, path]) => {
+    const rowId = valueAt(operation.payload, path);
+    if (!rowId) return [];
+    return outbox.filter(item => item.id !== operation.id && item.table === table && item.rowId === rowId && ['create', 'restore'].includes(item.type));
+  });
+}
+
 export class SyncEngine {
   constructor({ state, cloud, readLocal, writeLocal, onStatus = () => {} }) {
     this.state = state;
@@ -111,16 +146,17 @@ export class SyncEngine {
     await this.pull();
   }
 
-  async sync() {
+  async sync({ retryBlocked = false } = {}) {
     if (this.running) return this.running;
     this.running = (async () => {
       this.onStatus('syncing');
       try {
-        await this.push();
+        await this.push({ retryBlocked });
         await this.pull();
         this.state.state.lastSuccessfulSyncAt = new Date().toISOString();
         this.state.save();
-        this.onStatus('synced');
+        const waiting = this.state.state.outbox.some(item => ['retryable', 'blocked', 'dependency'].includes(item.status));
+        this.onStatus(waiting ? 'attention' : 'synced');
       } catch (error) {
         this.onStatus(navigator.onLine ? 'problem' : 'offline', error);
         throw error;
@@ -129,17 +165,25 @@ export class SyncEngine {
     return this.running;
   }
 
-  async push() {
+  async push({ retryBlocked = false } = {}) {
+    if (retryBlocked) this.state.retryBlocked();
     const queue = [...this.state.state.outbox].sort((a, b) => operationOrder(a) - operationOrder(b));
     for (const operation of queue) {
       if (operation.homesteadId !== this.state.state.homesteadId) throw new Error('A queued change belongs to a different Homestead.');
+      if (operation.status === 'blocked') continue;
+      const blockers = dependencyBlockers(operation, this.state.state.outbox);
+      if (blockers.length) {
+        this.state.waitForDependencies(operation, blockers);
+        continue;
+      }
+      operation.status = 'pending';
+      operation.blockedBy = [];
       try {
         const result = await this.cloud.apply(operation);
         if (result.status === 'conflict') this.state.addConflict(operation, result.row);
         else this.state.complete(operation, result.row);
       } catch (error) {
-        this.state.fail(operation, error);
-        break;
+        this.state.fail(operation, error, { retryable: isRetryableSyncError(error) });
       }
     }
   }
