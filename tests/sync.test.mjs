@@ -122,6 +122,130 @@ test('a Ledger edit queued during incomplete setup uploads after initialization'
   assert.equal(h.cloud.rows.ledger_entries[0].description, 'Setup recovery test');
 });
 
+test('sync reconciles and uploads a local Calendar Event that was never queued', async () => {
+  const local = blank();
+  local.calendarEvents.push({
+    id: 'missed-mobile-event',
+    title: 'Mobile test event',
+    startDate: '2026-08-30',
+    endDate: '2026-08-30',
+    allDay: true,
+    createdAt: '2026-08-30T22:50:00.000Z',
+    updatedAt: '2026-08-30T22:50:00.000Z'
+  });
+  const h = harness(local);
+  h.state.bind(crypto.randomUUID());
+  h.state.state.initialSyncCompleted = true;
+
+  await h.engine.sync();
+
+  assert.equal(h.cloud.rows.calendar_events.length, 1);
+  assert.equal(h.cloud.rows.calendar_events[0].title, 'Mobile test event');
+  assert.equal(h.state.state.outbox.length, 0);
+  assert.ok(h.state.state.lastSuccessfulSyncAt);
+});
+
+test('sync reconciles an unqueued current Task without duplicating queued work', async () => {
+  const local = blank();
+  local.tasks.push({
+    id: 'missed-mobile-task',
+    title: 'Mobile test task',
+    status: 'open',
+    completed: false,
+    dueDate: '2026-08-30',
+    createdAt: '2026-08-30T22:50:00.000Z',
+    updatedAt: '2026-08-30T22:50:00.000Z'
+  });
+  const h = harness(local);
+  h.state.bind(crypto.randomUUID());
+  h.state.state.initialSyncCompleted = true;
+
+  assert.equal(h.engine.reconcileUntrackedLocalChanges(), 1);
+  assert.equal(h.engine.reconcileUntrackedLocalChanges(), 0);
+  await h.engine.sync();
+
+  assert.equal(h.cloud.rows.tasks.length, 1);
+  assert.equal(h.cloud.rows.tasks[0].title, 'Mobile test task');
+});
+
+test('reconciliation accepts a cloud deletion instead of recreating stale local work', () => {
+  const local = blank();
+  local.tasks.push({
+    id: 'retired-task', title: 'Old device task', status: 'open', completed: false,
+    dueDate: '2026-08-20', createdAt: '2026-08-20T12:00:00.000Z',
+    updatedAt: '2026-08-20T12:00:00.000Z', deletedAt: null
+  });
+  const h = harness(local);
+  h.state.bind(crypto.randomUUID());
+  h.state.state.initialSyncCompleted = true;
+  const entity = h.state.entity('tasks', 'retired-task');
+  entity.cloudVersion = 4;
+  entity.cloudRow = {
+    id: entity.cloudId, version: 4, title: 'Old device task', status: 'open',
+    priority: 'normal', due_date: '2026-08-20', recurrence_rule: null,
+    deleted_at: '2026-08-30T01:00:00.000Z', updated_at: '2026-08-30T01:00:00.000Z'
+  };
+
+  assert.equal(h.engine.reconcileUntrackedLocalChanges(), 0);
+  assert.equal(h.state.state.outbox.length, 0);
+  assert.equal(h.local().tasks[0].deletedAt, '2026-08-30T01:00:00.000Z');
+});
+
+test('reconciliation does not recreate an unknown historical tombstone', () => {
+  const local = blank();
+  local.tasks.push({
+    id: 'old-deleted-task', title: 'Historical Task', status: 'open', completed: false,
+    createdAt: '2026-07-01T12:00:00.000Z', updatedAt: '2026-07-02T12:00:00.000Z',
+    deletedAt: '2026-07-02T12:00:00.000Z'
+  });
+  const h = harness(local);
+  h.state.bind(crypto.randomUUID());
+  h.state.state.initialSyncCompleted = true;
+
+  assert.equal(h.engine.reconcileUntrackedLocalChanges(), 0);
+  assert.equal(h.state.state.outbox.length, 0);
+});
+
+test('reconciliation ignores JSON object key ordering differences', () => {
+  const local = blank();
+  local.records.push({
+    id: 'daisy-order', type: 'Animal', name: 'Daisy', status: 'Active',
+    identity: { purpose: 'Dairy', species: 'Cattle' },
+    stewardship: { location: 'North Barn', responsible: 'Steward' },
+    createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z'
+  });
+  const h = harness(local);
+  h.state.bind(crypto.randomUUID());
+  h.state.state.initialSyncCompleted = true;
+  const entity = h.state.entity('records', 'daisy-order');
+  entity.cloudVersion = 2;
+  entity.cloudRow = {
+    id: entity.cloudId, version: 2, type: 'animal', name: 'Daisy', status: 'Active',
+    identity: { species: 'Cattle', purpose: 'Dairy', profilePhotoCrop: { zoom: 1, y: 50, x: 50 } },
+    stewardship: { responsible: 'Steward', location: 'North Barn' },
+    primary_photo_id: null, updated_at: '2026-08-20T00:00:00.000Z'
+  };
+
+  assert.equal(h.engine.reconcileUntrackedLocalChanges(), 0);
+  assert.equal(h.state.state.outbox.length, 0);
+});
+
+test('sync success is not reported while an operation remains blocked', async () => {
+  const local = blank();
+  local.tasks.push({ id: 'blocked-task', title: 'Blocked Task', status: 'open', completed: false, createdAt: '2026-08-30T22:00:00.000Z', updatedAt: '2026-08-30T22:00:00.000Z' });
+  const h = harness(local);
+  h.state.bind(crypto.randomUUID());
+  h.state.state.initialSyncCompleted = true;
+  h.state.enqueue({ table: 'tasks', localId: 'blocked-task', type: 'create', payload: toCloud('tasks', local.tasks[0], h.state) });
+  h.cloud.apply = async () => { throw Object.assign(new Error('Chore Window belongs to another Homestead'), { code: '23503' }); };
+
+  await h.engine.sync();
+
+  assert.equal(h.state.state.outbox.length, 1);
+  assert.equal(h.state.state.outbox[0].status, 'blocked');
+  assert.equal(h.state.state.lastSuccessfulSyncAt, null);
+});
+
 test('an unbound local-only device does not create a cloud outbox', () => {
   const h = harness();
   const after = blank();
@@ -365,6 +489,7 @@ test('offline linked completion queues both changes and reconnect sync succeeds 
   Object.assign(after.tasks[0], { status: 'completed', completed: true, completedAt: '2026-08-10T11:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
   after.yieldEntries.push({ id: 'milk-task', taskId: 'milk-task', recordId: 'daisy', type: 'milk', session: 'morning', occurredAt: '2026-08-10T11:00:00Z', quantity: 2, unit: 'gal', unusableQuantity: 0, details: '', createdAt: '2026-08-10T11:00:00Z', updatedAt: '2026-08-10T11:00:00Z' });
   setup.engine.queueLocalChanges(before, after);
+  setup.setLocal(after);
   assert.deepEqual(setup.state.state.outbox.map(item => [item.table, item.type]), [['tasks', 'update'], ['yield_entries', 'create']]);
   await setup.engine.sync();
   assert.equal(setup.state.state.outbox.length, 0);

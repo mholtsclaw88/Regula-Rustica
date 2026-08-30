@@ -30,6 +30,18 @@ const DEPENDENCIES = Object.freeze({
 });
 
 const valueAt = (value, path) => path.split('.').reduce((current, key) => current?.[key], value);
+const canonicalValue = value => {
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalValue(value[key])]));
+};
+const comparablePayload = payload => {
+  const value = structuredClone(payload || {});
+  delete value.id;
+  delete value.client_updated_at;
+  delete value.source;
+  return canonicalValue(value);
+};
 
 function dependencyBlockers(operation, outbox) {
   if (operation.type === 'soft_delete') return [];
@@ -87,6 +99,53 @@ export class SyncEngine {
         if (!current.has(id)) this.state.enqueue({ table, localId: id, type: 'soft_delete', payload: toCloud(table, { ...row, deletedAt: new Date().toISOString() }, this.state) });
       }
     }
+  }
+
+  reconcileUntrackedLocalChanges() {
+    if (!this.state.state.initialSyncCompleted) return 0;
+    const local = this.readLocal();
+    let reconciled = null;
+    let queued = 0;
+    for (const table of DOMAIN_ORDER) {
+      const collection = COLLECTIONS[table];
+      const rows = table === 'record_attachments'
+        ? (local[collection] || []).filter(attachmentCloudReady)
+        : (local[collection] || []);
+      for (const row of rows) {
+        if (this.state.state.outbox.some(item => item.table === table && item.localId === row.id)) continue;
+        if (this.state.state.conflicts.some(item => item.table === table && item.localId === row.id && item.status === 'unresolved')) continue;
+        const entity = this.state.entity(table, row.id);
+        const currentPayload = toCloud(table, row, this.state);
+        // Older device state can know the cloud version without retaining the
+        // last cloud payload. That is not evidence that the row is missing.
+        if (!entity.cloudRow && entity.cloudVersion != null) continue;
+        if (!entity.cloudRow || entity.cloudVersion == null) {
+          // A local tombstone with no known cloud row is already converged.
+          // Do not recreate historical data merely to delete it again.
+          if (row.deletedAt || row.removedAt) continue;
+          this.state.enqueue({ table, localId: row.id, type: 'create', payload: currentPayload, clientUpdatedAt: row.updatedAt });
+          queued += 1;
+          continue;
+        }
+        const cloudLocal = fromCloud(table, entity.cloudRow, this.state);
+        const cloudPayload = toCloud(table, cloudLocal, this.state);
+        const cloudDeleted = Boolean(entity.cloudRow.deleted_at || entity.cloudRow.removed_at);
+        const localDeleted = Boolean(row.deletedAt || row.removedAt);
+        if (cloudDeleted && !localDeleted) {
+          reconciled ||= structuredClone(local);
+          const index = (reconciled[collection] || []).findIndex(item => item.id === row.id);
+          if (index >= 0) reconciled[collection][index] = cloudLocal;
+          continue;
+        }
+        if (JSON.stringify(comparablePayload(currentPayload)) === JSON.stringify(comparablePayload(cloudPayload))
+          && cloudDeleted === localDeleted) continue;
+        const type = !cloudDeleted && localDeleted ? 'soft_delete' : 'update';
+        this.state.enqueue({ table, localId: row.id, type, payload: currentPayload, clientUpdatedAt: row.updatedAt });
+        queued += 1;
+      }
+    }
+    if (reconciled) this.writeLocal(reconciled, 'sync');
+    return queued;
   }
 
   async initialize(choice, homesteadId) {
@@ -183,11 +242,19 @@ export class SyncEngine {
     this.running = (async () => {
       this.onStatus('syncing');
       try {
+        this.reconcileUntrackedLocalChanges();
         await this.push({ retryBlocked });
         await this.pull();
-        this.state.state.lastSuccessfulSyncAt = new Date().toISOString();
+        this.reconcileUntrackedLocalChanges();
+        if (this.state.state.outbox.some(item => item.status === 'pending')) {
+          await this.push();
+          await this.pull();
+          this.reconcileUntrackedLocalChanges();
+        }
+        const waiting = this.state.state.outbox.length > 0
+          || this.state.state.conflicts.some(item => item.status === 'unresolved');
+        if (!waiting) this.state.state.lastSuccessfulSyncAt = new Date().toISOString();
         this.state.save();
-        const waiting = this.state.state.outbox.some(item => ['retryable', 'blocked', 'dependency'].includes(item.status));
         this.onStatus(waiting ? 'attention' : 'synced');
       } catch (error) {
         this.onStatus(navigator.onLine ? 'problem' : 'offline', error);

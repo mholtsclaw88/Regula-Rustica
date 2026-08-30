@@ -228,6 +228,9 @@ function normalizeLedgerEntry(entry = {}) {
     amount: Number(entry.amount || 0),
     description: entry.description || '',
     recordId: entry.recordId || null,
+    currencyCode: entry.currencyCode || 'USD',
+    category: entry.category || null,
+    vendorOrSource: entry.vendorOrSource || null,
     createdAt,
     updatedAt: entry.updatedAt || createdAt,
     deletedAt: entry.deletedAt || null
