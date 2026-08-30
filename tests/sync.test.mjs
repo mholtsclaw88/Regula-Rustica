@@ -329,6 +329,109 @@ test('a verified pre-migration backup is readable', () => {
   assert.equal(state.createVerifiedBackup(data, 'test').data.records[0].id, 'one');
 });
 
+test('device cloud recovery preserves its backup and identity while clearing stale sync metadata', () => {
+  const storage = new MemoryStorage();
+  const state = new LocalSyncState(storage); const homestead = crypto.randomUUID();
+  state.bind(homestead); state.state.initialSyncCompleted = true;
+  state.state.cursors.records = { updatedAt: '2026-08-30T12:00:00Z', id: crypto.randomUUID() };
+  state.state.outbox.push({ id: 'old-operation' });
+  state.state.conflicts.push({ id: 'old-conflict', status: 'unresolved' });
+  state.state.entities['records:daisy'] = { localId: 'daisy', cloudId: crypto.randomUUID() };
+  state.state.failedOperations.push({ operationId: 'old-operation' });
+  state.save();
+  const deviceId = state.state.deviceId;
+
+  const recovery = state.prepareCloudRecovery({ records: [record('daisy')] }, homestead);
+
+  assert.equal(state.state.deviceId, deviceId);
+  assert.equal(state.state.homesteadId, homestead);
+  assert.equal(state.state.enabled, true);
+  assert.equal(state.state.initialSyncCompleted, false);
+  assert.deepEqual(state.state.cursors, {});
+  assert.deepEqual(state.state.outbox, []);
+  assert.deepEqual(state.state.conflicts, []);
+  assert.deepEqual(state.state.entities, {});
+  assert.deepEqual(state.state.failedOperations, []);
+  const backups = JSON.parse(storage.getItem(SYNC_STORAGE_KEYS.backups));
+  assert.equal(backups[0].id, recovery.backupId);
+  assert.equal(backups[0].data.records[0].name, 'Daisy');
+});
+
+test('device cloud recovery changes only the selected device state', () => {
+  const homestead = crypto.randomUUID();
+  const first = new LocalSyncState(new MemoryStorage());
+  const second = new LocalSyncState(new MemoryStorage());
+  [first, second].forEach(state => { state.bind(homestead); state.state.initialSyncCompleted = true; });
+  first.state.outbox.push({ id: 'first-device-change' }); first.save();
+  second.state.outbox.push({ id: 'second-device-change' }); second.save();
+
+  first.prepareCloudRecovery({ records: [record('first-local')] }, homestead);
+
+  assert.deepEqual(first.state.outbox, []);
+  assert.equal(second.state.outbox[0].id, 'second-device-change');
+  assert.equal(second.state.initialSyncCompleted, true);
+});
+
+test('device cloud recovery downloads the authoritative copy without writing to cloud', async () => {
+  const cloudRecord = {
+    id: crypto.randomUUID(), version: 3, type: 'animal', name: 'Cloud Daisy', status: 'Active',
+    identity: {}, stewardship: {}, created_at: '2026-08-30T12:00:00.000Z', updated_at: '2026-08-30T12:00:00.000Z', deleted_at: null
+  };
+  class RecoveryCloud extends MockCloud {
+    async *changes(table) {
+      const rows = this.rows[table];
+      if (!rows.length) return;
+      const last = rows.at(-1);
+      yield { rows, cursor: { updatedAt: last.updated_at, id: last.id } };
+    }
+  }
+  const local = blank(); local.records.push(record('local-daisy'));
+  const cloud = new RecoveryCloud({ records: [cloudRecord] });
+  const h = harness(local, cloud); const homestead = crypto.randomUUID();
+  h.state.bind(homestead); h.state.state.initialSyncCompleted = true;
+  h.state.enqueue({ table: 'records', localId: 'stale', type: 'update', payload: { name: 'Stale' } });
+  h.state.state.conflicts.push({ id: 'stale-conflict', status: 'unresolved' }); h.state.save();
+
+  await h.engine.resetDeviceFromCloud(homestead);
+
+  assert.equal(h.local().records.length, 1);
+  assert.equal(h.local().records[0].name, 'Cloud Daisy');
+  assert.equal(h.state.state.initialSyncCompleted, true);
+  assert.equal(h.state.state.initialSyncState.status, 'complete');
+  assert.deepEqual(h.state.state.outbox, []);
+  assert.deepEqual(h.state.state.conflicts, []);
+  assert.equal(cloud.calls.length, 0);
+});
+
+test('device cloud recovery refuses an empty cloud before changing local state', async () => {
+  const local = blank(); local.records.push(record('local-daisy'));
+  const h = harness(local); const homestead = crypto.randomUUID();
+  h.state.bind(homestead); h.state.state.initialSyncCompleted = true; h.state.save();
+  const before = structuredClone(h.state.state);
+
+  await assert.rejects(h.engine.resetDeviceFromCloud(homestead), /cloud Homestead is empty/i);
+
+  assert.deepEqual(h.state.state, before);
+  assert.equal(h.local().records[0].id, 'local-daisy');
+  assert.equal(h.storage.getItem(SYNC_STORAGE_KEYS.backups), null);
+});
+
+test('retrying an interrupted device recovery retains the original safety backup', async () => {
+  const cloud = new MockCloud({ records: [{ id: crypto.randomUUID() }] });
+  cloud.changes = async function* () { throw new Error('download interrupted'); };
+  const local = blank(); local.records.push(record('original-local'));
+  const h = harness(local, cloud); const homestead = crypto.randomUUID();
+  h.state.bind(homestead); h.state.state.initialSyncCompleted = true; h.state.save();
+
+  await assert.rejects(h.engine.resetDeviceFromCloud(homestead), /download interrupted/);
+  await assert.rejects(h.engine.resetDeviceFromCloud(homestead), /download interrupted/);
+
+  const backups = JSON.parse(h.storage.getItem(SYNC_STORAGE_KEYS.backups));
+  assert.equal(backups.length, 1);
+  assert.equal(backups[0].data.records[0].id, 'original-local');
+  assert.equal(h.state.state.initialSyncState.status, 'failed');
+});
+
 test('first sync identifies populated local and empty cloud as A', async () => {
   const data = blank(); data.records.push(record('legacy'));
   assert.equal((await harness(data).engine.inspectFirstSync(crypto.randomUUID())).case, 'A');

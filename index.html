@@ -23,7 +23,7 @@
   <script src="ui-refinements.js?v=data-entry-forms-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=conflict-resolution-hotfix-v1" type="module"></script>
+  <script src="sync/runtime.mjs?v=device-sync-recovery-v1" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -442,6 +442,13 @@
             </div>
             <button class="btn secondary hidden" id="syncNow" type="button">Sync now</button>
             <div id="syncConflicts" class="form-grid"></div>
+            <details class="hidden" id="syncRecovery">
+              <summary>Device sync recovery</summary>
+              <div class="form-grid">
+                <p class="muted">If this device is stuck on old queued changes, save a backup and replace its working copy with the current cloud Homestead. Cloud data is not deleted. Repeat this separately on every affected device.</p>
+                <button class="btn secondary" id="syncResetFromCloud" type="button">Reset this device from cloud</button>
+              </div>
+            </details>
           </div>
           <form id="cloudPasswordForm" class="form-grid hidden">
             <label>New password<input id="cloudNewPassword" type="password" autocomplete="new-password" minlength="8" required></label>

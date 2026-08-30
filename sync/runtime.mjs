@@ -8,6 +8,8 @@ const status = document.querySelector('#syncStatus');
 const actions = document.querySelector('#syncFirstActions');
 const conflictList = document.querySelector('#syncConflicts');
 const syncNow = document.querySelector('#syncNow');
+const syncRecovery = document.querySelector('#syncRecovery');
+const syncResetFromCloud = document.querySelector('#syncResetFromCloud');
 const offlineEngine = new SyncEngine({
   state,
   cloud: null,
@@ -54,6 +56,9 @@ function render(kind = 'ready', error = null) {
   status.textContent = message(kind, error);
   status.classList.toggle('error', kind === 'problem' || kind === 'attention' || state.state.outbox.some(item => item.status === 'blocked'));
   syncNow.classList.toggle('hidden', !context?.homesteadId || !state.state.initialSyncCompleted);
+  const recoveryInProgress = state.state.initialSyncState?.case === 'device-cloud-recovery'
+    && state.state.initialSyncState.status !== 'complete';
+  syncRecovery.classList.toggle('hidden', !context?.homesteadId || (!state.state.initialSyncCompleted && !recoveryInProgress));
   actions.classList.toggle('hidden', !firstCase || state.state.initialSyncCompleted);
   actions.querySelectorAll('[data-cases]').forEach(button => {
     button.classList.toggle('hidden', !button.dataset.cases.includes(firstCase));
@@ -183,6 +188,13 @@ syncNow.addEventListener('click', () => {
   if (!context?.homesteadId) return;
   run(() => engine.sync({ retryBlocked: true }));
   startAttachmentSync();
+});
+syncResetFromCloud.addEventListener('click', () => {
+  if (!context?.homesteadId) return;
+  const confirmed = window.confirm('Are you sure? This will discard queued local changes on this device and replace its working copy with the current cloud Homestead. Cloud data will not be deleted. A safety backup will be saved first.');
+  if (!confirmed) return;
+  window.RegulaRusticaLocal.exportBackup();
+  run(() => engine.resetDeviceFromCloud(context.homesteadId));
 });
 document.querySelector('#syncUpload').addEventListener('click', () => run(async () => {
   await engine.initialize('upload', context.homesteadId);
