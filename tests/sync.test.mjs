@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SyncEngine, isRetryableSyncError } from '../sync/engine.mjs';
 import { LocalSyncState, SYNC_STORAGE_KEYS } from '../sync/local-state.mjs';
-import { DOMAIN_ORDER, fromCloud, hasMeaningfulData, operationOrder, toCloud } from '../sync/entities.mjs';
+import { DOMAIN_ORDER, conflictPresentation, fromCloud, hasMeaningfulData, operationOrder, toCloud } from '../sync/entities.mjs';
 import { LEGACY_SYNC_RPC_ROUTES, SYNC_RPC_ROUTES, SupabaseSyncAdapter, rpcForSyncTable } from '../sync/cloud-adapter.mjs';
 import { legacyOperationAlreadySatisfied, markLegacyOperation } from '../sync/legacy-recovery.mjs';
 import housekeepingData from '../housekeeping-data.js';
@@ -812,6 +812,84 @@ test('use-local conflict resolution queues a new update on current version', asy
   const id = crypto.randomUUID(); const cloud = new MockCloud({ records: [{ id, version: 2, name: 'Cloud' }] }); const h = harness(blank(), cloud);
   h.state.bind(crypto.randomUUID()); const conflict = h.state.addConflict({ id: crypto.randomUUID(), table: 'records', localId: id, rowId: id, payload: { id, name: 'Local' }, baseVersion: 1 }, cloud.rows.records[0]);
   await h.engine.resolveConflict(conflict.id, 'local'); assert.equal(cloud.rows.records[0].name, 'Local');
+});
+
+test('keep-cloud resolution rebinds a legacy relationship conflict and preserves other reviews', async () => {
+  const localId = 'legacy-location';
+  const staleCloudId = crypto.randomUUID();
+  const existingCloudId = crypto.randomUUID();
+  const sourceCloudId = crypto.randomUUID();
+  const targetCloudId = crypto.randomUUID();
+  const data = blank();
+  data.relationships.push({ id: localId, sourceRecordId: 'daisy', targetRecordId: 'north-field', relationshipType: 'grazes_on', details: { local: true } });
+  data.notes.push({ id: 'unrelated-note', text: 'Leave this alone' });
+  const h = harness(data);
+  h.state.bind(crypto.randomUUID());
+  h.state.entity('records', 'daisy').cloudId = sourceCloudId;
+  h.state.entity('records', 'north-field').cloudId = targetCloudId;
+  h.state.entity('record_relationships', localId).cloudId = staleCloudId;
+  const conflict = h.state.addConflict({
+    id: crypto.randomUUID(), table: 'record_relationships', localId, rowId: staleCloudId, type: 'create', baseVersion: null,
+    payload: { id: staleCloudId, source_record_id: sourceCloudId, target_record_id: targetCloudId, relationship_type: 'grazes_on', details: { local: true } }
+  }, {
+    id: existingCloudId, version: 4, source_record_id: sourceCloudId, target_record_id: targetCloudId,
+    relationship_type: 'located_on', started_at: null, ended_at: null, details: { cloud: true },
+    created_at: '2026-08-01T00:00:00Z', updated_at: '2026-08-02T00:00:00Z'
+  });
+  const other = h.state.addConflict({ id: crypto.randomUUID(), table: 'records', localId: 'other', rowId: crypto.randomUUID(), payload: {}, baseVersion: 1 }, { id: crypto.randomUUID(), version: 2 });
+
+  await h.engine.resolveConflict(conflict.id, 'cloud');
+
+  assert.deepEqual(h.local().relationships.map(row => ({ id: row.id, type: row.relationshipType, details: row.details })), [
+    { id: localId, type: 'located_on', details: { cloud: true } }
+  ]);
+  assert.equal(h.state.entity('record_relationships', localId).cloudId, existingCloudId);
+  assert.equal(h.state.entity('record_relationships', localId).cloudVersion, 4);
+  assert.deepEqual(h.state.state.conflicts.filter(item => item.status === 'unresolved').map(item => item.id), [other.id]);
+  assert.deepEqual(new LocalSyncState(h.storage).state.conflicts.filter(item => item.status === 'unresolved').map(item => item.id), [other.id]);
+  assert.deepEqual(h.local().notes, [{ id: 'unrelated-note', text: 'Leave this alone' }]);
+});
+
+test('relationship conflict presentation identifies the linked Records and relationship type', () => {
+  const conflict = { table: 'record_relationships', localId: 'relationship-1', localPayload: {}, cloudRow: {} };
+  assert.deepEqual(conflictPresentation(conflict, {
+    records: [{ id: 'daisy', name: 'Daisy' }, { id: 'north-field', name: 'North Field' }],
+    relationships: [{ id: 'relationship-1', sourceRecordId: 'daisy', targetRecordId: 'north-field', relationshipType: 'grazes_on' }]
+  }), {
+    title: 'Record relationship changed on this device and in cloud.',
+    detail: 'Source: Daisy · Type: grazes on · Related Record: North Field'
+  });
+});
+
+test('use-local resolution updates the existing relationship row without duplication', async () => {
+  const localId = 'legacy-location';
+  const staleCloudId = crypto.randomUUID();
+  const existingCloudId = crypto.randomUUID();
+  const sourceCloudId = crypto.randomUUID();
+  const targetCloudId = crypto.randomUUID();
+  const cloud = new MockCloud({ record_relationships: [{
+    id: existingCloudId, version: 4, source_record_id: sourceCloudId, target_record_id: targetCloudId,
+    relationship_type: 'located_on', started_at: null, ended_at: null, details: { cloud: true }
+  }] });
+  const h = harness(blank(), cloud);
+  h.state.bind(crypto.randomUUID());
+  h.state.entity('record_relationships', localId).cloudId = staleCloudId;
+  const conflict = h.state.addConflict({
+    id: crypto.randomUUID(), table: 'record_relationships', localId, rowId: staleCloudId, type: 'create', baseVersion: null,
+    payload: { id: staleCloudId, source_record_id: sourceCloudId, target_record_id: targetCloudId, relationship_type: 'grazes_on', started_at: null, ended_at: null, details: { local: true } }
+  }, cloud.rows.record_relationships[0]);
+
+  await h.engine.resolveConflict(conflict.id, 'local');
+
+  assert.equal(cloud.rows.record_relationships.length, 1);
+  assert.equal(cloud.rows.record_relationships[0].id, existingCloudId);
+  assert.equal(cloud.rows.record_relationships[0].relationship_type, 'grazes_on');
+  assert.deepEqual(cloud.rows.record_relationships[0].details, { local: true });
+  assert.equal(h.state.state.conflicts.some(item => item.status === 'unresolved'), false);
+  assert.equal(h.state.state.outbox.length, 0);
+  assert.equal(h.state.entity('record_relationships', localId).cloudId, existingCloudId);
+  assert.equal(new LocalSyncState(h.storage).state.conflicts.some(item => item.status === 'unresolved'), false);
+  assert.ok(h.state.state.lastSuccessfulSyncAt);
 });
 
 test('soft deletion and restoration are explicit operations', () => {

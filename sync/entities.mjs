@@ -45,3 +45,18 @@ export function fromCloud(t,r,s){
 export function meaningfulCounts(data){return Object.fromEntries(DOMAIN_ORDER.map(t=>[t,(data[COLLECTIONS[t]]||[]).filter(r=>!r.deletedAt&&!r.removedAt&&(t!=='homestead_people'||r.personType==='child')&&(t!=='record_attachments'||attachmentCloudReady(r))).length]));}
 export const hasMeaningfulData=data=>Object.values(meaningfulCounts(data)).some(Boolean);
 export function operationOrder(o){const d=DOMAIN_ORDER.indexOf(o.table),t=o.type==='create'||o.type==='restore'?0:o.type==='update'?1:2;if(o.table==='records'&&o.type==='update'&&o.payload?.primary_photo_id)return(DOMAIN_ORDER.indexOf('record_attachments')+1)*10+1;return(t===2?DOMAIN_ORDER.length-d:d)*10+t;}
+
+export function conflictPresentation(conflict, data = {}) {
+  if (conflict?.table !== 'record_relationships') {
+    return { title: `${String(conflict?.table || 'change').replaceAll('_', ' ')} changed here and in the cloud.`, detail: '' };
+  }
+  const relationship = (data.relationships || []).find(item => item.id === conflict.localId);
+  const records = new Map((data.records || []).map(item => [item.id, item.name]));
+  const type = relationship?.relationshipType || conflict.localPayload?.relationship_type || conflict.cloudRow?.relationship_type;
+  const details = [
+    relationship?.sourceRecordId && records.get(relationship.sourceRecordId) ? `Source: ${records.get(relationship.sourceRecordId)}` : '',
+    type ? `Type: ${String(type).replaceAll('_', ' ')}` : '',
+    relationship?.targetRecordId && records.get(relationship.targetRecordId) ? `Related Record: ${records.get(relationship.targetRecordId)}` : ''
+  ].filter(Boolean);
+  return { title: 'Record relationship changed on this device and in cloud.', detail: details.join(' · ') };
+}

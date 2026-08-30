@@ -1,5 +1,6 @@
 import { SupabaseSyncAdapter } from './cloud-adapter.mjs';
 import { SyncEngine } from './engine.mjs';
+import { conflictPresentation } from './entities.mjs';
 import { LocalSyncState } from './local-state.mjs';
 
 const state = new LocalSyncState();
@@ -62,8 +63,29 @@ function render(kind = 'ready', error = null) {
   unresolved.forEach(conflict => {
     const item = document.createElement('div');
     item.className = 'sync-conflict';
-    item.innerHTML = `<p><strong>${conflict.table.replaceAll('_', ' ')}</strong> changed here and in the cloud.</p><div class="quick"><button class="btn secondary" data-choice="cloud">Keep cloud version</button><button class="btn primary" data-choice="local">Use my version</button></div>`;
-    item.querySelectorAll('button').forEach(button => button.addEventListener('click', () => run(() => engine.resolveConflict(conflict.id, button.dataset.choice))));
+    const presentation = conflictPresentation(conflict, window.RegulaRusticaLocal.read());
+    const title = document.createElement('p');
+    const strong = document.createElement('strong');
+    strong.textContent = presentation.title;
+    title.appendChild(strong);
+    item.appendChild(title);
+    if (presentation.detail) {
+      const detail = document.createElement('p');
+      detail.className = 'muted';
+      detail.textContent = presentation.detail;
+      item.appendChild(detail);
+    }
+    const choices = document.createElement('div');
+    choices.className = 'quick';
+    [['cloud', 'secondary', 'Keep cloud version'], ['local', 'primary', 'Use my version']].forEach(([choice, style, label]) => {
+      const button = document.createElement('button');
+      button.className = `btn ${style}`;
+      button.dataset.choice = choice;
+      button.textContent = label;
+      button.addEventListener('click', () => run(() => engine.resolveConflict(conflict.id, choice)));
+      choices.appendChild(button);
+    });
+    item.appendChild(choices);
     conflictList.appendChild(item);
   });
   state.state.outbox.filter(item => ['blocked', 'dependency'].includes(item.status)).forEach(operation => {
