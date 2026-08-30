@@ -100,6 +100,20 @@ test('skipping only one occurrence allows the next scheduled date', () => {
   assert.equal(list.filter(task => !task.deletedAt && task.dueDate === '2026-08-19').length, 1);
 });
 
+test('catch-up continues from the latest tombstone instead of branching from its parent', () => {
+  const list = [
+    occurrence({ id: 'completed-parent', completed: true, status: 'completed', dueDate: '2026-08-18' }),
+    occurrence({ id: 'skipped-child', parentTaskId: 'completed-parent', dueDate: '2026-08-19', deletedAt: '2026-08-19T12:00:00Z' })
+  ];
+  tasks.stabilizeRecurringTasks(list, {
+    targetDate: '2026-08-20', nextDueDate: housekeeping.nextRecurringDueDate,
+    makeId: () => 'current-task', now: '2026-08-20T10:00:00Z'
+  });
+  const current = list.find(task => task.id === 'current-task');
+  assert.equal(current.parentTaskId, 'skipped-child');
+  assert.equal(current.dueDate, '2026-08-20');
+});
+
 test('a future skipped tombstone blocks completion-style rematerialization', () => {
   const list = [
     occurrence({ completed: true, status: 'completed' }),
@@ -156,6 +170,39 @@ test('Disabled recurring Tasks persist and remain separate from Open work', () =
   assert.deepEqual(tasks.filterTasksByStatus(reloaded, 'done').map(task => task.id), ['completed']);
   assert.deepEqual(tasks.filterTasksByStatus(reloaded, 'all').map(task => task.id), ['task-1', 'completed', 'open']);
   assert.equal(tasks.isDisabledRecurringTask(reloaded[0]), true);
+});
+
+test('Delete recurring series hides its controller, stops materialization, and can be re-enabled from Suggestions', () => {
+  const list = [
+    occurrence({ id: 'completed', completed: true, status: 'completed', dueDate: '2026-08-17' }),
+    occurrence({ id: 'current', dueDate: '2026-08-18', parentTaskId: 'completed' })
+  ];
+  const anchor = tasks.deleteRecurringSeries(list, list[1], '2026-08-18T12:00:00Z');
+  assert.equal(anchor.recurrenceRule.enabled, false);
+  assert.equal(anchor.recurrenceRule.seriesDeleted, true);
+  assert.deepEqual(tasks.filterTasksByStatus(list, 'all').map(task => task.id), ['completed']);
+  assert.deepEqual(tasks.filterTasksByStatus(list, 'disabled'), []);
+  const result = tasks.stabilizeRecurringTasks(list, {
+    targetDate: '2026-08-19', nextDueDate: housekeeping.nextRecurringDueDate,
+    makeId: () => 'must-not-exist', now: '2026-08-19T10:00:00Z'
+  });
+  assert.equal(result.created, 0);
+  const restored = tasks.reactivateSuggestedTask(list, 'record-1', 'dairy-milk-morning', {
+    dueDate: '2026-08-19', recurrenceRule: rule('series-1'), updatedAt: '2026-08-19T11:00:00Z'
+  });
+  assert.equal(restored.id, 'current');
+  assert.equal(restored.recurrenceRule.seriesDeleted, undefined);
+  assert.equal(tasks.suggestionEnabled(list, 'record-1', 'dairy-milk-morning'), true);
+});
+
+test('deleted-series state survives recurrence and cloud normalization', () => {
+  const normalized = housekeeping.normalizeRecurrenceRule({ ...rule('series-1', false), seriesDeleted: true });
+  assert.equal(normalized.seriesDeleted, true);
+  const state = { cloudId: (_table, id) => id, localIdForCloud: (_table, id) => id, entity: () => ({}) };
+  const local = occurrence({ recurrenceRule: normalized });
+  const cloud = toCloud('tasks', local, state);
+  assert.equal(cloud.recurrence_rule.seriesDeleted, true);
+  assert.equal(fromCloud('tasks', { ...cloud, id: local.id, created_at: local.createdAt, updated_at: local.updatedAt }, state).recurrenceRule.seriesDeleted, true);
 });
 
 test('Generic re-enable reuses the disabled series without resurrecting history', () => {
