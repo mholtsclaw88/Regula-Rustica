@@ -17,7 +17,7 @@ After sign-in, the app inspects both sides before enabling sync:
 - Both populated: automatic merge is refused. **Back up this device and use cloud Homestead** exports and retains a safety copy before replacement; Cancel leaves both sides unchanged.
 - Both empty: choose **Start cloud synchronization**.
 
-An interrupted or failed migration is not marked complete. Local data, the safety backup, and queued operations remain available for retry. Safety copies use `regulaRusticaSyncBackupsV1`; current backups use schema version 6 and include task date windows, Calendar, and Yield. Schema-version 5 backups remain importable.
+An interrupted or failed migration is not marked complete. Local data, the safety backup, and queued operations remain available for retry. Once a device is bound to a Homestead, new edits are durably queued even while setup or recovery remains incomplete; the header shows **Sync setup** instead of incorrectly reporting **Synced**. Safety copies use `regulaRusticaSyncBackupsV1`; current backups use schema version 6 and include task date windows, Calendar, and Yield. Schema-version 5 backups remain importable.
 
 Legacy v5 IDs are not rewritten. Valid UUIDs remain identical; older non-UUID IDs receive a stable cloud UUID mapping in the separate `regulaRusticaSyncV1` metadata store.
 

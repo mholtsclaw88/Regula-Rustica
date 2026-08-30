@@ -63,7 +63,9 @@ export class SyncEngine {
   }
 
   queueLocalChanges(before, after) {
-    if (!this.state.state.initialSyncCompleted) return;
+    // Once a device is bound, preserve edits in the durable outbox even while
+    // first-sync/recovery is incomplete. Pushing still waits for initialization.
+    if (!this.state.state.enabled || !this.state.state.homesteadId) return;
     for (const table of DOMAIN_ORDER) {
       const collection = COLLECTIONS[table];
       const cloudRows = rows => table === 'record_attachments' ? rows.filter(attachmentCloudReady) : rows;

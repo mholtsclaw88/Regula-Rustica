@@ -107,6 +107,7 @@ test('header sync status derives all five states and links to existing Cloud set
   assert.match(html, /id="headerSyncStatus"/);
   ['synced', 'syncing', 'issue', 'offline', 'local'].forEach(state => assert.match(runtime, new RegExp(`state: '${state}'`)));
   assert.match(runtime, /renderHeaderStatus\(kind\)/);
+  assert.match(runtime, /!state\.state\.initialSyncCompleted[\s\S]*label: 'Sync setup'/);
   assert.match(runtime, /data-settings-category="cloud"/);
   assert.match(runtime, /regula-rustica:sync-status/);
 });

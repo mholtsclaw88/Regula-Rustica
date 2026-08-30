@@ -75,6 +75,61 @@ test('device UUID persists across reloads', () => {
   assert.equal(new LocalSyncState(storage).state.deviceId, first.state.deviceId);
 });
 
+test('a bound device preserves Ledger edits while cloud setup is incomplete', () => {
+  const h = harness();
+  h.state.bind(crypto.randomUUID());
+  const after = blank();
+  after.ledger.push({
+    id: 'local-test-entry',
+    type: 'expense',
+    date: '2026-08-30',
+    description: 'Test entry',
+    amount: 1,
+    createdAt: '2026-08-30T12:00:00.000Z',
+    updatedAt: '2026-08-30T12:00:00.000Z'
+  });
+
+  h.engine.queueLocalChanges(blank(), after);
+
+  assert.equal(h.state.state.initialSyncCompleted, false);
+  assert.deepEqual(h.state.state.outbox.map(item => [item.table, item.type, item.localId]), [
+    ['ledger_entries', 'create', 'local-test-entry']
+  ]);
+});
+
+test('a Ledger edit queued during incomplete setup uploads after initialization', async () => {
+  const h = harness();
+  const homestead = crypto.randomUUID();
+  h.state.bind(homestead);
+  const after = blank();
+  after.ledger.push({
+    id: 'setup-ledger-entry',
+    type: 'expense',
+    date: '2026-08-30',
+    description: 'Setup recovery test',
+    amount: 2,
+    createdAt: '2026-08-30T12:00:00.000Z',
+    updatedAt: '2026-08-30T12:00:00.000Z'
+  });
+  h.setLocal(after);
+  h.engine.queueLocalChanges(blank(), after);
+
+  await h.engine.initialize('upload', homestead);
+
+  assert.equal(h.state.state.initialSyncCompleted, true);
+  assert.equal(h.state.state.outbox.length, 0);
+  assert.equal(h.cloud.rows.ledger_entries.length, 1);
+  assert.equal(h.cloud.rows.ledger_entries[0].description, 'Setup recovery test');
+});
+
+test('an unbound local-only device does not create a cloud outbox', () => {
+  const h = harness();
+  const after = blank();
+  after.ledger.push({ id: 'local-only-entry', type: 'expense', date: '2026-08-30', description: 'Local', amount: 1 });
+  h.engine.queueLocalChanges(blank(), after);
+  assert.deepEqual(h.state.state.outbox, []);
+});
+
 test('legacy local IDs remain local and receive stable cloud UUID mappings', () => {
   const storage = new MemoryStorage();
   const first = new LocalSyncState(storage); const mapping = first.entity('records', 'daisy');
