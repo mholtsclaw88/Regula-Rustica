@@ -60,6 +60,7 @@ function message(kind, error) {
   if (waiting) return `${waiting} change${waiting === 1 ? '' : 's'} waiting`;
   if (!context?.homesteadId) return 'Cloud synchronization is disconnected.';
   if (!state.state.enabled) return 'Cloud synchronization is not connected.';
+  if (!state.state.initialSyncCompleted) return 'Cloud setup is incomplete. Changes remain safely queued on this device.';
   return 'Synced';
 }
 
@@ -68,6 +69,7 @@ function headerStatusSnapshot(kind) {
   const blocked = state.state.outbox.some(item => ['blocked', 'dependency'].includes(item.status));
   if (!context?.homesteadId || !state.state.enabled) return { state: 'local', label: 'Local only', detail: 'Saved on this device' };
   if (kind === 'offline' || !navigator.onLine) return { state: 'offline', label: 'Offline', detail: 'Cloud sync unavailable' };
+  if (!state.state.initialSyncCompleted) return { state: 'issue', label: 'Sync setup', detail: state.state.outbox.length ? `${state.state.outbox.length} change${state.state.outbox.length === 1 ? '' : 's'} waiting safely` : 'Finish cloud setup' };
   if (conflicts || blocked || kind === 'problem' || kind === 'attention') return { state: 'issue', label: 'Sync issue', detail: 'Some changes could not sync' };
   if (kind === 'syncing' || state.state.outbox.length) return { state: 'syncing', label: 'Syncing', detail: 'Changes are being synchronized' };
   return { state: 'synced', label: 'Synced', detail: state.state.lastSuccessfulSyncAt ? 'Just now' : 'Everything is up to date' };
