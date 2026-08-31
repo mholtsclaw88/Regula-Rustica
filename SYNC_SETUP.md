@@ -25,7 +25,11 @@ Legacy v5 IDs are not rewritten. Valid UUIDs remain identical; older non-UUID ID
 
 User actions are saved locally before a durable outbox operation is created. Sync runs after local changes, at startup, when connectivity returns, when the app returns to the foreground, approximately once a minute while the app is visible, and from **Sync now**. These triggers are debounced and share one active sync run. Signing out stops authenticated sync but keeps local data and pending metadata.
 
+Each initialized sync run also reconciles the current local collections against their last accepted cloud rows. This repairs the narrow failure case where a local save completed but an older client never created its outbox item; missing current Tasks, Calendar events, Journal entries, Yield, and Ledger data are queued through the same audited RPC paths. Reconciliation never bypasses version checks. A newer cloud deletion wins over an unqueued stale local copy, while divergent active edits still use normal optimistic-version conflict review.
+
 Every active local domain has an explicit server RPC route. Retryable transport or service failures remain queued, while permanent server rejections are marked as blocked with the domain, operation, local item ID, attempt count, error code, and timestamp retained on the device. A blocked change never causes unrelated healthy changes to be skipped, and the app does not report **Synced** while blocked work remains. **Sync now** retries blocked changes after a correction is deployed. Legacy failed operations are upgraded to retryable operations without clearing the outbox.
+
+Task synchronization treats Record, parent-Task, and Chore Window links as optional references. A reference to a deleted or unavailable Chore Window is removed from the incoming Task instead of blocking the whole device. If an old device updates a Task that was already deleted in cloud, the cloud deletion is returned as the accepted result so the device retires its stale copy. Morning and Evening system Chore Windows are restored or created by migration if historical recovery removed them.
 
 ### Legacy backlog recovery
 
