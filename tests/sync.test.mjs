@@ -206,6 +206,40 @@ test('reconciliation does not recreate an unknown historical tombstone', () => {
   assert.equal(h.state.state.outbox.length, 0);
 });
 
+test('a bound device resumes its durable queue when setup was left incomplete', async () => {
+  const h = harness();
+  const homestead = crypto.randomUUID();
+  h.state.bind(homestead);
+  h.state.enqueue({
+    table: 'ledger_entries',
+    localId: 'waiting-entry',
+    type: 'create',
+    payload: { entry_type: 'expense', amount: 3, description: 'Waiting safely' }
+  });
+  h.state.state.outbox[0].status = 'blocked';
+  h.state.save();
+
+  assert.equal(h.engine.canResumeQueuedSync(homestead), true);
+  await h.engine.resumeQueuedSync(homestead);
+
+  assert.equal(h.state.state.initialSyncCompleted, true);
+  assert.equal(h.state.state.initialSyncState.status, 'complete');
+  assert.equal(h.state.state.outbox.length, 0);
+  assert.equal(h.cloud.rows.ledger_entries.length, 1);
+});
+
+test('queued recovery never crosses a Homestead boundary', async () => {
+  const h = harness();
+  const homestead = crypto.randomUUID();
+  h.state.bind(homestead);
+  h.state.enqueue({ table: 'records', localId: 'daisy', type: 'create', payload: { name: 'Daisy' } });
+
+  assert.equal(h.engine.canResumeQueuedSync(crypto.randomUUID()), false);
+  await assert.rejects(() => h.engine.resumeQueuedSync(crypto.randomUUID()), /does not have a resumable/);
+  assert.equal(h.cloud.calls.length, 0);
+  assert.equal(h.state.state.outbox.length, 1);
+});
+
 test('reconciliation ignores JSON object key ordering differences', () => {
   const local = blank();
   local.records.push({

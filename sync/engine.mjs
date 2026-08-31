@@ -237,6 +237,52 @@ export class SyncEngine {
     }
   }
 
+  canResumeQueuedSync(homesteadId) {
+    return Boolean(
+      this.cloud
+      && homesteadId
+      && this.state.state.enabled
+      && this.state.state.homesteadId === homesteadId
+      && !this.state.state.initialSyncCompleted
+      && this.state.state.outbox.length
+    );
+  }
+
+  async resumeQueuedSync(homesteadId) {
+    if (!this.canResumeQueuedSync(homesteadId)) {
+      throw new Error('This device does not have a resumable cloud sync queue.');
+    }
+    if (this.state.state.outbox.some(operation => operation.homesteadId !== homesteadId)) {
+      throw new Error('A queued change belongs to a different Homestead.');
+    }
+    this.state.state.initialSyncCompleted = true;
+    this.state.state.initialSyncState = {
+      case: 'queued-sync-recovery',
+      status: 'running',
+      startedAt: new Date().toISOString()
+    };
+    this.state.save();
+    try {
+      await this.sync({ retryBlocked: true });
+      this.state.state.initialSyncState = {
+        ...this.state.state.initialSyncState,
+        status: 'complete',
+        completedAt: new Date().toISOString()
+      };
+      this.state.save();
+    } catch (error) {
+      // Keep normal sync enabled so a transient failure cannot strand the
+      // durable outbox behind first-sync controls again.
+      this.state.state.initialSyncState = {
+        ...this.state.state.initialSyncState,
+        status: 'failed',
+        error: error.message
+      };
+      this.state.save();
+      throw error;
+    }
+  }
+
   async sync({ retryBlocked = false } = {}) {
     if (this.running) return this.running;
     this.running = (async () => {
