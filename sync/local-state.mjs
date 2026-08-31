@@ -5,6 +5,24 @@ const BACKUP_KEY = 'regulaRusticaSyncBackupsV1';
 
 export const uuid = () => crypto.randomUUID();
 
+export function syncDiagnosticSummary(value = {}) {
+  const outbox = Array.isArray(value.outbox) ? value.outbox : [];
+  const conflicts = (Array.isArray(value.conflicts) ? value.conflicts : [])
+    .filter(item => item.status === 'unresolved');
+  const byTable = {};
+  const byStatus = {};
+  const add = (table, status) => {
+    const tableKey = table || 'unknown';
+    byTable[tableKey] = (byTable[tableKey] || 0) + 1;
+    byStatus[status] = (byStatus[status] || 0) + 1;
+  };
+  outbox.forEach(item => add(item.table, ['blocked', 'retryable', 'dependency', 'pending'].includes(item.status)
+    ? item.status
+    : 'pending'));
+  conflicts.forEach(item => add(item.table, 'conflict'));
+  return { total: outbox.length + conflicts.length, byTable, byStatus };
+}
+
 export function emptySyncState() {
   return {
     schemaVersion: 1,

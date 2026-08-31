@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SyncEngine, isRetryableSyncError } from '../sync/engine.mjs';
-import { LocalSyncState, SYNC_STORAGE_KEYS } from '../sync/local-state.mjs';
+import { LocalSyncState, SYNC_STORAGE_KEYS, syncDiagnosticSummary } from '../sync/local-state.mjs';
 import { DOMAIN_ORDER, conflictPresentation, fromCloud, hasMeaningfulData, operationOrder, toCloud } from '../sync/entities.mjs';
 import { LEGACY_SYNC_RPC_ROUTES, SYNC_RPC_ROUTES, SupabaseSyncAdapter, rpcForSyncTable } from '../sync/cloud-adapter.mjs';
 import { legacyOperationAlreadySatisfied, markLegacyOperation } from '../sync/legacy-recovery.mjs';
@@ -62,13 +62,34 @@ class MockCloud {
   async *changes() { return; }
 }
 
-function harness(local = blank(), cloud = new MockCloud()) {
+function harness(local = blank(), cloud = new MockCloud(), { normalizeWrite = value => value } = {}) {
   const storage = new MemoryStorage();
   const state = new LocalSyncState(storage);
   let current = structuredClone(local);
-  const engine = new SyncEngine({ state, cloud, readLocal: () => structuredClone(current), writeLocal: value => { current = structuredClone(value); } });
+  const engine = new SyncEngine({ state, cloud, readLocal: () => structuredClone(current), writeLocal: value => { current = structuredClone(normalizeWrite(value)); } });
   return { state, cloud, engine, storage, local: () => current, setLocal: value => { current = structuredClone(value); } };
 }
+
+test('sync diagnostics count domains and queue states without exposing payloads', () => {
+  const summary = syncDiagnosticSummary({
+    outbox: [
+      { table: 'tasks', status: 'pending' },
+      { table: 'tasks', status: 'retryable' },
+      { table: 'chore_windows', status: 'blocked' },
+      { table: 'tasks', status: 'dependency' }
+    ],
+    conflicts: [
+      { table: 'records', status: 'unresolved' },
+      { table: 'ledger_entries', status: 'resolved' }
+    ]
+  });
+
+  assert.deepEqual(summary, {
+    total: 5,
+    byTable: { tasks: 3, chore_windows: 1, records: 1 },
+    byStatus: { pending: 1, retryable: 1, blocked: 1, dependency: 1, conflict: 1 }
+  });
+});
 
 test('device UUID persists across reloads', () => {
   const storage = new MemoryStorage();
@@ -786,6 +807,103 @@ test('device cloud recovery downloads the authoritative copy without writing to 
   assert.deepEqual(h.state.state.outbox, []);
   assert.deepEqual(h.state.state.conflicts, []);
   assert.equal(cloud.calls.length, 0);
+});
+
+test('Reset to Cloud discards dirty sync artifacts and accepts deleted legacy Tasks as baseline', async () => {
+  const legacyTaskId = crypto.randomUUID();
+  const legacyTask = {
+    id: legacyTaskId,
+    version: 6,
+    title: 'Morning Milking',
+    description: null,
+    status: 'completed',
+    priority: 'normal',
+    record_id: null,
+    available_from: null,
+    due_date: '2026-08-14',
+    completed_at: '2026-08-30T01:14:21.257Z',
+    recurrence_rule: {
+      mode: 'fixed_schedule', enabled: false, interval: 1, frequency: 'daily',
+      seriesId: 'legacy-series', seriesDeleted: true,
+      routineType: 'milk_morning', migratedToRoutineId: legacyTaskId
+    },
+    parent_task_id: null,
+    chore_window_id: null,
+    yield_type: null,
+    suggestion_key: null,
+    created_at: '2026-08-14T12:00:00.000Z',
+    updated_at: '2026-08-30T01:14:44.007Z',
+    deleted_at: '2026-08-30T01:14:44.007Z'
+  };
+  class RecoveryCloud extends MockCloud {
+    async *changes(table) {
+      const rows = this.rows[table];
+      if (!rows.length) return;
+      const last = rows.at(-1);
+      yield { rows, cursor: { updatedAt: last.updated_at, id: last.id } };
+    }
+  }
+  const normalizeWrite = value => {
+    const next = structuredClone(value);
+    next.tasks = next.tasks.map(task => ({
+      ...task,
+      recurrenceRule: housekeepingData.normalizeRecurrenceRule(task.recurrenceRule)
+    }));
+    return next;
+  };
+  const cloud = new RecoveryCloud({ tasks: [legacyTask] });
+  const local = blank();
+  local.tasks.push({ id: 'obsolete-local-task', title: 'Obsolete', status: 'open', completed: false });
+  const h = harness(local, cloud, { normalizeWrite });
+  const homestead = crypto.randomUUID();
+  h.state.bind(homestead);
+  h.state.state.initialSyncCompleted = true;
+  h.state.state.cursors.tasks = { updatedAt: '2026-08-01T00:00:00.000Z', id: crypto.randomUUID() };
+  h.state.state.outbox.push(
+    { id: 'pending-old', table: 'tasks', status: 'pending' },
+    { id: 'blocked-old', table: 'tasks', status: 'blocked' },
+    { id: 'retryable-old', table: 'yield_entries', status: 'retryable' },
+    { id: 'dependency-old', table: 'ledger_allocations', status: 'dependency' }
+  );
+  h.state.state.conflicts.push({ id: 'old-conflict', table: 'records', status: 'unresolved' });
+  h.state.state.entities['tasks:obsolete-local-task'] = { localId: 'obsolete-local-task', cloudId: crypto.randomUUID(), cloudVersion: 2 };
+  h.state.state.failedOperations.push({ operationId: 'blocked-old' });
+  h.state.state.legacyRecoveryVersion = 1;
+  h.state.save();
+
+  await h.engine.resetDeviceFromCloud(homestead);
+
+  assert.equal(h.state.state.initialSyncCompleted, true);
+  assert.equal(h.state.state.initialSyncState.status, 'complete');
+  assert.deepEqual(h.state.state.outbox, []);
+  assert.deepEqual(h.state.state.conflicts, []);
+  assert.deepEqual(h.state.state.failedOperations, []);
+  assert.equal(h.local().tasks.length, 1);
+  assert.equal(h.local().tasks[0].id, legacyTaskId);
+  assert.equal(h.local().tasks[0].deletedAt, legacyTask.deleted_at);
+  assert.equal(h.local().tasks[0].recurrenceRule.routineType, undefined);
+  assert.equal(h.engine.reconcileUntrackedLocalChanges(), 0);
+  assert.equal(cloud.calls.length, 0);
+
+  const before = h.local();
+  const after = structuredClone(before);
+  after.tasks.push({
+    id: 'new-current-task', title: 'Current Task', status: 'open', completed: false,
+    dueDate: '2026-09-01', createdAt: '2026-08-31T22:30:00.000Z', updatedAt: '2026-08-31T22:30:00.000Z'
+  });
+  h.engine.queueLocalChanges(before, after);
+  h.setLocal(after);
+  assert.deepEqual(h.state.state.outbox.map(item => [item.table, item.type, item.localId]), [
+    ['tasks', 'create', 'new-current-task']
+  ]);
+
+  await h.engine.sync();
+
+  assert.equal(cloud.calls.length, 1);
+  assert.equal(cloud.calls[0].table, 'tasks');
+  assert.equal(cloud.calls[0].type, 'create');
+  assert.equal(cloud.rows.tasks.filter(row => row.title === 'Current Task').length, 1);
+  assert.equal(h.state.state.outbox.length, 0);
 });
 
 test('device cloud recovery refuses an empty cloud before changing local state', async () => {
@@ -1549,4 +1667,161 @@ test('two devices exchange Record, Task, Yield, Ledger, edits, and soft deletion
   second.engine.queueLocalChanges(staleSecond, staleEdit); second.setLocal(staleEdit); await second.engine.sync();
   assert.equal(second.state.state.conflicts.some(item => item.table === 'tasks'), true);
   assert.equal(second.local().tasks[0].deletedAt, taskDeleteAt);
+});
+
+test('two clean Reset-to-Cloud devices converge across every current forward-sync workflow', async () => {
+  class SharedCloud extends MockCloud {
+    async *changes(table, cursor) {
+      const start = cursor || { updatedAt: '1970-01-01T00:00:00.000Z', id: '00000000-0000-0000-0000-000000000000' };
+      const rows = this.rows[table]
+        .filter(row => row.updated_at > start.updatedAt || (row.updated_at === start.updatedAt && row.id > start.id))
+        .sort((left, right) => left.updated_at.localeCompare(right.updated_at) || left.id.localeCompare(right.id));
+      if (!rows.length) return;
+      const last = rows.at(-1);
+      yield { rows, cursor: { updatedAt: last.updated_at, id: last.id } };
+    }
+  }
+
+  const recordId = crypto.randomUUID();
+  const morningId = crypto.randomUUID();
+  const cloud = new SharedCloud({
+    records: [{
+      id: recordId, version: 1, type: 'animal', name: 'Cloud Daisy', status: 'Active',
+      identity: { species: 'Cattle', purpose: 'Dairy' }, stewardship: {}, primary_photo_id: null,
+      created_at: '2026-08-31T20:00:00.000Z', updated_at: '2026-08-31T20:00:00.000Z', deleted_at: null
+    }],
+    chore_windows: [{
+      id: morningId, version: 1, system_key: 'morning', name: 'Morning', display_order: 10,
+      enabled: true, daypart: 'morning', start_time: '06:00:00', end_time: '10:00:00',
+      created_at: '2026-08-31T20:00:01.000Z', updated_at: '2026-08-31T20:00:01.000Z', deleted_at: null
+    }]
+  });
+  const homestead = crypto.randomUUID();
+  const deviceA = harness(blank(), cloud);
+  const deviceB = harness(blank(), cloud);
+
+  await deviceA.engine.resetDeviceFromCloud(homestead);
+  await deviceB.engine.resetDeviceFromCloud(homestead);
+
+  const assertClean = device => {
+    assert.equal(device.state.state.initialSyncCompleted, true);
+    assert.equal(device.state.state.outbox.length, 0);
+    assert.equal(device.state.state.conflicts.filter(item => item.status === 'unresolved').length, 0);
+    assert.equal(device.engine.reconcileUntrackedLocalChanges(), 0);
+  };
+  const settle = async () => {
+    await deviceA.engine.sync();
+    await deviceB.engine.sync();
+    await deviceA.engine.sync();
+    assertClean(deviceA);
+    assertClean(deviceB);
+  };
+  let clock = Date.parse('2026-08-31T21:00:00.000Z');
+  const timestamp = () => new Date(clock += 1000).toISOString();
+  const change = async (device, mutate) => {
+    const before = device.local();
+    const after = structuredClone(before);
+    mutate(after, timestamp());
+    device.engine.queueLocalChanges(before, after);
+    device.setLocal(after);
+    await settle();
+  };
+
+  assert.equal(deviceA.local().records[0].name, 'Cloud Daisy');
+  assert.equal(deviceB.local().records[0].name, 'Cloud Daisy');
+  assertClean(deviceA);
+  assertClean(deviceB);
+
+  await change(deviceA, (data, now) => data.tasks.push({
+    id: 'forward-task', recordId, title: 'Inspect pasture fence', description: '', status: 'open',
+    completed: false, priority: 'normal', dueDate: '2026-09-01', availableFrom: '', recurrenceRule: null,
+    parentTaskId: null, choreWindowId: null, yieldType: null, suggestionKey: null,
+    createdAt: now, updatedAt: now, completedAt: null, deletedAt: null
+  }));
+  assert.equal(deviceB.local().tasks.filter(task => task.title === 'Inspect pasture fence').length, 1);
+
+  await change(deviceB, (data, now) => {
+    const task = data.tasks.find(item => item.title === 'Inspect pasture fence');
+    task.title = 'Inspect north pasture fence';
+    task.updatedAt = now;
+  });
+  assert.equal(cloud.rows.tasks.find(task => !task.deleted_at).title, 'Inspect north pasture fence');
+  assert.equal(deviceA.local().tasks.find(task => task.id === 'forward-task').title, 'Inspect north pasture fence');
+
+  await change(deviceA, (data, now) => {
+    const task = data.tasks.find(item => item.id === 'forward-task');
+    task.deletedAt = now;
+    task.updatedAt = now;
+  });
+  assert.ok(deviceB.local().tasks.find(task => task.title === 'Inspect north pasture fence').deletedAt);
+  assert.equal(cloud.rows.tasks.filter(task => task.title === 'Inspect north pasture fence' && !task.deleted_at).length, 0);
+
+  await change(deviceA, (data, now) => data.tasks.push({
+    id: 'recurring-milking-1', recordId, title: 'Morning milking', description: '', status: 'open',
+    completed: false, priority: 'normal', dueDate: '2026-09-01', availableFrom: '',
+    recurrenceRule: { mode: 'fixed_schedule', frequency: 'daily', interval: 1, enabled: true, seriesId: 'morning-milking-series' },
+    parentTaskId: null, choreWindowId: morningId, yieldType: 'milk', suggestionKey: 'dairy-milk-morning',
+    createdAt: now, updatedAt: now, completedAt: null, deletedAt: null
+  }));
+  assert.equal(deviceB.local().tasks.filter(task => task.title === 'Morning milking' && !task.deletedAt).length, 1);
+
+  await change(deviceA, (data, now) => {
+    const current = data.tasks.find(item => item.id === 'recurring-milking-1');
+    Object.assign(current, { completed: true, status: 'completed', completedAt: now, updatedAt: now });
+    data.tasks.push({
+      ...current, id: 'recurring-milking-2', dueDate: '2026-09-02', completed: false, status: 'open',
+      completedAt: null, parentTaskId: current.id, createdAt: now, updatedAt: now, deletedAt: null
+    });
+  });
+  assert.equal(cloud.rows.tasks.filter(task => task.recurrence_rule?.seriesId === 'morning-milking-series' && task.due_date === '2026-09-02').length, 1);
+  assert.equal(deviceB.local().tasks.filter(task => task.recurrenceRule?.seriesId === 'morning-milking-series' && task.dueDate === '2026-09-02').length, 1);
+
+  await change(deviceA, (data, now) => data.choreWindows.push({
+    id: 'midday-window', systemKey: null, name: 'Midday Check', displayOrder: 30, enabled: true,
+    daypart: 'midday', startTime: '12:00', endTime: '13:00', createdAt: now, updatedAt: now, deletedAt: null
+  }));
+  assert.equal(deviceB.local().choreWindows.filter(window => window.name === 'Midday Check').length, 1);
+  await change(deviceB, (data, now) => {
+    const window = data.choreWindows.find(item => item.name === 'Midday Check');
+    window.name = 'Noon Check';
+    window.endTime = '13:30';
+    window.updatedAt = now;
+  });
+  assert.equal(deviceA.local().choreWindows.find(window => window.id === 'midday-window').name, 'Noon Check');
+
+  await change(deviceA, (data, now) => data.calendarEvents.push({
+    id: 'vet-event', recordId, title: 'Veterinary visit', startDate: '2026-09-03', endDate: '2026-09-03',
+    allDay: false, startTime: '09:00', endTime: '10:00', location: 'Barn', notes: 'Annual check',
+    createdAt: now, updatedAt: now, deletedAt: null
+  }));
+  assert.equal(deviceB.local().calendarEvents.filter(event => event.title === 'Veterinary visit').length, 1);
+
+  await change(deviceA, (data, now) => data.yieldEntries.push({
+    id: 'forward-yield', recordId, taskId: 'recurring-milking-1', type: 'milk', occurredAt: now,
+    session: 'morning', quantity: 2.5, unit: 'gal', unusableQuantity: 0.25, details: 'Current test',
+    product: '', legacyEventId: null, createdAt: now, updatedAt: now, deletedAt: null
+  }));
+  assert.equal(deviceB.local().yieldEntries.filter(entry => entry.quantity === 2.5 && entry.unusableQuantity === 0.25).length, 1);
+
+  await change(deviceA, (data, now) => data.ledger.push({
+    id: 'forward-ledger', recordId, type: 'expense', date: '2026-09-01', description: 'Veterinary supplies',
+    amount: 42.75, currencyCode: 'USD', category: 'Animal Care', vendorOrSource: 'Farm Store',
+    createdAt: now, updatedAt: now, deletedAt: null
+  }));
+  const receivedLedger = deviceB.local().ledger.find(entry => entry.description === 'Veterinary supplies');
+  assert.deepEqual({
+    amount: receivedLedger.amount, currencyCode: receivedLedger.currencyCode,
+    category: receivedLedger.category, vendorOrSource: receivedLedger.vendorOrSource
+  }, { amount: 42.75, currencyCode: 'USD', category: 'Animal Care', vendorOrSource: 'Farm Store' });
+
+  await change(deviceB, (data, now) => {
+    const record = data.records.find(item => item.id === recordId);
+    record.name = 'Daisy Current';
+    record.identity.breed = 'Jersey';
+    record.updatedAt = now;
+  });
+  assert.equal(deviceA.local().records[0].name, 'Daisy Current');
+  assert.equal(deviceA.local().records[0].identity.breed, 'Jersey');
+  assertClean(deviceA);
+  assertClean(deviceB);
 });

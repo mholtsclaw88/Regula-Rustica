@@ -1,7 +1,7 @@
 import { SupabaseSyncAdapter } from './cloud-adapter.mjs';
 import { SyncEngine } from './engine.mjs';
 import { conflictPresentation } from './entities.mjs';
-import { LocalSyncState } from './local-state.mjs';
+import { LocalSyncState, syncDiagnosticSummary } from './local-state.mjs?v=clean-cloud-baseline-v1';
 
 const state = new LocalSyncState();
 const status = document.querySelector('#syncStatus');
@@ -10,6 +10,9 @@ const conflictList = document.querySelector('#syncConflicts');
 const syncNow = document.querySelector('#syncNow');
 const syncRecovery = document.querySelector('#syncRecovery');
 const syncResetFromCloud = document.querySelector('#syncResetFromCloud');
+const syncDiagnostics = document.querySelector('#syncDiagnostics');
+const syncDiagnosticsSummary = document.querySelector('#syncDiagnosticsSummary');
+const syncDiagnosticsBody = document.querySelector('#syncDiagnosticsBody');
 const headerStatus = document.querySelector('#headerSyncStatus');
 const headerStatusLabel = document.querySelector('#headerSyncLabel');
 const headerStatusDetail = document.querySelector('#headerSyncDetail');
@@ -100,6 +103,25 @@ function render(kind = 'ready', error = null) {
   actions.querySelectorAll('[data-cases]').forEach(button => {
     button.classList.toggle('hidden', !button.dataset.cases.includes(firstCase));
   });
+  const diagnostics = syncDiagnosticSummary(state.state);
+  syncDiagnostics.classList.toggle('hidden', diagnostics.total === 0);
+  if (diagnostics.total) {
+    syncDiagnosticsSummary.textContent = `${diagnostics.total} change${diagnostics.total === 1 ? '' : 's'} waiting`;
+    const domainList = document.createElement('ul');
+    domainList.className = 'sync-diagnostic-list';
+    Object.entries(diagnostics.byTable).forEach(([table, count]) => {
+      const row = document.createElement('li');
+      row.textContent = `${DOMAIN_LABELS[table] || table.replaceAll('_', ' ')} — ${count}`;
+      domainList.append(row);
+    });
+    const statusLabels = { pending: 'pending', blocked: 'blocked', retryable: 'retryable', dependency: 'waiting on related changes', conflict: 'need review' };
+    const statusText = Object.entries(diagnostics.byStatus)
+      .map(([key, count]) => `${count} ${statusLabels[key] || key}`)
+      .join(' · ');
+    const statusRow = document.createElement('p');
+    statusRow.textContent = statusText;
+    syncDiagnosticsBody.replaceChildren(domainList, statusRow);
+  }
   const unresolved = state.state.conflicts.filter(item => item.status === 'unresolved');
   conflictList.innerHTML = '';
   unresolved.forEach(conflict => {
@@ -230,7 +252,7 @@ syncNow.addEventListener('click', () => {
 });
 syncResetFromCloud.addEventListener('click', () => {
   if (!context?.homesteadId) return;
-  const confirmed = window.confirm('Are you sure? This will discard queued local changes on this device and replace its working copy with the current cloud Homestead. Cloud data will not be deleted. A safety backup will be saved first.');
+  const confirmed = window.confirm('Are you sure? This will discard this device\'s queued changes, conflicts, retry history, sync mappings, and local working copy, then establish the current cloud Homestead as its clean baseline. Cloud data will not be deleted. A safety backup will be saved first.');
   if (!confirmed) return;
   window.RegulaRusticaLocal.exportBackup();
   run(() => engine.resetDeviceFromCloud(context.homesteadId));
