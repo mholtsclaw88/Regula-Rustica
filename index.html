@@ -23,7 +23,7 @@
   <script src="ui-refinements.js?v=data-entry-forms-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=chore-window-sync-v1" type="module"></script>
+  <script src="sync/runtime.mjs?v=clean-cloud-baseline-v1" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -457,11 +457,15 @@
               <button class="btn secondary hidden" id="syncCancel" data-cases="ABC" type="button">Cancel</button>
             </div>
             <button class="btn secondary hidden" id="syncNow" type="button">Sync now</button>
+            <details class="hidden" id="syncDiagnostics">
+              <summary id="syncDiagnosticsSummary">Changes waiting</summary>
+              <div class="muted" id="syncDiagnosticsBody"></div>
+            </details>
             <div id="syncConflicts" class="form-grid"></div>
             <details class="hidden" id="syncRecovery">
               <summary>Device sync recovery</summary>
               <div class="form-grid">
-                <p class="muted">If this device is stuck on old queued changes, save a backup and replace its working copy with the current cloud Homestead. Cloud data is not deleted. Repeat this separately on every affected device.</p>
+                <p class="muted">Discard this device's local sync history and working copy, then establish the current cloud Homestead as its clean baseline. Cloud data is not deleted. Repeat this separately on every affected device.</p>
                 <button class="btn secondary" id="syncResetFromCloud" type="button">Reset this device from cloud</button>
               </div>
             </details>

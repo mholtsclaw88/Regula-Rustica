@@ -15,6 +15,13 @@
   color: var(--red);
 }
 
+.sync-diagnostic-list {
+  margin: .65rem 0 .35rem;
+  padding-left: 1.25rem;
+}
+
+.sync-diagnostic-list + p { margin: 0 0 .35rem; }
+
 .member-management {
   border-top: 1px solid var(--line);
   display: grid;

@@ -88,8 +88,8 @@ export class SyncEngine {
         if (table === 'yield_entries' && row.taskId) this.state.linkEntityIdentity(table, id, 'tasks', row.taskId);
         const old = previous.get(id);
         if (!old) {
-          this.state.enqueue({ table, localId: id, type: 'create', payload: toCloud(table, row, this.state) });
-          if (row.deletedAt || row.removedAt) this.state.enqueue({ table, localId: id, type: 'soft_delete', payload: toCloud(table, row, this.state) });
+          this.state.enqueue({ table, localId: id, type: 'create', payload: toCloud(table, row, this.state), clientUpdatedAt: row.updatedAt });
+          if (row.deletedAt || row.removedAt) this.state.enqueue({ table, localId: id, type: 'soft_delete', payload: toCloud(table, row, this.state), clientUpdatedAt: row.updatedAt });
         }
         else {
           const wasDeleted = Boolean(old.deletedAt || old.removedAt);
@@ -140,6 +140,11 @@ export class SyncEngine {
         const cloudPayload = toCloud(table, cloudLocal, this.state);
         const cloudDeleted = Boolean(entity.cloudRow.deleted_at || entity.cloudRow.removed_at);
         const localDeleted = Boolean(row.deletedAt || row.removedAt);
+        // Once both sides agree that a row is deleted, representation differences
+        // in historical payload fields are not a new local change. In particular,
+        // current Task normalization intentionally drops obsolete recurrence
+        // metadata that may remain on an old cloud tombstone.
+        if (cloudDeleted && localDeleted) continue;
         if (cloudDeleted && !localDeleted) {
           reconciled ||= structuredClone(local);
           const index = (reconciled[collection] || []).findIndex(item => item.id === row.id);
@@ -233,7 +238,17 @@ export class SyncEngine {
         completedAt: new Date().toISOString()
       };
       this.state.save();
-      await this.sync();
+      // Reset to Cloud is cloud-authoritative and must never turn the downloaded
+      // baseline into outbound writes. Reconcile only as an invariant check; a
+      // non-zero result is a client mapping defect, not permission to edit cloud.
+      const baselineChanges = this.reconcileUntrackedLocalChanges();
+      const unresolved = this.state.state.conflicts.some(item => item.status === 'unresolved');
+      if (baselineChanges || this.state.state.outbox.length || unresolved) {
+        throw new Error('The downloaded cloud baseline could not be accepted cleanly. No cloud changes were sent.');
+      }
+      this.state.state.lastSuccessfulSyncAt = new Date().toISOString();
+      this.state.save();
+      this.onStatus('synced');
     } catch (error) {
       this.state.state.initialSyncCompleted = false;
       this.state.state.initialSyncState = {
