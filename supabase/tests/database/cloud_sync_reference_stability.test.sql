@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(22);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -179,6 +179,20 @@ select public.apply_task_sync_operation(
 select ok((select status = 'open' and completed_at is null and completed_by is null from public.tasks
   where id = 'b2000000-0000-0000-0000-000000000005'),
   'reopening through sync clears completion metadata consistently');
+
+select version as conflict_version from public.tasks
+where id = 'b2000000-0000-0000-0000-000000000003' \gset
+select public.apply_task_sync_operation(
+  'stale-soft-delete-conflict', 'b4000000-0000-0000-0000-000000000001', 'tasks',
+  'b2000000-0000-0000-0000-000000000003', 'soft_delete', :conflict_version - 1, now(),
+  jsonb_build_object('title', 'Updated active Task', 'status', 'open', 'priority', 'normal')
+) as soft_delete_conflict_result \gset
+select is((:'soft_delete_conflict_result'::jsonb ->> 'status'), 'conflict',
+  'a stale Task soft-delete returns a conflict');
+select is((:'soft_delete_conflict_result'::jsonb -> 'row' ->> 'id'),
+  'b2000000-0000-0000-0000-000000000003', 'Task conflict includes the authoritative cloud row');
+select is((:'soft_delete_conflict_result'::jsonb -> 'row' ->> 'version')::integer,
+  :conflict_version, 'Task conflict includes the current cloud version');
 
 reset role;
 select * from finish();
