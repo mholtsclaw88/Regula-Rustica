@@ -196,7 +196,9 @@ async function connect(nextContext) {
     onStatus: render
   });
   if (state.state.initialSyncCompleted) scheduleSync();
-  else run(async () => {
+  else if (engine.canResumeQueuedSync(context.homesteadId)) {
+    run(() => engine.resumeQueuedSync(context.homesteadId));
+  } else run(async () => {
     const inspection = await engine.inspectFirstSync(context.homesteadId);
     firstCase = inspection.case;
     render('ready');
