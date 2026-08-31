@@ -326,7 +326,9 @@ function normalizeData(source = {}, options = {}) {
     ledgerAllocations: asArray(source.ledgerAllocations).map(normalizeLedgerAllocation),
     calendarEvents: asArray(source.calendarEvents).map(normalizeCalendarEvent),
     yieldEntries,
-    choreWindows: (asArray(source.choreWindows).length ? asArray(source.choreWindows) : window.RegulaRusticaTasks.DEFAULT_WINDOWS)
+    choreWindows: (asArray(source.choreWindows).length
+      ? asArray(source.choreWindows)
+      : options.ensureDefaultChoreWindows === false ? [] : window.RegulaRusticaTasks.DEFAULT_WINDOWS)
       .map(value => window.RegulaRusticaTasks.normalizeWindow(value, { applyBuiltInDefaults: options.applyBuiltInDefaults !== false })),
     ...(source.legacy ? { legacy: source.legacy } : {})
   };
@@ -464,7 +466,9 @@ function loadData() {
 
 function saveData(nextData = data, source = 'user') {
   const before = persistedData ? structuredClone(persistedData) : null;
-  data = normalizeData(nextData);
+  // A cloud replacement deliberately writes empty collections before pulling.
+  // Do not turn that empty Chore Window collection back into local defaults.
+  data = normalizeData(nextData, { ensureDefaultChoreWindows: source !== 'sync' });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   persistedData = structuredClone(data);
   renderAll();

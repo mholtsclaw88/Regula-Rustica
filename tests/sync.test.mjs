@@ -499,7 +499,7 @@ test('legacy duplicate relationship binds to the exact existing cloud row', asyn
   assert.equal(recovered.entity('record_relationships', 'old-location').cloudId, existing.id);
 });
 
-test('legacy system Chore Window create rebinds and updates the canonical window', async () => {
+test('legacy system Chore Window create adopts the canonical window without rewriting it', async () => {
   const local = blank();
   local.choreWindows.push({ id: 'old-morning', systemKey: 'morning', name: 'Morning', displayOrder: 10, enabled: true, daypart: 'morning', startTime: '06:00', endTime: '09:00' });
   const h = harness(local); const homestead = crypto.randomUUID(); h.state.bind(homestead); h.state.state.initialSyncCompleted = true;
@@ -519,10 +519,49 @@ test('legacy system Chore Window create rebinds and updates the canonical window
 
   await engine.push();
 
-  assert.equal(calls[0].type, 'update');
-  assert.equal(calls[0].rowId, canonical.id);
+  assert.equal(calls.length, 0);
   assert.equal(recovered.entity('chore_windows', 'old-morning').cloudId, canonical.id);
   assert.equal(recovered.state.outbox.length, 0);
+});
+
+test('blocked duplicate system Chore Windows auto-recover and consolidate local references', async () => {
+  const local = blank();
+  const canonicalId = crypto.randomUUID();
+  local.choreWindows.push(
+    { id: 'chore-window-morning', systemKey: 'morning', name: 'Morning', displayOrder: 10, enabled: true, daypart: 'morning', startTime: '06:00', endTime: '10:00' },
+    { id: canonicalId, systemKey: 'morning', name: 'Morning', displayOrder: 10, enabled: true, daypart: 'morning', startTime: '06:00', endTime: '10:00' }
+  );
+  local.tasks.push({ id: 'morning-task', title: 'Morning chores', choreWindowId: canonicalId });
+  const h = harness(local); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  h.state.entity('chore_windows', canonicalId).cloudId = canonicalId;
+  const operation = h.state.enqueue({
+    table: 'chore_windows', localId: 'chore-window-morning', type: 'create',
+    payload: toCloud('chore_windows', local.choreWindows[0], h.state)
+  });
+  operation.status = 'blocked';
+  operation.attempts = 1;
+  operation.lastErrorCode = '23505';
+  h.state.save();
+
+  const recovered = new LocalSyncState(h.storage);
+  const canonical = { id: canonicalId, system_key: 'morning', name: 'Morning', display_order: 10, enabled: true, daypart: 'morning', start_time: '06:00:00', end_time: '10:00:00', version: 17 };
+  let localCopy = local;
+  const cloud = {
+    async inspectLegacy() { return { supported: true, row: canonical }; },
+    async apply() { throw new Error('semantic duplicate must be adopted before the RPC'); },
+    async *changes() { return; }
+  };
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: () => localCopy, writeLocal: value => { localCopy = value; } });
+
+  assert.equal(recovered.state.outbox[0].status, 'retryable');
+  await engine.push();
+
+  assert.equal(recovered.state.outbox.length, 0);
+  assert.equal(localCopy.choreWindows.length, 1);
+  assert.equal(localCopy.choreWindows[0].id, 'chore-window-morning');
+  assert.equal(localCopy.tasks[0].choreWindowId, 'chore-window-morning');
+  assert.equal(recovered.entity('chore_windows', 'chore-window-morning').cloudId, canonicalId);
+  assert.equal(recovered.state.entities[`chore_windows:${canonicalId}`], undefined);
 });
 
 test('legacy Yield retry refreshes a stale Task reference from current identity mapping', async () => {

@@ -39,7 +39,7 @@ async function dataApi() {
   };
   vm.createContext(context);
   vm.runInContext(`${dataFoundation}\n;globalThis.__dataApi = { isSupportedData, loadData, normalizeData, prepareImportedData, storageKey: STORAGE_KEY };`, context);
-  return { ...context.__dataApi, localStorage };
+  return { ...context.__dataApi, localStorage, window: context.window };
 }
 
 const record = (type, identity, stewardship = {}) => ({
@@ -129,6 +129,13 @@ test('normalization does not materialize recurring Tasks as a read side effect',
   const normalized = api.normalizeData(source);
   assert.equal(normalized.tasks.length, 1);
   assert.equal(normalized.tasks[0].id, 'recurring-task');
+});
+
+test('cloud replacement can preserve an intentionally empty Chore Window collection', async () => {
+  const api = await dataApi();
+  api.window.RegulaRusticaTasks.DEFAULT_WINDOWS = [{ id: 'local-default', systemKey: 'morning' }];
+  const normalized = api.normalizeData(currentData([]), { ensureDefaultChoreWindows: false });
+  assert.deepEqual(Array.from(normalized.choreWindows), []);
 });
 
 test('v5 through v12 backups remain supported and legacy data still migrates', async () => {

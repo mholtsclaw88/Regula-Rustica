@@ -351,23 +351,19 @@ export class SyncEngine {
       operation.status = 'pending';
       operation.blockedBy = [];
       try {
+        if (operation.table === 'chore_windows' && operation.type === 'create'
+          && operation.payload?.system_key && typeof this.cloud.inspectLegacy === 'function') {
+          const inspection = await this.cloud.inspectLegacy(operation);
+          if (inspection.supported && inspection.row?.system_key === operation.payload.system_key) {
+            this.adoptSystemChoreWindow(operation, inspection.row);
+            continue;
+          }
+        }
         if (isLegacyOperation(operation) && typeof this.cloud.inspectLegacy === 'function') {
           const inspection = await this.cloud.inspectLegacy(operation);
           if (inspection.supported && legacyOperationAlreadySatisfied(operation, inspection.row)) {
             this.state.complete(operation, inspection.row);
             continue;
-          }
-          if (inspection.supported && operation.table === 'chore_windows' && operation.type === 'create'
-            && inspection.row?.system_key === operation.payload?.system_key) {
-            const entity = this.state.entity(operation.table, operation.localId);
-            entity.cloudId = inspection.row.id;
-            entity.cloudVersion = inspection.row.version;
-            entity.cloudRow = inspection.row;
-            operation.rowId = inspection.row.id;
-            operation.type = 'update';
-            operation.baseVersion = inspection.row.version;
-            operation.idempotencyKey = crypto.randomUUID();
-            this.state.save();
           }
           if (inspection.supported && operation.type === 'create' && inspection.row) {
             this.state.addConflict(operation, inspection.row);
@@ -392,6 +388,30 @@ export class SyncEngine {
         this.state.fail(operation, error, { retryable: isRetryableSyncError(error) });
       }
     }
+  }
+
+  adoptSystemChoreWindow(operation, cloudRow) {
+    const next = structuredClone(this.readLocal());
+    const duplicateIds = new Set(
+      (next.choreWindows || [])
+        .filter(item => !item.deletedAt && item.systemKey === cloudRow.system_key)
+        .map(item => item.id)
+    );
+    duplicateIds.add(cloudRow.id);
+    duplicateIds.add(operation.localId);
+    this.state.adoptCloudIdentity('chore_windows', operation.localId, cloudRow, duplicateIds);
+    const adopted = fromCloud('chore_windows', cloudRow, this.state);
+    const firstIndex = Math.max(0, (next.choreWindows || []).findIndex(item => duplicateIds.has(item.id)));
+    next.choreWindows = (next.choreWindows || []).filter(item => !duplicateIds.has(item.id));
+    next.choreWindows.splice(Math.min(firstIndex, next.choreWindows.length), 0, adopted);
+    for (const task of next.tasks || []) {
+      if (duplicateIds.has(task.choreWindowId)) task.choreWindowId = operation.localId;
+    }
+    for (const routine of next.routines || []) {
+      if (duplicateIds.has(routine.choreWindowId)) routine.choreWindowId = operation.localId;
+    }
+    this.writeLocal(next, 'sync');
+    this.state.complete(operation, cloudRow);
   }
 
   async pull() {
