@@ -139,9 +139,17 @@ begin
   set deleted_at = coalesce(deleted_at, cleanup_time), updated_at = cleanup_time
   where deleted_at is null;
 
-  update public.routines
-  set enabled = false, deleted_at = coalesce(deleted_at, cleanup_time), updated_at = cleanup_time
-  where deleted_at is null;
+  update public.routines as routine
+  set enabled = false,
+      chore_window_id = case when exists (
+        select 1 from public.chore_windows as linked_window
+        where linked_window.id = routine.chore_window_id
+          and linked_window.homestead_id = routine.homestead_id
+          and linked_window.deleted_at is null
+      ) then routine.chore_window_id else null end,
+      deleted_at = coalesce(routine.deleted_at, cleanup_time),
+      updated_at = cleanup_time
+  where routine.deleted_at is null;
 
   with legacy_series as (
     select distinct recurrence_rule ->> 'seriesId' as series_id
@@ -153,6 +161,12 @@ begin
         jsonb_set(coalesce(task.recurrence_rule, '{}'::jsonb), '{enabled}', 'false'::jsonb, true),
         '{seriesDeleted}', 'true'::jsonb, true
       ),
+      chore_window_id = case when exists (
+        select 1 from public.chore_windows as linked_window
+        where linked_window.id = task.chore_window_id
+          and linked_window.homestead_id = task.homestead_id
+          and linked_window.deleted_at is null
+      ) then task.chore_window_id else null end,
       deleted_at = case when task.status in ('open', 'in_progress') then coalesce(task.deleted_at, cleanup_time) else task.deleted_at end,
       updated_at = cleanup_time
   where task.recurrence_rule ? 'routineType'

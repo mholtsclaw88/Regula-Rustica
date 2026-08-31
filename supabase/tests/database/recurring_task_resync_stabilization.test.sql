@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(10);
 
 select has_function(
   'private', 'retire_legacy_routine_foundation', array[]::text[],
@@ -23,6 +23,9 @@ select set_config('request.jwt.claim.sub', 'a8100000-0000-0000-0000-000000000001
 select public.create_homestead('Resync Stabilization Test') as homestead_id \gset
 reset role;
 
+select id as stale_window_id from public.chore_windows
+where homestead_id = :'homestead_id' and system_key = 'morning' and deleted_at is null \gset
+
 insert into public.records (id, homestead_id, type, name, status, identity, created_by, updated_by)
 values (
   'a8200000-0000-0000-0000-000000000001', :'homestead_id', 'animal', 'Legacy Dairy Cow', 'active',
@@ -31,27 +34,27 @@ values (
 
 insert into public.tasks (
   id, homestead_id, record_id, title, status, priority, due_date, recurrence_rule,
-  completed_at, completed_by, created_by, updated_by
+  completed_at, completed_by, chore_window_id, created_by, updated_by
 ) values (
   'a8300000-0000-0000-0000-000000000001', :'homestead_id', 'a8200000-0000-0000-0000-000000000001',
   'Morning Milking', 'completed', 'normal', current_date - 2,
   '{"mode":"fixed_schedule","frequency":"daily","interval":1,"enabled":true,"seriesId":"a8400000-0000-0000-0000-000000000001","routineType":"milk_morning"}',
-  now(), 'a8100000-0000-0000-0000-000000000001',
+  now(), 'a8100000-0000-0000-0000-000000000001', :'stale_window_id',
   'a8100000-0000-0000-0000-000000000001', 'a8100000-0000-0000-0000-000000000001'
 ), (
   'a8300000-0000-0000-0000-000000000002', :'homestead_id', 'a8200000-0000-0000-0000-000000000001',
   'Morning Milking', 'open', 'normal', current_date - 1,
   '{"mode":"fixed_schedule","frequency":"daily","interval":1,"enabled":true,"seriesId":"a8400000-0000-0000-0000-000000000001"}',
-  null, null,
+  null, null, :'stale_window_id',
   'a8100000-0000-0000-0000-000000000001', 'a8100000-0000-0000-0000-000000000001'
 );
 
 insert into public.routines (
   id, homestead_id, record_id, name, routine_type, enabled, frequency, interval,
-  first_date, next_date, created_by, updated_by
+  first_date, next_date, chore_window_id, created_by, updated_by
 ) values (
   'a8500000-0000-0000-0000-000000000001', :'homestead_id', 'a8200000-0000-0000-0000-000000000001',
-  'Morning Milking', 'milk_morning', true, 'daily', 1, current_date - 1, current_date,
+  'Morning Milking', 'milk_morning', true, 'daily', 1, current_date - 1, current_date, :'stale_window_id',
   'a8100000-0000-0000-0000-000000000001', 'a8100000-0000-0000-0000-000000000001'
 );
 
@@ -62,16 +65,23 @@ insert into public.routine_occurrences (
   current_date, 'pending', 'a8100000-0000-0000-0000-000000000001', 'a8100000-0000-0000-0000-000000000001'
 );
 
+select set_config('regula.allow_deleted_state', 'true', true);
+update public.chore_windows
+set deleted_at = now(), deleted_by = 'a8100000-0000-0000-0000-000000000001'
+where id = :'stale_window_id';
+
 select private.retire_legacy_routine_foundation();
 select private.retire_legacy_routine_foundation();
 
 select ok((select deleted_at is not null and not enabled from public.routines where id='a8500000-0000-0000-0000-000000000001'), 'legacy Routine is disabled and soft-deleted');
+select is((select chore_window_id from public.routines where id='a8500000-0000-0000-0000-000000000001'), null::uuid, 'legacy Routine drops its inactive Chore Window during retirement');
 select ok((select deleted_at is not null from public.routine_occurrences where id='a8600000-0000-0000-0000-000000000001'), 'legacy Routine occurrence is soft-deleted');
 select is((select recurrence_rule ->> 'seriesDeleted' from public.tasks where id='a8300000-0000-0000-0000-000000000001'), 'true', 'legacy Task root is marked as a deleted series');
 select is((select recurrence_rule ->> 'enabled' from public.tasks where id='a8300000-0000-0000-0000-000000000001'), 'false', 'legacy Task root is disabled');
 select ok((select deleted_at is null from public.tasks where id='a8300000-0000-0000-0000-000000000001'), 'completed legacy Task history remains recoverable');
 select is((select recurrence_rule ->> 'seriesDeleted' from public.tasks where id='a8300000-0000-0000-0000-000000000002'), 'true', 'descendant without legacy keys is retired through its series ID');
 select ok((select deleted_at is not null from public.tasks where id='a8300000-0000-0000-0000-000000000002'), 'open legacy descendant is soft-deleted');
+select is((select count(*) from public.tasks where id in ('a8300000-0000-0000-0000-000000000001','a8300000-0000-0000-0000-000000000002') and chore_window_id is not null), 0::bigint, 'legacy Tasks drop inactive Chore Windows during retirement');
 
 select * from finish();
 rollback;
