@@ -35,7 +35,10 @@ function normalizeState(value) {
     outbox: Array.isArray(value.outbox) ? value.outbox.map(operation => {
       const normalized = {
         ...operation,
-        status: operation.status === 'failed' || (upgradeLegacyOutbox && ['blocked', 'dependency'].includes(operation.status))
+        status: operation.status === 'failed'
+          || (operation.table === 'chore_windows' && operation.type === 'create'
+            && operation.payload?.system_key && operation.lastErrorCode === '23505')
+          || (upgradeLegacyOutbox && ['blocked', 'dependency'].includes(operation.status))
           ? 'retryable'
           : (operation.status || 'pending'),
         attempts: Number(operation.attempts) || 0,
@@ -96,6 +99,18 @@ export class LocalSyncState {
       this.save();
     }
     return this.state.entities[key];
+  }
+
+  adoptCloudIdentity(table, localId, serverRow, aliases = []) {
+    const aliasIds = new Set([...aliases].filter(Boolean));
+    aliasIds.delete(localId);
+    aliasIds.forEach(alias => delete this.state.entities[this.entityKey(table, alias)]);
+    const entity = this.entity(table, localId);
+    entity.cloudId = serverRow.id;
+    entity.cloudVersion = serverRow.version ?? entity.cloudVersion;
+    entity.cloudRow = serverRow;
+    this.save();
+    return entity;
   }
 
   localIdForCloud(table, cloudId) {
