@@ -1,4 +1,4 @@
-export const LEGACY_RECOVERY_VERSION = 1;
+export const LEGACY_RECOVERY_VERSION = 2;
 
 export const LEGACY_DOMAIN_ORDER = Object.freeze([
   'homestead_people', 'records', 'chore_windows', 'routines', 'tasks', 'routine_occurrences',
@@ -10,18 +10,19 @@ const LEGACY_DOMAINS = new Set(['routines', 'routine_occurrences']);
 const OPERATION_TYPES = new Set(['create', 'update', 'soft_delete', 'restore']);
 
 export function markLegacyOperation(operation) {
-  if (!operation || operation.legacyRecovery) return operation;
+  if (!operation || operation.legacyRecovery?.version === LEGACY_RECOVERY_VERSION) return operation;
   const historicalFailure = Number(operation.attempts) > 0
     || Boolean(operation.lastError || operation.lastErrorCode || operation.lastAttemptAt);
   if (!historicalFailure && !LEGACY_DOMAINS.has(operation.table)) return operation;
   return {
     ...operation,
     legacyRecovery: {
+      ...(operation.legacyRecovery || {}),
       version: LEGACY_RECOVERY_VERSION,
-      originalTable: operation.table || null,
-      originalRowId: operation.rowId || null,
-      originalStatus: operation.status || null,
-      originalErrorCode: operation.lastErrorCode || null
+      originalTable: operation.legacyRecovery?.originalTable || operation.table || null,
+      originalRowId: operation.legacyRecovery?.originalRowId || operation.rowId || null,
+      originalStatus: operation.legacyRecovery?.originalStatus || operation.status || null,
+      originalErrorCode: operation.legacyRecovery?.originalErrorCode || operation.lastErrorCode || null
     }
   };
 }
