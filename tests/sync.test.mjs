@@ -28,6 +28,7 @@ class MockCloud {
   }
   async counts() { return Object.fromEntries(DOMAIN_ORDER.map(table => [table, this.underreport ? 0 : this.rows[table].length])); }
   async memberDirectory() { return this.rows.homestead_people.filter(row => row.person_type === 'member'); }
+  async getRow(table, id) { return this.rows[table].find(row => row.id === id) || null; }
   async apply(operation) {
     this.calls.push(operation);
     if (this.fail) throw Object.assign(new Error('network unavailable'), { code: 'FETCH' });
@@ -261,6 +262,40 @@ test('reconciliation ignores JSON object key ordering differences', () => {
   };
 
   assert.equal(h.engine.reconcileUntrackedLocalChanges(), 0);
+  assert.equal(h.state.state.outbox.length, 0);
+});
+
+test('Task normalization does not queue semantically unchanged recurrence metadata', () => {
+  const before = blank();
+  before.tasks.push({
+    id: 'stable-recurring-task', title: 'Morning milking', status: 'completed', completed: true,
+    dueDate: '2026-08-30', completedAt: '2026-08-30T12:00:00.000Z',
+    recurrenceRule: { seriesId: 'series-1', enabled: true, interval: 1, frequency: 'daily', mode: 'fixed_schedule' },
+    createdAt: '2026-08-30T10:00:00.000Z', updatedAt: '2026-08-30T12:00:00.000Z'
+  });
+  const after = structuredClone(before);
+  after.tasks[0].recurrenceRule = { mode: 'fixed_schedule', frequency: 'daily', interval: 1, enabled: true, seriesId: 'series-1' };
+  const h = harness(before); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+
+  h.engine.queueLocalChanges(before, after);
+
+  assert.equal(h.state.state.outbox.length, 0);
+});
+
+test('normalizing an existing Task tombstone never replays it to cloud', () => {
+  const before = blank();
+  before.tasks.push({
+    id: 'retired-legacy-task', title: 'Old milking', status: 'open', completed: false,
+    dueDate: '2026-08-15', deletedAt: '2026-08-30T01:00:00.000Z',
+    recurrenceRule: { frequency: 'daily', interval: 1, enabled: false, seriesDeleted: true, routineType: 'milk_morning' },
+    createdAt: '2026-08-15T10:00:00.000Z', updatedAt: '2026-08-30T01:00:00.000Z'
+  });
+  const after = structuredClone(before);
+  delete after.tasks[0].recurrenceRule.routineType;
+  const h = harness(before); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+
+  h.engine.queueLocalChanges(before, after);
+
   assert.equal(h.state.state.outbox.length, 0);
 });
 
@@ -1238,6 +1273,40 @@ test('use-local conflict resolution queues a new update on current version', asy
   const id = crypto.randomUUID(); const cloud = new MockCloud({ records: [{ id, version: 2, name: 'Cloud' }] }); const h = harness(blank(), cloud);
   h.state.bind(crypto.randomUUID()); const conflict = h.state.addConflict({ id: crypto.randomUUID(), table: 'records', localId: id, rowId: id, payload: { id, name: 'Local' }, baseVersion: 1 }, cloud.rows.records[0]);
   await h.engine.resolveConflict(conflict.id, 'local'); assert.equal(cloud.rows.records[0].name, 'Local');
+});
+
+test('an existing conflict with a missing snapshot refreshes the cloud row before keeping cloud', async () => {
+  const localId = 'stale-task';
+  const cloudId = crypto.randomUUID();
+  const data = blank();
+  data.tasks.push({ id: localId, title: 'Local title', status: 'open', completed: false, dueDate: '2026-08-30', createdAt: '2026-08-30T10:00:00Z', updatedAt: '2026-08-30T10:00:00Z' });
+  const cloud = new MockCloud({ tasks: [{ id: cloudId, version: 4, title: 'Cloud title', status: 'open', priority: 'normal', due_date: '2026-08-30', recurrence_rule: null, created_at: '2026-08-30T09:00:00Z', updated_at: '2026-08-30T11:00:00Z' }] });
+  const h = harness(data, cloud); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  h.state.entity('tasks', localId).cloudId = cloudId;
+  const conflict = h.state.addConflict({ id: crypto.randomUUID(), table: 'tasks', localId, rowId: cloudId, type: 'update', payload: { title: 'Local title', status: 'open' }, baseVersion: 3 }, null);
+
+  await h.engine.resolveConflict(conflict.id, 'cloud');
+
+  assert.equal(h.local().tasks[0].title, 'Cloud title');
+  assert.equal(h.state.state.conflicts.some(item => item.status === 'unresolved'), false);
+});
+
+test('Use my version preserves a Task soft-delete conflict operation', async () => {
+  const localId = 'retired-task';
+  const cloudId = crypto.randomUUID();
+  const deletedAt = '2026-08-31T12:00:00Z';
+  const data = blank();
+  data.tasks.push({ id: localId, title: 'Retire me', status: 'open', completed: false, dueDate: '2026-08-20', deletedAt, createdAt: '2026-08-20T10:00:00Z', updatedAt: deletedAt });
+  const cloud = new MockCloud({ tasks: [{ id: cloudId, version: 5, title: 'Retire me', status: 'open', priority: 'normal', due_date: '2026-08-20', recurrence_rule: null, created_at: '2026-08-20T10:00:00Z', updated_at: '2026-08-30T10:00:00Z' }] });
+  const h = harness(data, cloud); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  h.state.entity('tasks', localId).cloudId = cloudId;
+  const conflict = h.state.addConflict({ id: crypto.randomUUID(), table: 'tasks', localId, rowId: cloudId, type: 'soft_delete', payload: toCloud('tasks', data.tasks[0], h.state), baseVersion: 4 }, null);
+
+  await h.engine.resolveConflict(conflict.id, 'local');
+
+  assert.equal(cloud.calls[0].type, 'soft_delete');
+  assert.ok(cloud.rows.tasks[0].deleted_at);
+  assert.equal(h.state.state.conflicts.some(item => item.status === 'unresolved'), false);
 });
 
 test('keep-cloud resolution rebinds a legacy relationship conflict and preserves other reviews', async () => {

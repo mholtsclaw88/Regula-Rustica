@@ -199,6 +199,8 @@ export class LocalSyncState {
     Object.assign(conflict, {
       localPayload: operation.payload,
       localBaseVersion: operation.baseVersion,
+      operationType: operation.type,
+      clientUpdatedAt: operation.clientUpdatedAt,
       cloudRow,
       operationId: operation.id,
       detectedAt: new Date().toISOString()

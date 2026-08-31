@@ -91,8 +91,16 @@ export class SyncEngine {
           this.state.enqueue({ table, localId: id, type: 'create', payload: toCloud(table, row, this.state) });
           if (row.deletedAt || row.removedAt) this.state.enqueue({ table, localId: id, type: 'soft_delete', payload: toCloud(table, row, this.state) });
         }
-        else if (JSON.stringify(table === 'record_attachments' ? toCloud(table, old, this.state) : old) !== JSON.stringify(table === 'record_attachments' ? toCloud(table, row, this.state) : row)) {
-          const type = !old.deletedAt && row.deletedAt ? 'soft_delete' : old.deletedAt && !row.deletedAt ? 'restore' : 'update';
+        else {
+          const wasDeleted = Boolean(old.deletedAt || old.removedAt);
+          const isDeleted = Boolean(row.deletedAt || row.removedAt);
+          // Once a tombstone is in place, local normalization must not keep
+          // rewriting obsolete historical rows back to the cloud.
+          if (wasDeleted && isDeleted) continue;
+          const oldPayload = comparablePayload(toCloud(table, old, this.state));
+          const currentPayload = comparablePayload(toCloud(table, row, this.state));
+          if (JSON.stringify(oldPayload) === JSON.stringify(currentPayload) && wasDeleted === isDeleted) continue;
+          const type = !wasDeleted && isDeleted ? 'soft_delete' : wasDeleted && !isDeleted ? 'restore' : 'update';
           this.state.enqueue({ table, localId: id, type, payload: toCloud(table, row, this.state), clientUpdatedAt: row.updatedAt });
         }
       }
@@ -431,14 +439,43 @@ export class SyncEngine {
   async resolveConflict(conflictId, choice) {
     const conflict = this.state.state.conflicts.find(item => item.id === conflictId && item.status === 'unresolved');
     if (!conflict) return;
-    if (!conflict.cloudRow?.id || conflict.cloudRow.version == null) throw new Error('The cloud version for this conflict is unavailable. Sync again before resolving it.');
+    if ((!conflict.cloudRow?.id || conflict.cloudRow.version == null) && typeof this.cloud?.getRow === 'function') {
+      conflict.cloudRow = await this.cloud.getRow(conflict.table, conflict.rowId);
+      this.state.save();
+    }
+    const collection = COLLECTIONS[conflict.table];
+    const localRow = (this.readLocal()[collection] || []).find(item => item.id === conflict.localId || item.id === conflict.rowId);
+    const localDeleted = Boolean(localRow?.deletedAt || localRow?.removedAt);
+    if (!conflict.cloudRow?.id || conflict.cloudRow.version == null) {
+      if (choice === 'cloud' || localDeleted) {
+        const next = structuredClone(this.readLocal());
+        next[collection] = (next[collection] || []).filter(item => ![conflict.localId, conflict.rowId].includes(item.id));
+        this.writeLocal(next, 'sync');
+        conflict.status = choice === 'cloud' ? 'kept_cloud_absent' : 'local_delete_already_applied';
+        conflict.resolvedAt = new Date().toISOString();
+        this.state.save();
+        await this.sync();
+        return;
+      }
+      if (choice === 'local') {
+        const entity = this.state.entity(conflict.table, conflict.localId);
+        entity.cloudVersion = null;
+        entity.cloudRow = null;
+        this.state.enqueue({ table: conflict.table, localId: conflict.localId, type: 'create', payload: conflict.localPayload, baseVersion: null, clientUpdatedAt: conflict.clientUpdatedAt });
+        conflict.status = 'use_local_create_queued';
+        conflict.resolvedAt = new Date().toISOString();
+        this.state.save();
+        await this.sync();
+        return;
+      }
+      throw new Error('Unknown conflict resolution.');
+    }
     const entity = this.state.entity(conflict.table, conflict.localId);
     entity.cloudId = conflict.cloudRow.id;
     entity.cloudVersion = conflict.cloudRow.version;
     entity.cloudRow = conflict.cloudRow;
     if (choice === 'cloud') {
       const next = structuredClone(this.readLocal());
-      const collection = COLLECTIONS[conflict.table];
       next[collection] ||= [];
       const resolved = fromCloud(conflict.table, conflict.cloudRow, this.state);
       let index = next[collection].findIndex(item => item.id === conflict.localId || item.id === conflict.cloudRow.id);
@@ -448,7 +485,10 @@ export class SyncEngine {
       conflict.status = 'kept_cloud';
     } else if (choice === 'local') {
       const payload = { ...conflict.localPayload, id: conflict.cloudRow.id };
-      this.state.enqueue({ table: conflict.table, localId: conflict.localId, type: 'update', payload, baseVersion: conflict.cloudRow.version });
+      const operationType = conflict.operationType === 'create'
+        ? 'update'
+        : (conflict.operationType || (localDeleted ? 'soft_delete' : 'update'));
+      this.state.enqueue({ table: conflict.table, localId: conflict.localId, type: operationType, payload, baseVersion: conflict.cloudRow.version, clientUpdatedAt: conflict.clientUpdatedAt });
       conflict.status = 'use_local_queued';
     } else throw new Error('Unknown conflict resolution.');
     conflict.resolvedAt = new Date().toISOString();

@@ -1,7 +1,7 @@
-const CACHE = 'regula-rustica-sync-convergence-v1';
+const CACHE = 'regula-rustica-task-conflict-v1';
 const ASSETS = [
   './', './index.html', './styles.css?v=today-daily-planner-v2', './housekeeping.css?v=today-daily-planner-v2', './cloud-auth.css', './housekeeping-data.js?v=recurring-resync-v2', './task-foundation.js?v=recurring-resync-v2', './record-documents.js?v=local-attachments-v1', './journal-foundation.js?v=journal-consolidation-v3', './form-selector.js?v=responsible-party-selectors-v2', './records-relationships.js?v=data-entry-forms-v2', './ui-refinements.js?v=data-entry-forms-v2', './ui-refinements-core.js?v=journal-documents-v1', './ledger-receipt-modal.js?v=data-entry-forms-v2', './ledger-allocations.js?v=data-entry-forms-v2', './ledger-allocation-display.js?v=multi-record-ledger-v1', './app.js?v=cloud-sync-stability-v1', './cloud-auth.js',
-  './cloud-invitations.mjs', './sync/runtime.mjs?v=sync-convergence-v1', './sync/local-state.mjs', './sync/legacy-recovery.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
+  './cloud-invitations.mjs', './sync/runtime.mjs?v=task-conflict-v1', './sync/local-state.mjs', './sync/legacy-recovery.mjs', './sync/entities.mjs', './sync/cloud-adapter.mjs', './sync/engine.mjs',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'
 ];
 const OPTIONAL_ASSETS = ['./cloud-runtime-config.js','https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.1/+esm'];

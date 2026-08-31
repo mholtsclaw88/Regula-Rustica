@@ -547,10 +547,9 @@ function exportData() {
 
 window.RegulaRusticaLocal = {
   read: () => structuredClone(data),
-  write: (nextData, source = 'sync') => {
-    saveData(nextData, source);
-    if (source === 'sync') materializeRecurringTasks();
-  },
+  // Cloud Task completion already materializes the next recurring occurrence.
+  // Do not run recurrence normalization during every paginated sync write.
+  write: (nextData, source = 'sync') => saveData(nextData, source),
   exportBackup: exportData,
   storageKey: STORAGE_KEY,
   materializeRecurringTasks
