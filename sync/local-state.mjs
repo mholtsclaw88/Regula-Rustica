@@ -35,7 +35,9 @@ function normalizeState(value) {
     outbox: Array.isArray(value.outbox) ? value.outbox.map(operation => {
       const normalized = {
         ...operation,
-        status: operation.status === 'failed' ? 'retryable' : (operation.status || 'pending'),
+        status: operation.status === 'failed' || (upgradeLegacyOutbox && ['blocked', 'dependency'].includes(operation.status))
+          ? 'retryable'
+          : (operation.status || 'pending'),
         attempts: Number(operation.attempts) || 0,
         lastAttemptAt: operation.lastAttemptAt || null,
         lastErrorCode: operation.lastErrorCode || null,

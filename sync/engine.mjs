@@ -4,6 +4,7 @@ import { isLegacyOperation, legacyOperationAlreadySatisfied, legacyOperationOrde
 const totals = counts => Object.values(counts).reduce((sum, count) => sum + count, 0);
 
 const RETRYABLE_CODES = new Set(['FETCH', 'NETWORK_ERROR', '408', '425', '429', '500', '502', '503', '504', '520', '522', '524', '40001', '40P01', '53300', '57014', '57P01']);
+const LEGACY_PAYLOAD_REFRESH_CODES = new Set(['23503', '23505', '23514', 'P0002', 'LEGACY_TARGET_MISSING', 'SYNC_DEPENDENCY']);
 
 export function isRetryableSyncError(error) {
   const code = String(error?.code || error?.status || error?.statusCode || '').toUpperCase();
@@ -321,6 +322,19 @@ export class SyncEngine {
         this.state.fail(operation, legacyError);
         continue;
       }
+      if (isLegacyOperation(operation) && operation.attempts > 0
+        && LEGACY_PAYLOAD_REFRESH_CODES.has(String(operation.lastErrorCode || '').toUpperCase())) {
+        const collection = COLLECTIONS[operation.table];
+        const localRow = (this.readLocal()[collection] || []).find(item => item.id === operation.localId);
+        if (localRow) {
+          const entity = this.state.entity(operation.table, operation.localId);
+          operation.payload = toCloud(operation.table, localRow, this.state);
+          operation.rowId = entity.cloudId;
+          if (operation.type !== 'create') operation.baseVersion = entity.cloudVersion;
+          operation.idempotencyKey = crypto.randomUUID();
+          this.state.save();
+        }
+      }
       const blockers = dependencyBlockers(operation, this.state.state.outbox);
       if (blockers.length) {
         this.state.waitForDependencies(operation, blockers);
@@ -334,6 +348,18 @@ export class SyncEngine {
           if (inspection.supported && legacyOperationAlreadySatisfied(operation, inspection.row)) {
             this.state.complete(operation, inspection.row);
             continue;
+          }
+          if (inspection.supported && operation.table === 'chore_windows' && operation.type === 'create'
+            && inspection.row?.system_key === operation.payload?.system_key) {
+            const entity = this.state.entity(operation.table, operation.localId);
+            entity.cloudId = inspection.row.id;
+            entity.cloudVersion = inspection.row.version;
+            entity.cloudRow = inspection.row;
+            operation.rowId = inspection.row.id;
+            operation.type = 'update';
+            operation.baseVersion = inspection.row.version;
+            operation.idempotencyKey = crypto.randomUUID();
+            this.state.save();
           }
           if (inspection.supported && operation.type === 'create' && inspection.row) {
             this.state.addConflict(operation, inspection.row);

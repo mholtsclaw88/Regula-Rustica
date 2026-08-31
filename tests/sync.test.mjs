@@ -337,9 +337,28 @@ test('persisted failures are marked once for recovery while new current operatio
 
   const currentState = new LocalSyncState(new MemoryStorage()).state;
   const storage = new MemoryStorage({
-    [SYNC_STORAGE_KEYS.state]: JSON.stringify({ ...currentState, legacyRecoveryVersion: 1, outbox: [{ ...current, attempts: 1, lastErrorCode: '42501' }] })
+    [SYNC_STORAGE_KEYS.state]: JSON.stringify({ ...currentState, legacyRecoveryVersion: 2, outbox: [{ ...current, attempts: 1, lastErrorCode: '42501' }] })
   });
   assert.equal(new LocalSyncState(storage).state.outbox[0].legacyRecovery, undefined);
+});
+
+test('recovery v2 retries previously blocked historical operations once', () => {
+  const state = new LocalSyncState(new MemoryStorage()).state;
+  const operation = markLegacyOperation({
+    id: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(), table: 'yield_entries',
+    localId: 'old-yield', rowId: crypto.randomUUID(), deviceId: state.deviceId,
+    homesteadId: crypto.randomUUID(), type: 'create', payload: {}, status: 'blocked',
+    attempts: 3, lastErrorCode: '23503'
+  });
+  operation.legacyRecovery.version = 1;
+  const storage = new MemoryStorage({
+    [SYNC_STORAGE_KEYS.state]: JSON.stringify({ ...state, legacyRecoveryVersion: 1, outbox: [operation] })
+  });
+
+  const recovered = new LocalSyncState(storage).state.outbox[0];
+  assert.equal(recovered.status, 'retryable');
+  assert.equal(recovered.legacyRecovery.version, 2);
+  assert.equal(recovered.legacyRecovery.originalErrorCode, '23503');
 });
 
 test('legacy failed operations reload as retryable without losing diagnostics', () => {
@@ -443,6 +462,84 @@ test('legacy duplicate relationship binds to the exact existing cloud row', asyn
   await engine.push();
   assert.equal(recovered.state.outbox.length, 0);
   assert.equal(recovered.entity('record_relationships', 'old-location').cloudId, existing.id);
+});
+
+test('legacy system Chore Window create rebinds and updates the canonical window', async () => {
+  const local = blank();
+  local.choreWindows.push({ id: 'old-morning', systemKey: 'morning', name: 'Morning', displayOrder: 10, enabled: true, daypart: 'morning', startTime: '06:00', endTime: '09:00' });
+  const h = harness(local); const homestead = crypto.randomUUID(); h.state.bind(homestead); h.state.state.initialSyncCompleted = true;
+  const operation = h.state.enqueue({ table: 'chore_windows', localId: 'old-morning', type: 'create', payload: toCloud('chore_windows', local.choreWindows[0], h.state) });
+  operation.attempts = 2; operation.status = 'blocked'; operation.lastErrorCode = '23505';
+  operation.legacyRecovery = { version: 1, originalTable: 'chore_windows', originalRowId: operation.rowId, originalStatus: 'blocked', originalErrorCode: '23505' };
+  h.state.state.legacyRecoveryVersion = 1; h.state.save();
+  const recovered = new LocalSyncState(h.storage); recovered.state.initialSyncCompleted = true;
+  const canonical = { id: crypto.randomUUID(), system_key: 'morning', name: 'Morning', display_order: 10, enabled: true, daypart: 'morning', start_time: '06:00:00', end_time: '09:00:00', version: 4 };
+  const calls = [];
+  const cloud = {
+    async inspectLegacy() { return { supported: true, row: canonical }; },
+    async apply(item) { calls.push(item); return { status: 'applied', row: { ...canonical, version: 5 } }; },
+    async *changes() { return; }
+  };
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: () => local, writeLocal: () => {} });
+
+  await engine.push();
+
+  assert.equal(calls[0].type, 'update');
+  assert.equal(calls[0].rowId, canonical.id);
+  assert.equal(recovered.entity('chore_windows', 'old-morning').cloudId, canonical.id);
+  assert.equal(recovered.state.outbox.length, 0);
+});
+
+test('legacy Yield retry refreshes a stale Task reference from current identity mapping', async () => {
+  const local = blank();
+  const taskId = 'morning-milk';
+  local.yieldEntries.push({ id: 'old-yield', recordId: 'daisy', taskId, type: 'milk', occurredAt: '2026-08-30T12:00:00Z', session: 'morning', quantity: 2, unit: 'gal', createdAt: '2026-08-30T12:00:00Z' });
+  const h = harness(local); const homestead = crypto.randomUUID(); h.state.bind(homestead); h.state.state.initialSyncCompleted = true;
+  const oldTaskCloudId = h.state.entity('tasks', taskId).cloudId;
+  const operation = h.state.enqueue({ table: 'yield_entries', localId: 'old-yield', type: 'create', payload: toCloud('yield_entries', local.yieldEntries[0], h.state) });
+  operation.attempts = 1; operation.status = 'blocked'; operation.lastErrorCode = '23503';
+  operation.legacyRecovery = { version: 1, originalTable: 'yield_entries', originalRowId: operation.rowId, originalStatus: 'blocked', originalErrorCode: '23503' };
+  h.state.state.legacyRecoveryVersion = 1;
+  const canonicalTaskId = crypto.randomUUID();
+  h.state.entity('tasks', taskId).cloudId = canonicalTaskId;
+  h.state.save();
+  const recovered = new LocalSyncState(h.storage); recovered.state.initialSyncCompleted = true;
+  const calls = [];
+  const cloud = {
+    async inspectLegacy() { return { supported: true, row: null }; },
+    async apply(item) { calls.push(item); return { status: 'applied', row: { ...item.payload, id: item.rowId, version: 1 } }; },
+    async *changes() { return; }
+  };
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: () => local, writeLocal: () => {} });
+
+  await engine.push();
+
+  assert.notEqual(oldTaskCloudId, canonicalTaskId);
+  assert.equal(calls[0].payload.details.task_id, canonicalTaskId);
+  assert.equal(recovered.state.outbox.length, 0);
+});
+
+test('legacy network retry preserves its original payload and idempotency key', async () => {
+  const local = blank();
+  local.tasks.push({ id: 'old-task', title: 'Edited after interruption', status: 'open', completed: false, createdAt: '2026-08-30T12:00:00Z', updatedAt: '2026-08-30T13:00:00Z' });
+  const h = harness(local); h.state.bind(crypto.randomUUID()); h.state.state.initialSyncCompleted = true;
+  const operation = h.state.enqueue({ table: 'tasks', localId: 'old-task', type: 'create', payload: { title: 'Original request', status: 'open' } });
+  operation.attempts = 1; operation.status = 'retryable'; operation.lastErrorCode = 'FETCH';
+  operation.legacyRecovery = { version: 1, originalTable: 'tasks', originalRowId: operation.rowId, originalStatus: 'retryable', originalErrorCode: 'FETCH' };
+  h.state.state.legacyRecoveryVersion = 1; h.state.save();
+  const recovered = new LocalSyncState(h.storage); recovered.state.initialSyncCompleted = true;
+  const originalKey = recovered.state.outbox[0].idempotencyKey;
+  const calls = [];
+  const cloud = {
+    async inspectLegacy() { return { supported: false, row: null }; },
+    async apply(item) { calls.push(structuredClone(item)); return { status: 'applied', row: { ...item.payload, id: item.rowId, version: 1 } }; }
+  };
+  const engine = new SyncEngine({ state: recovered, cloud, readLocal: () => local, writeLocal: () => {} });
+
+  await engine.push();
+
+  assert.equal(calls[0].idempotencyKey, originalKey);
+  assert.equal(calls[0].payload.title, 'Original request');
 });
 
 test('unknown and malformed historical operations remain blocked and diagnosable', async () => {
@@ -934,6 +1031,18 @@ test('calendar events retain all-day and optional time metadata', () => {
   assert.equal(cloud.all_day, false);
   const local = fromCloud('calendar_events', { ...cloud, id: cloud.id, created_at: event.createdAt, updated_at: event.createdAt }, state);
   assert.equal(local.location, 'Town green');
+});
+
+test('Postgres Chore Window times normalize to local HH:MM precision', () => {
+  const state = new LocalSyncState(new MemoryStorage());
+  const local = fromCloud('chore_windows', {
+    id: crypto.randomUUID(), system_key: 'morning', name: 'Morning', display_order: 10,
+    enabled: true, daypart: 'morning', start_time: '06:00:00', end_time: '09:00:00',
+    created_at: '2026-08-30T12:00:00Z', updated_at: '2026-08-30T12:00:00Z'
+  }, state);
+  assert.equal(local.startTime, '06:00');
+  assert.equal(local.endTime, '09:00');
+  assert.equal(toCloud('chore_windows', local, state).start_time, '06:00');
 });
 
 test('yield entries retain session, loss, and canonical record link', () => {

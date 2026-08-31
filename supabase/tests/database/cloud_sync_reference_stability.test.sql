@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(19);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -129,6 +129,56 @@ select is((select chore_window_id from public.tasks where id = :'next_task_id'),
   null::uuid, 'next recurrence does not inherit a deleted Chore Window');
 select is((select count(*) from public.tasks where parent_task_id = 'b2000000-0000-0000-0000-000000000002'),
   1::bigint, 'recurring completion creates exactly one next Task');
+
+select id as active_window_id from public.chore_windows
+where homestead_id = :'homestead_id' and system_key = 'evening' and deleted_at is null \gset
+
+select public.apply_task_sync_operation(
+  'completed-history-create', 'b4000000-0000-0000-0000-000000000001', 'tasks',
+  'b2000000-0000-0000-0000-000000000005', 'create', null, '2026-08-30T12:00:00Z',
+  jsonb_build_object(
+    'title', 'Historical completed Task', 'status', 'completed', 'priority', 'normal',
+    'available_from', '2026-08-31', 'due_date', '2026-08-30',
+    'completed_at', '2026-08-30T11:00:00Z', 'chore_window_id', :'active_window_id'
+  )
+) as completed_create_result \gset
+select is((:'completed_create_result'::jsonb ->> 'status'), 'applied',
+  'historical completed Task create converges');
+select ok((select completed_at is not null and completed_by is not null from public.tasks
+  where id = 'b2000000-0000-0000-0000-000000000005'),
+  'completed replay retains a valid completion state');
+select is((select available_from from public.tasks where id = 'b2000000-0000-0000-0000-000000000005'),
+  null::date, 'invalid historical date range is normalized at the sync boundary');
+
+select version as completed_version from public.tasks
+where id = 'b2000000-0000-0000-0000-000000000005' \gset
+select public.apply_task_sync_operation(
+  'completed-history-update', 'b4000000-0000-0000-0000-000000000001', 'tasks',
+  'b2000000-0000-0000-0000-000000000005', 'update', :completed_version, '2026-08-30T13:00:00Z',
+  jsonb_build_object(
+    'title', 'Historical completed Task updated', 'status', 'completed', 'priority', 'normal',
+    'due_date', '2026-08-30', 'completed_at', '2026-08-30T11:00:00Z',
+    'chore_window_id', :'active_window_id'
+  )
+) as completed_update_result \gset
+select is((:'completed_update_result'::jsonb ->> 'status'), 'applied',
+  'an already-completed Task accepts metadata convergence');
+select is((select title from public.tasks where id = 'b2000000-0000-0000-0000-000000000005'),
+  'Historical completed Task updated', 'completed Task metadata is actually updated');
+
+select version as reopen_version from public.tasks
+where id = 'b2000000-0000-0000-0000-000000000005' \gset
+select public.apply_task_sync_operation(
+  'completed-history-reopen', 'b4000000-0000-0000-0000-000000000001', 'tasks',
+  'b2000000-0000-0000-0000-000000000005', 'update', :reopen_version, '2026-08-30T14:00:00Z',
+  jsonb_build_object(
+    'title', 'Historical completed Task updated', 'status', 'open', 'priority', 'normal',
+    'due_date', '2026-08-30', 'chore_window_id', :'active_window_id'
+  )
+) as reopened_result \gset
+select ok((select status = 'open' and completed_at is null and completed_by is null from public.tasks
+  where id = 'b2000000-0000-0000-0000-000000000005'),
+  'reopening through sync clears completion metadata consistently');
 
 reset role;
 select * from finish();
