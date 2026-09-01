@@ -785,10 +785,10 @@ function createSuggestedTask(record, suggestion) {
 
 function renderSuggestedTasks(record) {
   const root=$('#suggestedTasks'); root.innerHTML='';
-  const suggestions=window.RegulaRusticaTasks.suggestedTasks(record).filter(item=>!window.RegulaRusticaTasks.suggestionEnabled(data.tasks,record.id,item.key));
+  const suggestions=window.RegulaRusticaTasks.suggestedTasks(record);
   if (!suggestions.length) return;
-  const heading=document.createElement('div'); heading.className='section-head'; heading.innerHTML='<div><h3>Suggested Tasks</h3><p class="muted">These are templates you can enable and customize.</p></div>'; root.append(heading);
-  suggestions.forEach(suggestion=>{const row=document.createElement('div');row.className='routine-management-row suggested';row.innerHTML=`<div><strong>${escapeHtml(suggestion.title)}</strong><div class="meta">${escapeHtml(suggestion.frequency)}${suggestion.yieldType?' · records Yield on completion':''}</div></div><button class="btn secondary">Enable</button>`;row.querySelector('button').addEventListener('click',()=>createSuggestedTask(record,suggestion));root.append(row);});
+  const heading=document.createElement('div'); heading.className='section-head'; heading.innerHTML='<div><h3>Suggested Tasks</h3><p class="muted">Built-in recommendations stay available and can be enabled whenever useful.</p></div>'; root.append(heading);
+  suggestions.forEach(suggestion=>{const enabled=window.RegulaRusticaTasks.suggestionEnabled(data.tasks,record.id,suggestion.key);const row=document.createElement('div');row.className='routine-management-row suggested';row.innerHTML=`<div><strong>${escapeHtml(suggestion.title)}</strong><div class="meta">${enabled?'Enabled':'Disabled'} · ${escapeHtml(suggestion.frequency)}${suggestion.yieldType?' · records Yield on completion':''}</div></div>${enabled?'':'<button class="btn secondary">Enable</button>'}`;row.querySelector('button')?.addEventListener('click',()=>createSuggestedTask(record,suggestion));root.append(row);});
 }
 
 function completeTask(task) {
@@ -870,7 +870,9 @@ function sharedTaskRow(task, { suggestionActions = false } = {}) {
     ? '<button class="reenable" type="button">Re-enable</button>'
     : window.RegulaRusticaTasks.recurringOccurrenceActions(task).length
       ? '<button class="recurrence-actions" type="button">Skip / disable…</button>'
-      : '<button class="del" type="button">Delete</button>';
+      : window.RegulaRusticaTasks.isBuiltInSuggestedTask(task)
+        ? ''
+        : '<button class="del" type="button">Delete</button>';
   row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${disabledSeries ? 'disabled' : ''} aria-label="${disabledSeries ? 'Disabled' : 'Complete'} ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${recurringActions}</div></details>`;
   row.querySelector('.shared-task-check').addEventListener('change', event => {
     if (event.target.checked && task.yieldType && !task.completed) {
@@ -1928,9 +1930,12 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
 
   if (nextMode === 'task-lifecycle') {
     const task = data.tasks.find(item => item.id === id);
+    const builtInSuggestion = window.RegulaRusticaTasks.isBuiltInSuggestedTask(task);
     const explanation = document.createElement('p');
     explanation.className = 'muted';
-    explanation.textContent = 'Skip this occurrence, disable the series for later reuse, or delete the recurring task while keeping completed history.';
+    explanation.textContent = builtInSuggestion
+      ? 'Skip this occurrence or disable the Suggested Task for later reuse.'
+      : 'Skip this occurrence, disable the series for later reuse, or delete the recurring task while keeping completed history.';
     const actions = document.createElement('div');
     actions.className = 'stack';
     const skip = document.createElement('button');
@@ -1954,7 +1959,8 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
       saveData();
       $('#modal').close();
     });
-    actions.append(skip, disable, deleteSeries);
+    actions.append(skip, disable);
+    if (!builtInSuggestion) actions.append(deleteSeries);
     root.append(explanation, actions);
   }
 

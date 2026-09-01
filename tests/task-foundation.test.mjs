@@ -51,6 +51,33 @@ test('a disabled or deleted suggestion reactivates once without duplicates', () 
   assert.equal(first.status,'open');
 });
 
+test('missing and previously deleted built-in suggestions are available as Disabled without creating work', () => {
+  const record={id:'hens',type:'Animal',identity:{purpose:'Eggs'}};
+  const suggestion=tasks.suggestedTasks(record).find(item=>item.key==='laying-collect-eggs');
+  const deleted={id:'deleted-eggs',recordId:'hens',suggestionKey:suggestion.key,dueDate:'2026-08-18',recurrenceRule:{frequency:'daily',mode:'fixed_schedule',interval:1,seriesId:'eggs',enabled:false,seriesDeleted:true},deletedAt:null,completed:false,status:'open'};
+  const missing=[];
+  assert.ok(suggestion);
+  assert.equal(tasks.suggestionEnabled([deleted],record.id,suggestion.key),false);
+  assert.equal(tasks.suggestionEnabled(missing,record.id,suggestion.key),false);
+  assert.equal(missing.length,0);
+  assert.equal(deleted.recurrenceRule.seriesDeleted,true);
+  const restored=tasks.reactivateSuggestedTask([deleted],record.id,suggestion.key,{dueDate:'2026-08-19',updatedAt:'2026-08-19T08:00:00Z'});
+  assert.equal(restored.id,'deleted-eggs');
+  assert.equal(restored.deletedAt,null);
+  assert.equal(restored.recurrenceRule.enabled,true);
+  assert.equal(restored.recurrenceRule.seriesDeleted,undefined);
+});
+
+test('repairing Suggested Task availability never resurrects an ordinary deleted Task', () => {
+  const ordinary={id:'ordinary',recordId:'hens',suggestionKey:null,deletedAt:'2026-08-18T12:00:00Z',recurrenceRule:null};
+  tasks.suggestedTasks({id:'hens',type:'Animal',identity:{purpose:'Eggs'}});
+  assert.equal(ordinary.deletedAt,'2026-08-18T12:00:00Z');
+  assert.equal(tasks.isBuiltInSuggestedTask(ordinary),false);
+  const deletable={...ordinary,deletedAt:null};
+  assert.equal(tasks.deleteTask(deletable,'2026-08-19T12:00:00Z'),true);
+  assert.equal(deletable.deletedAt,'2026-08-19T12:00:00Z');
+});
+
 test('Work does not auto-suggest recurring stewardship', () => {
   assert.deepEqual(tasks.suggestedTasks({id:'project',type:'Work',identity:{}}),[]);
 });
