@@ -172,16 +172,16 @@ test('Disabled recurring Tasks persist and remain separate from Open work', () =
   assert.equal(tasks.isDisabledRecurringTask(reloaded[0]), true);
 });
 
-test('Delete recurring series hides its controller, stops materialization, and can be re-enabled from Suggestions', () => {
+test('Built-in Suggested Tasks cannot be permanently deleted and remain disabled for re-enable', () => {
   const list = [
     occurrence({ id: 'completed', completed: true, status: 'completed', dueDate: '2026-08-17' }),
     occurrence({ id: 'current', dueDate: '2026-08-18', parentTaskId: 'completed' })
   ];
   const anchor = tasks.deleteRecurringSeries(list, list[1], '2026-08-18T12:00:00Z');
   assert.equal(anchor.recurrenceRule.enabled, false);
-  assert.equal(anchor.recurrenceRule.seriesDeleted, true);
-  assert.deepEqual(tasks.filterTasksByStatus(list, 'all').map(task => task.id), ['completed']);
-  assert.deepEqual(tasks.filterTasksByStatus(list, 'disabled'), []);
+  assert.equal(anchor.recurrenceRule.seriesDeleted, undefined);
+  assert.deepEqual(tasks.filterTasksByStatus(list, 'all').map(task => task.id), ['completed', 'current']);
+  assert.deepEqual(tasks.filterTasksByStatus(list, 'disabled').map(task => task.id), ['current']);
   const result = tasks.stabilizeRecurringTasks(list, {
     targetDate: '2026-08-19', nextDueDate: housekeeping.nextRecurringDueDate,
     makeId: () => 'must-not-exist', now: '2026-08-19T10:00:00Z'
@@ -193,6 +193,13 @@ test('Delete recurring series hides its controller, stops materialization, and c
   assert.equal(restored.id, 'current');
   assert.equal(restored.recurrenceRule.seriesDeleted, undefined);
   assert.equal(tasks.suggestionEnabled(list, 'record-1', 'dairy-milk-morning'), true);
+});
+
+test('ordinary user-created recurring Tasks remain permanently deletable', () => {
+  const userTask = occurrence({ suggestionKey: null });
+  const anchor = tasks.deleteRecurringSeries([userTask], userTask, '2026-08-18T12:00:00Z');
+  assert.equal(anchor.recurrenceRule.enabled, false);
+  assert.equal(anchor.recurrenceRule.seriesDeleted, true);
 });
 
 test('deleted-series state survives recurrence and cloud normalization', () => {
