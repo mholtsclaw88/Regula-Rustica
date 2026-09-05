@@ -1552,8 +1552,18 @@ function renderCalendar() {
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = `calendar-day${calendarView === 'month' && date.getMonth() !== anchor.getMonth() ? ' outside' : ''}${dateKey === today() ? ' current' : ''}`;
-    cell.innerHTML = `<span class="calendar-date">${date.getDate()}</span><span class="calendar-items"></span>`;
-    cell.addEventListener('click', () => openModal('calendar', null, null, '', dateKey));
+    const dayName = date.toLocaleDateString(undefined, { weekday: 'short' });
+    cell.innerHTML = `<span class="calendar-day-heading"><span class="calendar-day-name">${escapeHtml(dayName)}</span><span class="calendar-date">${date.getDate()}</span></span><span class="calendar-items"></span>`;
+    cell.addEventListener('click', () => {
+      if (calendarView === 'month' && window.matchMedia('(max-width: 520px)').matches) {
+        calendarView = 'today';
+        calendarMonth = date;
+        document.querySelector('[name="calendarView"][value="today"]').checked = true;
+        renderCalendar();
+        return;
+      }
+      openModal('calendar', null, null, '', dateKey);
+    });
     const items = cell.querySelector('.calendar-items');
     const weekStart = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
     const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
@@ -1562,7 +1572,9 @@ function renderCalendar() {
     rangeTasks
       .filter(task => {
         const bounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(task);
-        return bounds.start <= weekEndKey && bounds.end >= weekStartKey;
+        return calendarView === 'today'
+          ? Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey))
+          : bounds.start <= weekEndKey && bounds.end >= weekStartKey;
       })
       .forEach(task => {
         const occursToday = Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey));
@@ -1600,6 +1612,20 @@ function renderCalendar() {
         item.addEventListener('click', click => { click.stopPropagation(); openModal('calendar', event.id, event.recordId); });
         items.appendChild(item);
       });
+    }
+    if (calendarView === 'today' && !items.children.length) {
+      items.innerHTML = '<span class="calendar-empty">Nothing scheduled for this day.</span>';
+    }
+    if (calendarView === 'week') {
+      const visibleItems = [...items.children].filter(item => !item.classList.contains('calendar-placeholder'));
+      visibleItems.slice(3).forEach(item => item.classList.add('calendar-mobile-overflow'));
+      if (visibleItems.length > 3) items.insertAdjacentHTML('beforeend', `<span class="calendar-more">+${visibleItems.length - 3} more</span>`);
+    }
+    if (calendarView === 'month') {
+      const itemRows = [...items.children];
+      const hiddenCount = itemRows.slice(3).filter(item => !item.classList.contains('calendar-placeholder')).length;
+      itemRows.slice(3).forEach(item => item.classList.add('calendar-mobile-overflow'));
+      if (hiddenCount) items.insertAdjacentHTML('beforeend', `<span class="calendar-more">+${hiddenCount} more</span>`);
     }
     root.appendChild(cell);
   }
