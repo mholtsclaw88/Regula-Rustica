@@ -51,6 +51,15 @@ test('a disabled or deleted suggestion reactivates once without duplicates', () 
   assert.equal(first.status,'open');
 });
 
+test('an enabled catalog suggestion can be disabled by Record and key', () => {
+  const rule={frequency:'daily',mode:'fixed_schedule',interval:1,seriesId:'eggs',enabled:true};
+  const list=[{id:'eggs-task',recordId:'hens',suggestionKey:'laying-collect-eggs',dueDate:'2026-09-04',recurrenceRule:rule,deletedAt:null,completed:false,status:'open'}];
+  const disabled=tasks.disableSuggestedTask(list,'hens','laying-collect-eggs','2026-09-04T12:00:00Z');
+  assert.equal(disabled.id,'eggs-task');
+  assert.equal(disabled.recurrenceRule.enabled,false);
+  assert.equal(tasks.suggestionEnabled(list,'hens','laying-collect-eggs'),false);
+});
+
 test('missing and previously deleted built-in suggestions are available as Disabled without creating work', () => {
   const record={id:'hens',type:'Animal',identity:{purpose:'Eggs'}};
   const suggestion=tasks.suggestedTasks(record).find(item=>item.key==='laying-collect-eggs');
