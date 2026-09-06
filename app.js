@@ -806,13 +806,14 @@ function openTaskYield(task) {
   const yieldType = task.yieldType;
   const defaults = window.RegulaRusticaHousekeeping.yieldDefaultsForTask(task, data.choreWindows);
   const workDate = defaults.date || today();
-  openModal('yield', null, task.recordId, yieldType, workDate);
-  yieldCompletionTaskId = task.id;
-  $('#modalTitle').textContent = `Record ${window.RegulaRusticaTasks.YIELD_TYPES[yieldType]?.label || 'Yield'} & complete Task`;
-  $('#modalSubmit').textContent = 'Record Yield & Complete';
+  const yieldLabel = window.RegulaRusticaTasks.YIELD_TYPES[yieldType]?.label || 'Yield';
+  openModal('yield', null, task.recordId, yieldType, workDate, task);
+  $('#modalTitle').textContent = `How much ${yieldLabel.toLowerCase()}?`;
+  $('#modalSubtitle').textContent = `${recordName(task.recordId)} · ${task.title}`;
+  $('#modalSubtitle').classList.remove('hidden');
+  $('#modalSubmit').textContent = 'Save Yield & Complete';
+  $('#modalCompleteWithoutYield').textContent = 'Complete only';
   $('#modalCompleteWithoutYield').classList.remove('hidden');
-  $('#modalFields [name=occurredAt]').value = `${workDate}T${defaults.time || '12:00'}`;
-  if (defaults.session) $('#modalFields [name=session]').value = defaults.session;
 }
 
 function openTaskReopen(task, linkedYields) {
@@ -824,6 +825,8 @@ function openTaskReopen(task, linkedYields) {
   $('#modalTitle').textContent = 'Reopen completed Task?';
   $('#modalFields').innerHTML = `<p>This Task has ${count} linked Yield record${count === 1 ? '' : 's'}. Choose whether to keep or delete ${count === 1 ? 'it' : 'them'}.</p>`;
   $('#modalDelete').classList.add('hidden');
+  $('#modalForm').classList.remove('yield-task-completion');
+  $('#modalCancel').classList.remove('hidden');
   $('#modalCompleteWithoutYield').textContent = `Reopen and delete ${count === 1 ? 'Yield' : `${count} Yield records`}`;
   $('#modalCompleteWithoutYield').classList.remove('hidden');
   $('#modalSubmit').textContent = 'Reopen task only';
@@ -1955,8 +1958,8 @@ function appendRecordFields(root, record, type) {
   }
 }
 
-function openModal(nextMode, id = null, recordId = null, defaultType = '', defaultDate = null) {
-  yieldCompletionTaskId = null;
+function openModal(nextMode, id = null, recordId = null, defaultType = '', defaultDate = null, completionTask = null) {
+  yieldCompletionTaskId = completionTask?.id || null;
   modalMode = nextMode;
   editId = id;
   contextRecordId = recordId || null;
@@ -1969,8 +1972,10 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   $('#modalSubtitle').textContent = subtitles[nextMode] || '';
   $('#modalSubtitle').classList.toggle('hidden', !subtitles[nextMode]);
   $('#modalForm').dataset.formMode = nextMode;
-  $('#modalForm').classList.toggle('form-modal-long', ['task', 'record', 'yield', 'ledger'].includes(nextMode));
+  $('#modalForm').classList.toggle('form-modal-long', ['task', 'record', 'yield', 'ledger'].includes(nextMode) && !completionTask);
+  $('#modalForm').classList.toggle('yield-task-completion', Boolean(completionTask));
   $('#modalDelete').classList.toggle('hidden', !(id && ['calendar', 'yield'].includes(nextMode)));
+  $('#modalCancel').classList.toggle('hidden', Boolean(completionTask));
   $('#modalCompleteWithoutYield').classList.add('hidden');
   $('#modalCompleteWithoutYield').textContent = 'Complete without recording Yield';
   $('#modalSubmit').textContent = 'Save';
@@ -2138,32 +2143,78 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   if (nextMode === 'yield') {
     const entry = data.yieldEntries.find(item => item.id === id) || {};
     const type = entry.type || defaultType || 'milk';
-    root.append(formSection('Yield'));
-    const typeField = field('Yield type', 'yieldTypeDisplay', 'select', type, [type]);
-    typeField.querySelector('select').disabled = true;
-    root.append(typeField);
-    const typeInput = document.createElement('input');
-    typeInput.type = 'hidden';
-    typeInput.name = 'yieldType';
-    typeInput.value = type;
-    root.append(typeInput);
     const yieldConfig=window.RegulaRusticaTasks.YIELD_TYPES[type];
-    if (yieldConfig.productRequired) root.append(field('Crop or product', 'product', 'text', entry.product));
-    root.append(formRow(
-      field('Quantity', 'quantity', 'number', entry.quantity),
-      field('Unit', 'unit', 'select', entry.unit || yieldConfig.defaultUnit, yieldConfig.units)
-    ));
-    root.append(field('Loss or unusable amount', 'unusableQuantity', 'number', entry.unusableQuantity || 0));
-    root.append(formSection('When'));
     const defaultSession = type === 'milk' ? (new Date().getHours() < 15 ? 'morning' : 'evening') : 'other';
-    root.append(formRow(
-      field('Date and time', 'occurredAt', 'datetime-local', localDateTime(entry.occurredAt || new Date())),
-      field('Session', 'session', 'select', entry.session || defaultSession, ['morning', 'evening', 'other'])
-    ));
-    root.append(formSection('Related To'));
-    addYieldRecordSelect(root, type, recordId || entry.recordId);
-    root.append(formSection('Notes'));
-    root.append(field('Notes (optional)', 'details', 'textarea', entry.details));
+    if (completionTask) {
+      const defaults = window.RegulaRusticaHousekeeping.yieldDefaultsForTask(completionTask, data.choreWindows);
+      const workDate = defaults.date || defaultDate || today();
+      const workTime = defaults.time || '12:00';
+      const session = defaults.session || defaultSession;
+      const yieldLabel = yieldConfig?.label || 'Yield';
+      const recordLabel = recordName(completionTask.recordId);
+      const dateLabel = workDate === today() ? 'Today' : formatDate(workDate);
+      const context = document.createElement('div');
+      context.className = 'yield-completion-context';
+      const summary = document.createElement('div');
+      summary.innerHTML = `<strong>${escapeHtml(dateLabel)} at ${escapeHtml(window.RegulaRusticaTasks.formatClockTime(workTime))}</strong><span>${escapeHtml(yieldLabel)} · ${escapeHtml(recordLabel)} · ${escapeHtml(session)}</span>`;
+      const editTask = document.createElement('button');
+      editTask.type = 'button';
+      editTask.className = 'btn ghost yield-completion-edit';
+      editTask.textContent = 'Edit task';
+      editTask.addEventListener('click', () => { $('#modal').close(); openModal('task', completionTask.id); });
+      context.append(summary, editTask);
+      root.append(context);
+      if (yieldConfig.productRequired) root.append(field('Crop or product', 'product', 'text', entry.product));
+      root.append(formRow(
+        field('Quantity', 'quantity', 'number', entry.quantity),
+        field('Unit', 'unit', 'select', entry.unit || yieldConfig.defaultUnit, yieldConfig.units)
+      ));
+      const more = document.createElement('details');
+      more.className = 'yield-completion-details';
+      const moreSummary = document.createElement('summary');
+      moreSummary.textContent = 'More yield details';
+      const optional = document.createElement('div');
+      optional.className = 'form-grid yield-completion-optional';
+      optional.append(
+        field('Loss or unusable amount', 'unusableQuantity', 'number', entry.unusableQuantity || 0),
+        field('Notes (optional)', 'details', 'textarea', entry.details)
+      );
+      more.append(moreSummary, optional);
+      root.append(more);
+      [
+        ['yieldType', type],
+        ['occurredAt', `${workDate}T${workTime}`],
+        ['session', session],
+        ['recordId', completionTask.recordId]
+      ].forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = name; input.value = value;
+        root.append(input);
+      });
+    } else {
+      root.append(formSection('Yield'));
+      const typeField = field('Yield type', 'yieldTypeDisplay', 'select', type, [type]);
+      typeField.querySelector('select').disabled = true;
+      root.append(typeField);
+      const typeInput = document.createElement('input');
+      typeInput.type = 'hidden'; typeInput.name = 'yieldType'; typeInput.value = type;
+      root.append(typeInput);
+      if (yieldConfig.productRequired) root.append(field('Crop or product', 'product', 'text', entry.product));
+      root.append(formRow(
+        field('Quantity', 'quantity', 'number', entry.quantity),
+        field('Unit', 'unit', 'select', entry.unit || yieldConfig.defaultUnit, yieldConfig.units)
+      ));
+      root.append(field('Loss or unusable amount', 'unusableQuantity', 'number', entry.unusableQuantity || 0));
+      root.append(formSection('When'));
+      root.append(formRow(
+        field('Date and time', 'occurredAt', 'datetime-local', localDateTime(entry.occurredAt || new Date())),
+        field('Session', 'session', 'select', entry.session || defaultSession, ['morning', 'evening', 'other'])
+      ));
+      root.append(formSection('Related To'));
+      addYieldRecordSelect(root, type, recordId || entry.recordId);
+      root.append(formSection('Notes'));
+      root.append(field('Notes (optional)', 'details', 'textarea', entry.details));
+    }
   }
   if (nextMode === 'record') {
     const record = data.records.find(item => item.id === id) || { type: defaultType || 'Animal', name: '', status: 'Active', identity: {}, stewardship: {} };

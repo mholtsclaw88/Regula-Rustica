@@ -224,6 +224,18 @@ test('Today reuses Task completion and Yield-linked Task presentation paths', as
   assert.match(app, /matchingYieldForTask\(data\.yieldEntries, task\)/);
 });
 
+test('Yield-linked Task completion uses the compact Yield-only editor', async () => {
+  const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
+  assert.match(app, /openModal\('yield', null, task\.recordId, yieldType, workDate, task\)/);
+  assert.match(app, /How much \$\{yieldLabel\.toLowerCase\(\)\}\?/);
+  assert.match(app, /moreSummary\.textContent = 'More yield details'/);
+  assert.match(app, /editTask\.addEventListener\('click', \(\) => \{ \$\('#modal'\)\.close\(\); openModal\('task', completionTask\.id\); \}\)/);
+  assert.match(app, /\['recordId', completionTask\.recordId\]/);
+  assert.match(app, /\$\('#modalCompleteWithoutYield'\)\.textContent = 'Complete only'/);
+  assert.match(app, /\$\('#modalSubmit'\)\.textContent = 'Save Yield & Complete'/);
+  assert.match(app, /else \{[\s\S]*root\.append\(formSection\('When'\)\)[\s\S]*addYieldRecordSelect\(root, type, recordId \|\| entry\.recordId\)/);
+});
+
 test('header sync status derives all five states and links to existing Cloud settings', async () => {
   const [html, runtime] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
