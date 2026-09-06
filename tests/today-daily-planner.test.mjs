@@ -45,7 +45,35 @@ test('Chore Windows and timed Events form one chronological schedule', () => {
   assert.deepEqual(projection.schedule.map(item => item.type === 'window' ? item.window.name : item.event.title), [
     'Morning Chores', 'Mass', 'Midday Check', 'Soccer', 'Evening Chores'
   ]);
-  assert.equal(projection.nextId, 'window:midday');
+  assert.equal(projection.nextId, 'event:Soccer');
+  assert.equal(projection.currentId, 'event:Mass');
+  assert.deepEqual(projection.pastIds, ['window:morning']);
+});
+
+test('Today progress and current/next state use completed work and deterministic time', () => {
+  const taskList = [
+    task('morning-done', { choreWindowId: 'morning', dueDate: workDate, completed: true, status: 'completed' }),
+    task('evening-open', { choreWindowId: 'evening', dueDate: workDate })
+  ];
+  const beforeEvening = housekeeping.dailyPlannerProjection({ workDate, now: new Date(2026, 7, 30, 17, 30), choreWindows: windows, tasks: taskList, includeCompleted: true });
+  assert.equal(beforeEvening.windowItems.find(item => item.window.id === 'morning').completed, 1);
+  assert.equal(beforeEvening.nextId, 'window:evening');
+  assert.ok(beforeEvening.pastIds.includes('window:morning'));
+  const duringEvening = housekeeping.dailyPlannerProjection({ workDate, now: new Date(2026, 7, 30, 18, 30), choreWindows: windows, tasks: taskList, includeCompleted: true });
+  assert.equal(duringEvening.currentId, 'window:evening');
+  assert.equal(duringEvening.nextId, null);
+});
+
+test('Today next state ignores empty Chore Windows', () => {
+  const projection = housekeeping.dailyPlannerProjection({ workDate, now, choreWindows: windows, tasks: [] });
+  assert.equal(projection.currentId, null);
+  assert.equal(projection.nextId, null);
+});
+
+test('Today next state ignores a fully completed upcoming Chore Window', () => {
+  const completed = task('evening-done', { choreWindowId: 'evening', dueDate: workDate, completed: true, status: 'completed' });
+  const projection = housekeeping.dailyPlannerProjection({ workDate, now: new Date(2026, 7, 30, 17, 30), choreWindows: windows, tasks: [completed], includeCompleted: true });
+  assert.equal(projection.nextId, null);
 });
 
 test('Chore Window Tasks never duplicate under Other Work and general work is priority sorted', () => {
@@ -58,6 +86,15 @@ test('Chore Window Tasks never duplicate under Other Work and general work is pr
   const projection = housekeeping.dailyPlannerProjection({ workDate, now, choreWindows: windows, tasks: taskList });
   assert.deepEqual(projection.otherWork.map(item => item.id), ['urgent', 'low']);
   assert.equal(projection.windowItems.find(item => item.window.id === 'midday').tasks[0].id, 'window-task');
+});
+
+test('Today retains completed work from today without showing completed historical work', () => {
+  const taskList = [
+    task('today-done', { dueDate: workDate, completed: true, status: 'completed' }),
+    task('old-done', { dueDate: '2026-08-20', completed: true, status: 'completed' })
+  ];
+  const projection = housekeeping.dailyPlannerProjection({ workDate, now, choreWindows: windows, tasks: taskList, includeCompleted: true });
+  assert.deepEqual(projection.otherWork.map(item => item.id), ['today-done']);
 });
 
 test('undated Chore Window work appears today without repeating across other dates', () => {
@@ -81,6 +118,17 @@ test('Needs Attention deduplicates presentation without modifying recurrence his
   assert.equal(projection.needsAttention.length, 2);
   assert.equal(projection.needsAttention.find(group => group.task.title === 'Morning Milking').count, 2);
   assert.deepEqual(taskList, before);
+});
+
+test('Needs Attention excludes skipped, deleted, and disabled recurring history', () => {
+  const taskList = [
+    task('actionable', { dueDate: '2026-08-29' }),
+    task('skipped', { dueDate: '2026-08-28', status: 'skipped', deletedAt: '2026-08-28T12:00:00Z' }),
+    task('deleted-series', { dueDate: '2026-08-27', recurrenceRule: { frequency: 'daily', seriesDeleted: true } }),
+    task('disabled-series', { dueDate: '2026-08-26', recurrenceRule: { frequency: 'daily', enabled: false } })
+  ];
+  const projection = housekeeping.dailyPlannerProjection({ workDate, now, choreWindows: windows, tasks: taskList });
+  assert.deepEqual(projection.needsAttention.map(group => group.task.id), ['actionable']);
 });
 
 test('all-day Events stay above the timeline and are not duplicated', () => {
@@ -109,7 +157,7 @@ test('empty days and multiple custom Chore Windows remain valid projections', ()
   assert.deepEqual(empty.otherWork, []);
   assert.deepEqual(empty.needsAttention, []);
   const custom = housekeeping.dailyPlannerProjection({ workDate, now: new Date(2026, 7, 30, 12, 30), choreWindows: windows, tasks: [] });
-  assert.equal(custom.currentId, 'window:midday');
+  assert.equal(custom.currentId, null);
   assert.deepEqual(custom.windowItems.map(item => item.window.id), ['morning', 'midday', 'evening']);
 });
 
@@ -170,7 +218,8 @@ test('Week and Month cells share selected-date Day navigation without event dots
 
 test('Today reuses Task completion and Yield-linked Task presentation paths', async () => {
   const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
-  assert.match(app, /item\.tasks[\s\S]*taskRow\(task\)/);
+  assert.match(app, /item\.tasks[\s\S]*calendarCompactTaskRow\(task\)/);
+  assert.match(app, /calendar-task-meta/);
   assert.match(app, /shared-task-check[\s\S]*openTaskYield\(task\)/);
   assert.match(app, /matchingYieldForTask\(data\.yieldEntries, task\)/);
 });

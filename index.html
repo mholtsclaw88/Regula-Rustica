@@ -9,17 +9,17 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=today-daily-planner-v2">
-  <link rel="stylesheet" href="housekeeping.css?v=calendar-almanac-v4">
+  <link rel="stylesheet" href="housekeeping.css?v=today-operational-v4">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=calendar-almanac-v3" defer></script>
+  <script src="housekeeping-data.js?v=today-operational-v4" defer></script>
   <script src="task-foundation.js?v=record-lifecycle-v1" defer></script>
   <script src="record-documents.js?v=local-attachments-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=calendar-almanac-v4" defer></script>
+  <script src="app.js?v=today-operational-v4" defer></script>
   <script src="ui-refinements.js?v=yield-ledger-ui-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
@@ -60,10 +60,8 @@
       <aside class="card today-glance" aria-labelledby="todayGlanceTitle">
         <span class="label" id="todayGlanceTitle">Today at a Glance</span>
         <div class="today-status-strip">
-          <div id="todayFirstWindow"><span id="todayFirstWindowName">Chores</span><strong id="todayFirstWindowProgress">0 of 0 complete</strong></div>
-          <div><span id="todayNextLabel">Next up</span><strong id="todayNextUp">Nothing scheduled</strong><small id="todayNextUpDetail"></small></div>
-          <div id="todayLastWindow"><span id="todayLastWindowName">Chores</span><strong id="todayLastWindowProgress">0 of 0 complete</strong></div>
-          <div><span>Today</span><strong id="todayTotals">A quiet day</strong><small id="todayEventTotal"></small></div>
+          <div><span>Today's necessary rhythm</span><strong id="todayChoreProgress">No chores scheduled</strong><small id="todayTotals">A quiet day</small></div>
+          <div><span id="todayNextLabel">Next</span><strong id="todayNextUp">Nothing scheduled</strong><small id="todayNextUpDetail"></small></div>
         </div>
       </aside>
       <section class="today-all-day hidden" id="todayAllDaySection" aria-labelledby="todayAllDayTitle">
@@ -71,7 +69,7 @@
         <div id="todayAllDayEvents" class="today-all-day-events"></div>
       </section>
       <section class="today-schedule" aria-labelledby="todayScheduleTitle">
-        <div class="today-section-heading"><span class="label">Daily ledger</span><h3 id="todayScheduleTitle">Today's Schedule</h3></div>
+        <div class="today-section-heading"><span class="label">Horarium</span><h3 id="todayScheduleTitle">Today's Schedule</h3></div>
         <div id="todayTimeline" class="today-timeline"></div>
         <p id="todayScheduleEmpty" class="empty card">No Chore Windows or timed Events today.</p>
       </section>
@@ -81,7 +79,7 @@
           <span class="today-section-summary"><span id="todayTaskCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
         </summary>
         <div class="daily-section-body">
-          <div id="todayTasks" class="stack"></div>
+          <div id="todayTasks" class="calendar-ledger-tasks"></div>
           <p id="todayEmpty" class="empty">No other work needs attention today.</p>
         </div>
       </details>
@@ -91,7 +89,7 @@
           <span class="today-section-summary"><span id="todayAttentionCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
         </summary>
         <div class="daily-section-body">
-          <div id="todayAttention" class="stack"></div><p id="todayAttentionEmpty" class="empty">Nothing overdue.</p>
+          <div id="todayAttention" class="calendar-ledger-tasks"></div><p id="todayAttentionEmpty" class="empty">Nothing overdue.</p>
           <p class="muted hidden" id="todayAttentionHistoryNote">Earlier recurring occurrences remain available in Tasks history.</p>
         </div>
       </details>
