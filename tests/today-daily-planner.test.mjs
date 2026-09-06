@@ -161,6 +161,9 @@ test('Week and Month cells share selected-date Day navigation without event dots
   assert.match(app, /renderCalendarMonth[\s\S]*cell\.addEventListener\('click', \(\) => openCalendarDay\(date\)\)/);
   assert.match(app, /calendarView = input\.value; renderCalendar\(\)/);
   assert.match(app, /let calendarMonth = new Date\(\);/);
+  assert.match(app, /No other work for this day\./);
+  assert.match(app, /<em>other work<\/em>/);
+  assert.match(app, /calendar-other-summary[\s\S]*projection\.otherWorkCount/);
   assert.doesNotMatch(app, /eventdot|event-dot/);
   assert.match(css, /\.calendar-month-day\.workload-5/);
 });

@@ -1557,7 +1557,8 @@ function renderCalendarDay(root, anchor) {
   }
   const timeline = document.createElement('div');
   timeline.className = 'calendar-ledger-timeline';
-  projection.schedule.filter(item => item.type === 'event' || item.tasks.length).forEach(item => {
+  const scheduledItems = projection.schedule.filter(item => item.type === 'event' || item.tasks.length);
+  scheduledItems.forEach(item => {
     if (item.type === 'event') {
       timeline.append(calendarEventCard(item.event));
       return;
@@ -1568,15 +1569,14 @@ function renderCalendarDay(root, anchor) {
     item.tasks.forEach(task => group.querySelector('.calendar-ledger-tasks').append(calendarCompactTaskRow(task)));
     timeline.append(group);
   });
+  if (!scheduledItems.length) timeline.innerHTML = '<p class="calendar-empty-inline">No Chore Windows or timed Events for this day.</p>';
   root.append(timeline);
-  if (projection.otherWork.length) {
-    const other = document.createElement('section');
-    other.className = 'calendar-ledger-other';
-    other.innerHTML = `<header><h4>Other Work</h4><span>${projection.otherWork.length} ${projection.otherWork.length === 1 ? 'task' : 'tasks'}</span></header><div class="calendar-ledger-tasks"></div>`;
-    projection.otherWork.forEach(task => other.querySelector('.calendar-ledger-tasks').append(calendarCompactTaskRow(task)));
-    root.append(other);
-  }
-  if (!projection.choreCount && !projection.otherWorkCount && !projection.eventCount) root.innerHTML = '<p class="calendar-empty">Nothing scheduled for this day.</p>';
+  const other = document.createElement('section');
+  other.className = 'calendar-ledger-other';
+  other.innerHTML = `<header><h4>Other Work</h4><span>${projection.otherWork.length} ${projection.otherWork.length === 1 ? 'task' : 'tasks'}</span></header><div class="calendar-ledger-tasks"></div>`;
+  projection.otherWork.forEach(task => other.querySelector('.calendar-ledger-tasks').append(calendarCompactTaskRow(task)));
+  if (!projection.otherWork.length) other.querySelector('.calendar-ledger-tasks').innerHTML = '<p class="calendar-empty-inline">No other work for this day.</p>';
+  root.append(other);
 }
 
 function renderCalendarWeek(root, start) {
@@ -1596,8 +1596,7 @@ function renderCalendarWeek(root, start) {
     const items = cell.querySelector('.calendar-summary-items');
     projection.windowItems.filter(item => item.tasks.length).forEach(item => items.insertAdjacentHTML('beforeend', `<span class="calendar-window-summary"><strong>${escapeHtml(item.window.name)}</strong><small>${item.tasks.length} ${item.tasks.length === 1 ? 'chore' : 'chores'}</small></span>`));
     [...projection.allDayEvents, ...projection.schedule.filter(item => item.type === 'event').map(item => item.event)].forEach(event => items.insertAdjacentHTML('beforeend', `<span class="calendar-event-summary"><strong>${escapeHtml(event.title)}</strong><small>${event.allDay || !event.startTime ? 'All day' : escapeHtml(calendarEventTime(event))}</small></span>`));
-    if (projection.otherWorkCount) items.insertAdjacentHTML('beforeend', `<span class="calendar-other-summary"><strong>Other Work</strong><small>${projection.otherWorkCount} ${projection.otherWorkCount === 1 ? 'task' : 'tasks'}</small></span>`);
-    if (!items.children.length) items.innerHTML = '<small class="calendar-quiet-day">Open day</small>';
+    items.insertAdjacentHTML('beforeend', `<span class="calendar-other-summary"><strong>Other Work</strong><small>${projection.otherWorkCount} ${projection.otherWorkCount === 1 ? 'task' : 'tasks'}</small></span>`);
     cell.addEventListener('click', () => openCalendarDay(date));
     grid.append(cell);
   }
@@ -1615,7 +1614,7 @@ function renderCalendarMonth(root, anchor, start) {
     cell.type = 'button';
     cell.className = `calendar-month-day workload-${projection.workloadLevel}${date.getMonth() !== anchor.getMonth() ? ' outside' : ''}${dateKey === today() ? ' current' : ''}`;
     cell.setAttribute('aria-label', `Open ${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}: ${projection.choreCount} chores, ${projection.otherWorkCount} other tasks, ${projection.eventCount} events`);
-    cell.innerHTML = `<span class="calendar-summary-date">${date.getDate()}</span><span class="calendar-month-counts"><span>${projection.choreCount} <em>chore${projection.choreCount === 1 ? '' : 's'}</em></span><span>${projection.otherWorkCount} <em>other</em></span><span>${projection.eventCount} <em>event${projection.eventCount === 1 ? '' : 's'}</em></span></span>`;
+    cell.innerHTML = `<span class="calendar-summary-date">${date.getDate()}</span><span class="calendar-month-counts"><span>${projection.choreCount} <em>chore${projection.choreCount === 1 ? '' : 's'}</em></span><span>${projection.otherWorkCount} <em>other work</em></span><span>${projection.eventCount} <em>event${projection.eventCount === 1 ? '' : 's'}</em></span></span>`;
     cell.addEventListener('click', () => openCalendarDay(date));
     root.append(cell);
   }
