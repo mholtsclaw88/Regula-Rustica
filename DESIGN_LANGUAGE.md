@@ -1,337 +1,317 @@
 # Regula Rustica Design Language
 
-**Version:** 1.0  
-**Status:** Adopted
+**Version:** 2.0  
+**Status:** Adopted governing design standard
 
 ## Purpose
 
-The design language defines how Regula Rustica should feel in daily use.
+Regula Rustica should feel calm, durable, purposeful, and at home in daily stewardship.
 
-The application should feel calm, dependable, and purposeful. It should support stewardship by reducing friction rather than demanding attention.
-
-Every screen should help the user complete meaningful work and return to the Homestead quickly.
+The visual metaphor is a **modern farm ledger or almanac**: orderly enough to preserve years of useful information, quick enough to use with dirty boots and one hand on a phone, and restrained enough that the software never becomes the center of attention.
 
 ## I. Design Philosophy
 
-Regula Rustica is a tool for daily stewardship.
+Regula Rustica is a tool for stewardship.
 
-It is not social media.
+It is not social media, enterprise software, a game, or a generic productivity dashboard.
 
-It is not enterprise software.
+Every screen should help the user remember, decide, act, or understand—and then return to the Homestead.
 
-It is not a game.
+## II. Simplicity with Depth
 
-The interface should disappear into the work being done.
+The application may be robust without appearing complicated.
 
-## II. Simplicity
+Common workflows should remain obvious. Advanced information should appear through progressive disclosure rather than crowding the default view.
 
-Every feature should earn its place.
+When capability and simplicity conflict, first ask whether the complexity can be hidden until it is needed.
 
-When choosing between additional options and a simpler workflow, favor the simpler workflow unless meaningful capability would be lost.
+## III. Mobile First
 
-Complexity should remain hidden until it becomes necessary.
+Phone use is the primary design constraint.
 
-## III. Calm Interface
+Major workflows should be comfortable around 360–390px and usable with one hand where practical. Desktop may use additional space but should not establish a separate visual language.
 
-The application should avoid visual noise.
+## IV. Common Work Quickly
 
-Use:
+Whenever practical, common actions should require no more than about three deliberate interactions.
 
-- Generous spacing
-- Restrained color
-- Readable typography
-- Meaningful icons
-- Minimal animation
+Examples:
 
-The interface should communicate confidence rather than urgency.
+- complete a Task;
+- record milk or eggs;
+- enter an expense;
+- find a Record;
+- add an observation.
 
-## IV. Mobile First
+This is a guideline, not permission to remove necessary clarity or confirmation from consequential actions.
 
-Regula Rustica is designed primarily for use on a phone.
+## V. Plain Stewardship Language
 
-Every major feature should be comfortable to use with one hand.
-
-Desktop layouts may enhance the experience but should not become the primary design target.
-
-## V. Common Work in Three Interactions
-
-Whenever practical, a common action should require no more than three deliberate interactions.
-
-Examples include:
-
-- Record milk
-- Complete a task
-- Record an expense
-- Find an animal
-
-If a common workflow exceeds this guideline, it should be reviewed for unnecessary friction.
-
-This is a design goal rather than an absolute rule. Clarity and safety take precedence when an action has significant consequences.
-
-## VI. Plain Language
-
-Use familiar stewardship language rather than technical terminology.
-
-Prefer:
+Prefer familiar terms:
 
 - Homestead
 - Record
-- Chronicle
 - Task
-- Steward
+- Journal
+- Yield
+- Ledger
+- Chore Window
+- Other Work
 - What happened?
 
-Avoid exposing database, synchronization, or implementation terminology during ordinary use.
+Do not expose database, synchronization, tombstone, projection, or implementation terminology in ordinary use.
 
-Users should understand the interface without reading technical documentation.
+## VI. Visual Character
 
-## VII. Consistency
+The application should draw from paper, ink, wood, brass, fields, and durable agricultural ledgers without becoming decorative nostalgia.
 
-Every record type should behave similarly.
+Core semantics:
 
-Users should not need to learn different interfaces for Animals, Land, Equipment, Structures, or Works.
+- **Forest green** — structure, orientation, primary navigation, active framing
+- **Parchment / warm cream** — working surface
+- **Brass / restrained gold** — boundaries, selection, Events, useful ornament
+- **Dark ink** — primary content
+- **Muted sepia/earth** — metadata and secondary context
+- **Muted warning tones** — genuine attention states
 
-Consistency is more valuable than perfect optimization for each individual record type.
+Color should communicate hierarchy, not decorate every object.
 
-## VIII. Progressive Disclosure
+Color must never be the only indicator of state.
 
-Show only what is needed for the current decision or action.
+## VII. Typography
 
-Reveal additional information only when requested or when the context requires it.
+Use restrained serif typography for identity, headings, and ledger character. Use highly readable system/sans-serif typography where it improves dense metadata, forms, controls, and operational information.
+
+Hierarchy should come from weight, spacing, grouping, and modest size changes—not giant dashboard typography.
+
+## VIII. Compact Ledger Rows
+
+Operational lists should favor compact ledger rows over large cards.
+
+A collapsed Task row generally shows:
+
+- checkbox;
+- Task title;
+- one useful quiet context line;
+- disclosure caret when more detail is available.
+
+Do not repeat context already obvious from the surrounding section. For example, a Task nested under Evening does not need `Evening` repeated in every collapsed row.
+
+Expanded detail may reveal recurrence, Record, assignee, Yield, due state, Chore Window, and actions.
+
+## IX. Progressive Disclosure
+
+Show the minimum information necessary for the current decision.
 
 Examples:
 
-- Show basic record fields first
-- Keep advanced settings collapsed
-- Offer filters and sorting without crowding the default view
-- Reveal type-specific fields after the record type is selected
+- compact Task row → expand for details;
+- simple Record summary → edit for deeper fields;
+- Needs Attention → collapsed until needed;
+- advanced cloud diagnostics → available in Settings, not ordinary Today use.
 
-This keeps the interface approachable while preserving useful depth.
+Progressive disclosure is the primary way Regula Rustica remains simple as capability grows.
 
-## IX. Respect for Attention
+## X. Time and Human Rhythm
 
-The application should interrupt users only when necessary.
+Do not force homestead work into an office calendar model.
+
+- Calendar Events may have times.
+- Chore Windows have start/end times.
+- Ordinary Tasks generally do not need individual times.
+- Tasks associated with a Chore Window inherit that period's place in the day.
+- Date-scheduled Tasks without a Chore Window remain visible as **Other Work**.
+
+Chore Windows are structural periods of recurring care, not appointments.
+
+## XI. Today and Calendar
+
+These views share components but have different jobs.
+
+### Today — operate
+
+Today answers: **Where are we in the day, and what needs to happen next?**
+
+It may emphasize progress, completed/past work, current/next Chore Window or Event, Other Work, and restrained overdue attention.
+
+### Calendar Day — inspect
+
+Day answers: **What belongs on this date?**
+
+It presents Chore Windows, Events, and Other Work in a detailed daily ledger.
+
+### Calendar Week — plan
+
+Week summarizes enough Chore Window work, Events, and Other Work to understand the near-term plan without rendering seven full Day views.
+
+### Calendar Month — orient
+
+Month emphasizes overall workload and date selection. Detail decreases as the time horizon expands.
+
+A useful governing rule is:
+
+> **Detail decreases as the time horizon expands.**
+
+Week and Month day selections should naturally drill into Day rather than create parallel navigation systems.
+
+## XII. Information Density
+
+Do not confuse simplicity with emptiness.
+
+Regula Rustica may show meaningful operational density when it is well organized. Prefer compact rows, strong grouping, quiet metadata, and clear hierarchy over oversized cards and excessive whitespace.
+
+The user should be able to scan a real working day without excessive scrolling.
+
+## XIII. Calm Attention
+
+Protect attention.
 
 Avoid:
 
-- Unnecessary notifications
-- Excessive confirmations
-- Decorative pop-ups
-- Urgency language for ordinary work
-- Badges that exist only to attract attention
+- unnecessary notifications;
+- gamification;
+- celebratory confetti for ordinary work;
+- badges designed merely to attract attention;
+- urgency language for routine chores;
+- modal confirmations for harmless reversible actions.
 
-Attention is a limited resource and should be treated accordingly.
+Overdue work should be available without allowing historical recurrence debt to dominate today's legitimate work.
 
-## X. Feedback and Confirmation
+## XIV. Feedback and Consequence
 
-The application should provide quiet, immediate feedback when work is saved, synchronized, completed, or cannot be completed.
+Routine successful actions should provide quiet immediate feedback.
 
-Routine successful actions should use brief confirmation rather than modal interruptions.
-
-Routine work should follow the Homestead's daily rhythm. Today groups dated
-occurrences under calm Chore Window headings; completed windows collapse instead
-of competing for attention. Chore Windows are never styled as appointments.
-
-Consequential actions should use clear confirmation proportional to their risk.
+Consequential actions deserve proportional confirmation.
 
 Examples:
 
-- Completing an ordinary task should be immediate
-- Deleting a record should require confirmation
-- Removing the final Steward should be prohibited
-- Replacing Homestead data during restore should require explicit confirmation
+- complete Task → immediate;
+- disable recurring series → clear but reversible;
+- delete ordinary Task → confirmation when warranted;
+- delete Record or destructive restore/reset → explicit confirmation;
+- remove final Steward → prohibited.
 
-## XI. Navigation
+## XV. Navigation
 
-Primary navigation should remain short, stable, and predictable.
+Navigation should remain short, stable, and predictable.
 
-The first-release foundation uses:
+Primary mobile destinations currently center on:
 
-- Today
 - Records
 - Tasks
+- Yield
 - Ledger
-- Settings
+- Calendar
 
-New top-level destinations should be added only when they represent a distinct and frequently used mode of work.
+Today/Home and Settings remain readily available from the application header/navigation structure.
 
-The application should preserve context when a user opens a record and returns to the prior list.
+Do not add a top-level destination merely because a data type exists.
 
-## XII. Lists, Filtering, and Sorting
+Preserve selected date/list/Record context when practical.
 
-List-based screens should remain easy to scan before filters are applied.
+## XVI. Records
 
-Filtering and sorting should be available where they meaningfully reduce effort, especially for Records, Tasks, Ledger entries, and Chronicle activity.
+Animals, Land, Equipment, Structures, and Works should feel like variations of one application.
 
-The default view should remain useful without configuration.
+Type-specific fields and Suggested Tasks may adapt to context, but navigation, forms, history, Task behavior, and visual hierarchy should remain familiar.
 
-Prefer:
-
-- Simple type or status filters
-- One clear sort control
-- Remembered choices when helpful
-- Easy return to the unfiltered view
-
-Avoid complex query builders or enterprise-style filter panels unless practical use proves they are needed.
-
-## XIII. Forms
+## XVII. Forms
 
 Forms should ask stewardship questions rather than database questions.
 
-Prefer:
+Required fields should be the minimum needed for a useful object. Conditional fields should remove irrelevant choices rather than create long branching forms.
 
-- Is this managed individually or as a group?
-- What happened?
-- Did this cost or earn money?
-- When can this work begin?
-- When should it be completed?
+Favor clear selectors and ordinary language over clever controls.
 
-Fields should adapt to context. Selecting Animal may reveal species and purpose; selecting Equipment may reveal make and model.
+## XVIII. Lists, Filtering, and Sorting
 
-Conditional fields should reduce irrelevant choices rather than create long branching forms.
+Default lists should be useful without configuration.
 
-Required fields should be kept to the minimum necessary for a useful record.
+Filtering and sorting should reduce effort, especially in Records, Tasks, Yield, Ledger, and Journal/history.
 
-## XIV. Tasks and Time
-
-Task design should reflect Homestead work rather than office scheduling.
-
-Support distinctions among:
-
-- Work due on a specific date
-- Work that may be done within a date range
-- Recurring work
-- Work with no date yet
-
-The interface should communicate what is available now, approaching its deadline, due today, or overdue without creating unnecessary alarm.
-
-Times of day should remain optional and should not be required for ordinary Homestead tasks.
-
-## XV. Accessibility
-
-The interface should remain usable by people of varying ages, abilities, and technical experience.
-
-Support:
-
-- Readable text sizes
-- Adequate contrast
-- Large touch targets
-- Clear focus states
-- Keyboard navigation where appropriate
-- Labels that do not depend only on color or icons
-- Reduced motion preferences
-
-Accessibility is part of good stewardship, not an optional refinement.
-
-## XVI. Color
-
-Color should support recognition and hierarchy without becoming decorative noise.
-
-The visual foundation may draw from natural materials and the Homestead landscape:
-
-- Deep greens
-- Warm cream and paper tones
-- Restrained earth and gold accents
-- Muted warning colors
-
-Color should never be the only indicator of status, permission, or error.
-
-## XVII. Typography
-
-Typography should feel durable, readable, and quiet.
-
-A restrained serif may be used for identity, headings, or editorial character. Highly readable system or sans-serif type should be used where it improves forms, metadata, and dense operational information.
-
-Typography should preserve hierarchy without relying on excessive size changes or decorative styling.
-
-## XVIII. Icons and Imagery
-
-Icons should clarify actions and record types, not decorate empty space.
-
-Every icon should have a text label when its meaning may not be immediately obvious.
-
-Photos should support identification, condition, progress, and memory.
-
-The application should not depend on stock imagery to create character.
+Avoid enterprise query builders unless practical use proves a real need.
 
 ## XIX. Empty States
 
-Empty states should be useful and calm.
+Empty states should be calm and useful.
 
-They should explain what belongs in the space and provide one appropriate next action.
+Explain what belongs there and offer one appropriate next action when needed.
 
 Prefer:
 
-> No tasks are due. Add the next useful task.
+> No other work for this day.
 
-Avoid celebratory language that turns ordinary stewardship into gamification.
+Avoid gamified congratulations for the absence of work.
 
-## XX. Errors and Recovery
+## XX. Accessibility
+
+Accessibility is part of good stewardship.
+
+Support:
+
+- readable text;
+- adequate contrast;
+- large touch targets;
+- visible focus;
+- keyboard navigation where appropriate;
+- labels that do not depend only on color/icons;
+- reduced motion preferences;
+- responsive layouts without horizontal overflow.
+
+Workload shading or color status must always have a textual/structural counterpart.
+
+## XXI. Errors, Offline State, and Sync
 
 Errors should explain:
 
-1. What could not be completed
-2. Whether the user's data remains safe
-3. What action is available next
+1. what could not be completed;
+2. whether the user's data remains safe;
+3. what action is available next.
 
-Technical details should remain available for diagnostics without being placed in the ordinary user experience.
+Ordinary sync status should be quiet: Synced, Syncing/Waiting, Issue, Offline, or Local Only as appropriate.
 
-Offline or synchronization failures must not imply that locally saved work has been lost when it remains safely queued.
+Detailed queue/retry/conflict diagnostics belong behind a troubleshooting surface.
 
-## XXI. Roles and Permissions
+Never imply that safely stored local work is lost merely because synchronization is delayed.
 
-The roles Steward, Keeper, Hand, and Guest should be presented with plain-language descriptions during invitations and settings.
+## XXII. Roles and Responsibility
 
-Users should not need to memorize a permission matrix.
+Roles such as Steward, Keeper, Hand, and Guest should be explained in plain language. Task assignment to a household person is not the same as granting application access.
 
-Unavailable actions should generally be hidden or clearly explained rather than presented as unexplained failures.
+Unavailable actions should generally be hidden or clearly explained rather than fail mysteriously.
 
-## XXII. The Cellarer
+## XXIII. The Cellarer
 
 The Cellarer should feel like a trusted practical assistant.
 
-The Cellarer should:
+It should be concise, explain recommendations when useful, acknowledge uncertainty, and confirm consequential actions.
 
-- Be concise
-- Explain recommendations when useful
-- Ask when uncertain
-- Avoid pretending certainty
-- Confirm consequential actions
-- Complete routine work without unnecessary conversation
+Recommend before automating. The Cellarer assists the stewardship model; it does not create a parallel one.
 
-The Cellarer exists to help complete work, not to become the center of attention.
+## XXIV. Timelessness
 
-The Cellarer should recommend before it automates.
+Avoid short-lived interface trends.
 
-## XXIII. Timelessness
+Prefer durable typography, natural restrained color, familiar controls, simple layouts, and clear hierarchy.
 
-Regula Rustica should avoid short-lived design trends.
+The application should feel appropriate years from now, not merely fashionable today.
 
-Prefer:
+## XXV. Design Review Questions
 
-- Simple layouts
-- Restrained colors
-- Durable typography
-- Predictable navigation
-- Familiar controls
+Before approving an interface or workflow, ask:
 
-The application should feel as appropriate in ten years as it does today.
-
-## XXIV. Design Review Questions
-
-Before approving a new interface or workflow, ask:
-
-1. Does this help the Steward remember, decide, or act?
-2. Can it be used comfortably on a phone with one hand?
-3. Is the most common path obvious?
-4. Are uncommon options hidden until needed?
+1. Does this help the steward remember, decide, act, or understand?
+2. Can it be used comfortably on a phone?
+3. Is the common path obvious?
+4. Are uncommon details disclosed only when needed?
 5. Does it use plain stewardship language?
-6. Does it behave consistently with the rest of the application?
-7. Does it protect attention and avoid unnecessary urgency?
-8. Can the user recover safely from a mistake?
-9. Is the added complexity justified by real use?
+6. Does it behave like the rest of Regula Rustica?
+7. Does it protect attention?
+8. Can the user recover safely from mistakes?
+9. Does the information density match the screen's purpose?
+10. Is the added complexity justified by real use?
 
-If the answer is unclear, simplify the design or leave the feature in the parking lot until practical experience proves the need.
+If the answer is unclear, simplify or defer.
 
 ## Governing Principle
 
@@ -339,6 +319,10 @@ If the answer is unclear, simplify the design or leave the feature in the parkin
 
 ## Version History
 
+### Version 2.0 — September 2026
+
+Updated the original design language to reflect the mature local-first application, farm-ledger/almanac identity, compact operational rows, Chore Windows, and the distinct Today/Calendar Day/Week/Month information hierarchy.
+
 ### Version 1.0 — August 2026
 
-Initial adopted design language for Regula Rustica.
+Initial adopted design language.
