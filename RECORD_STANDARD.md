@@ -1,505 +1,289 @@
-# Regula Rustica Record Standard
+# Regula Rustica Stewardship and Record Standard
 
-**Version:** 1.0  
-**Status:** Adopted foundation for future development
+**Version:** 2.0  
+**Status:** Governing product standard
 
 ## Purpose
 
-This standard defines how Regula Rustica represents the things entrusted to a household's care.
+This standard defines how Regula Rustica represents the things, work, history, production, and financial stewardship of a Homestead.
 
-The goal is not to model every possible detail of agriculture or homestead life. The goal is to capture useful, actionable information with the least necessary complexity.
+The goal is not to model every possible detail of agriculture. The goal is to preserve useful, actionable information with the least complexity necessary for faithful long-term stewardship.
 
-## Core Model
+## Core Stewardship Model
 
-Regula Rustica uses five core concepts:
+Regula Rustica uses five primary concepts:
 
-1. **Records** describe things that exist and change over time.
-2. **Events** describe what happened to a record.
-3. **Tasks** describe what should happen next.
-4. **Notes** capture enduring knowledge.
-5. **Ledger entries** record financial stewardship.
+1. **Records** — what is entrusted to care.
+2. **Tasks** — what should happen.
+3. **Journal** — what happened and what should be remembered.
+4. **Yield** — what the Homestead produced.
+5. **Ledger** — what was spent or earned.
 
-The application should always prefer plain stewardship language over database language.
+Supporting concepts such as Chore Windows, Calendar Events, People, assignments, Suggested Tasks, photos, documents, and relationships should strengthen these five concepts rather than compete with them.
 
-Examples:
+## Records
 
-- **Record** rather than “Add event”
-- **What happened?** rather than “Choose event type”
-- **Record Expense** rather than “Add ledger entry”
-- **Is this managed individually or as a group?** rather than “Select record schema”
+A Record represents an enduring thing or managed unit the household actually cares for.
 
-## Universal Record Structure
+Current core types:
 
-Every record supports the same foundation:
+- Animal
+- Land
+- Equipment
+- Structure
+- Work
 
-### 1. Identity
+Every Record shares a common foundation:
 
-Answers: **What is this?**
+### Identity — What is this?
 
-May include:
+May include name, type, status, photo, and stable type-specific identifying information.
 
-- Name
-- Record type
-- Status
-- Photo
-- Type-specific identifying fields
+Identity should contain information that is reasonably stable. Dated changes belong in the Journal/history.
 
-Identity should contain information that is reasonably stable. Measurements and dated changes belong in Events.
+### Stewardship — How is this currently being cared for?
 
-### 2. Stewardship
-
-Answers: **How is this currently being cared for or managed?**
-
-May include:
-
-- Current location
-- Responsible household member
-- Current use or purpose
-- Current stage
+May include current location, responsible person, current use/purpose, stage, or condition when those fields change decisions.
 
 Stewardship should remain short and practical.
 
-### 3. Tasks
+### Relationships
 
-Answers: **What needs to happen?**
+Records may be related to other Records when the relationship helps the steward understand or act. Relationships should use stable IDs rather than copied facts.
 
-Tasks may be:
+### Tasks
 
-- Standalone
-- Linked to a record
-- Generated as the next occurrence of a recurring Task series
+A Task created in Record context should retain that Record relationship automatically when appropriate.
 
-A task created from inside a record should automatically link to that record.
+### Journal
 
-A task should contain:
+A Record's history should show meaningful dated activity and documentation without requiring the user to reconstruct it from scattered screens.
 
-- Title
-- Available date, optional
-- Due date, optional
-- Linked record, optional
-- Completion status
-- Priority and supporting details, optional
-- Assignment and recurrence metadata, optional
+### Yield
 
-The available date and due date are independent. When both are present, the due date may not precede the available date.
+Production may be linked to the Record that produced it.
 
-### 4. Record / Events
+### Ledger
 
-The user-facing action is **Record**.
+Financial activity may be linked or allocated to Records without duplicating the underlying transaction.
 
-After selecting it, the app asks:
+### Photos and documents
 
-> What happened?
+Attachments support identification, condition, progress, evidence, and memory. They should live in meaningful Record/Journal context rather than an isolated gallery.
 
-Each record type may define a short list of common events. Every list must include **Other**.
+## Tasks
 
-Events are dated and appear in the Chronicle.
+Tasks describe work that should happen.
 
-Examples:
+A Task may be:
 
-- Milked
-- Moved
-- Repaired
-- Seeded
-- Inspected
-- Completed
-- Other
+- standalone;
+- linked to a Record;
+- linked to multiple Records where the supported workflow requires it;
+- assigned to a Homestead person;
+- due/scheduled on a date;
+- recurring;
+- associated with a Chore Window;
+- linked to Yield capture;
+- created from a Suggested Task.
 
-### 5. Chronicle
+Ordinary Tasks should not require an individual time. If recurring work belongs to a daily period, the Chore Window owns the time.
 
-Answers: **What has happened over time?**
+### Recurring Task semantics
 
-The Chronicle is the dated timeline of a record.
+A recurring Task series must distinguish:
+
+- completing an occurrence;
+- skipping one occurrence;
+- disabling the recurring series;
+- deleting ordinary user-created work.
+
+Skipped occurrences must remain skipped. Disabling a series stops future work without erasing completed history. Re-enabling should not recreate deliberately skipped historical occurrences.
+
+### Suggested Tasks
+
+Built-in Suggested Tasks are curated recommendations, not disposable ordinary Tasks.
+
+Their user-facing lifecycle is:
+
+- **Enabled** — actively generates recurring work.
+- **Disabled** — generates no future work but remains available to enable again.
+
+Built-in suggestions should not require a Hide state or permanent user deletion. Missing applicable built-in suggestions may be repaired from the current catalog as Disabled without resurrecting ordinary deleted Tasks.
+
+## Chore Windows
+
+Chore Windows represent recurring periods of necessary Homestead work, such as Morning and Evening.
+
+They:
+
+- have start/end times;
+- group recurring Tasks;
+- provide daily rhythm for Today and Calendar;
+- may show completion progress for their Tasks.
+
+Chore Windows are not appointments. Their visual treatment should remain structural and calm.
+
+## Calendar Events
+
+Calendar Events represent scheduled happenings rather than work instructions or historical Journal entries.
+
+Events may have times and may recur according to supported Event recurrence behavior.
+
+Events and Tasks remain distinct even when both appear on Today or Calendar.
+
+## Journal
+
+Journal answers: **What happened, and what should we remember?**
+
+Journal is the intentional history/documentation layer of the Homestead.
 
 It may include:
 
-- Recorded events
-- Completed tasks
-- Important status changes
-- Linked milestones
-- Selected photos
+- observations and notes;
+- significant Record activity;
+- treatments, repairs, moves, planting, harvest milestones, and other dated happenings;
+- photos and documents;
+- useful completion/history references generated by other workflows.
 
-The user should rarely type directly into the Chronicle. It is primarily built from actions elsewhere in the record.
+Journal should preserve chronology and context. It should not become a dumping ground for every internal state transition.
 
-### 6. Ledger
+Enduring facts belong in Identity/Stewardship; dated facts belong in Journal/history.
 
-Answers: **What did this cost or earn?**
+## Yield
 
-Ledger entries may be linked to a record automatically when created from inside that record.
+Yield answers: **What did the Homestead produce?**
 
-Supported entry types:
+Examples include:
+
+- milk;
+- eggs;
+- garden harvests;
+- other measured production supported by the application.
+
+Yield entries should contain enough information to answer practical production questions without becoming an industrial inventory system.
+
+Where a recurring Task naturally produces Yield, completion may offer:
+
+- Complete + Record Yield
+- Complete without recording Yield
+
+Both actions complete only the relevant Task occurrence and preserve the recurring series.
+
+## Ledger
+
+Ledger answers: **What did this cost or earn?**
+
+Supported financial direction remains fundamentally:
 
 - Expense
 - Income
 
-Initial fields:
+A Ledger transaction should be canonical. If one transaction applies to several Records, allocation should relate shares to those Records rather than create duplicate full-value transactions.
 
-- Description
-- Amount
-- Date
-- Linked record, optional
+Regula Rustica is a stewardship ledger, not a replacement for full accounting/tax software unless future real use justifies that expansion.
 
-Regula Rustica is not intended to replace full accounting software.
+## People and Responsibility
 
-### 7. Notes
+A Homestead person may exist for responsibility/assignment without being an authenticated account member.
 
-Answers: **What should I remember?**
-
-Notes describe enduring or generally true information.
-
-Examples:
-
-- Daisy stands better if fed first.
-- The lower corner of North Pasture stays wet.
-- The chainsaw starts hard below 20°F.
-
-Notes are not substitutes for dated events.
-
-### 8. Photos
-
-Photos support identification, condition, progress, and memory.
-
-Photos should belong to records rather than a separate gallery.
-
-The first implementation may allow one primary photo, with additional photos later.
-
-## Record Type Rules
-
-Every record type must:
-
-- Use the universal structure
-- Define only fields that change decisions
-- Offer no more than about 10 common event shortcuts
-- Include an **Other** event
-- Avoid duplicate information
-- Remain usable with one hand on a phone
-
-Specialized record types may add one or two high-value actions, but should not become separate mini-applications.
+Account membership controls application access. People/assignment describes who is responsible for work. Do not conflate the two.
 
 ## Animal Records
 
-An Animal record may represent an individual animal or a managed group.
+An Animal Record may represent an individual animal or a managed group.
 
-### Identity
+A Record should represent the smallest unit the steward actually manages individually.
 
-Required:
+Useful identity fields may include:
 
-- Managed as: Individual or Group
-- Name
-- Species
-- Status
+- managed as Individual or Group;
+- name;
+- species;
+- status;
+- breed;
+- purpose;
+- sex for individuals;
+- birth/hatch/acquisition information;
+- tag/band/identifier;
+- quantity for groups.
 
-Optional:
+Purposes may include Dairy, Meat, Breeding, Eggs, Honey, Fiber, Draft, Companion, or Mixed.
 
-- Breed
-- Purpose
-- Photo
-
-If **Individual**:
-
-- Sex, optional
-- Birth date or estimated age, optional
-- Tag, band, or identifying number, optional
-- Acquisition date, optional
-
-If **Group**:
-
-- Quantity
-- Acquisition or hatch date, optional
-- Planned end or processing date, optional
-- Average weight, optional
-
-The guiding rule is:
-
-> A record should represent the smallest unit the steward actually manages individually.
-
-### Purpose
-
-Examples:
-
-- Dairy
-- Meat
-- Breeding
-- Eggs
-- Honey
-- Fiber
-- Draft
-- Companion
-- Mixed
-
-Purpose may determine which event shortcuts appear.
-
-### Stewardship
-
-May include:
-
-- Current location
-- Responsible household member, optional
-
-### Common Events
-
-Universal animal events:
-
-- Weight
-- Treatment
-- Moved
-- Breeding
-- Birth / Hatch
-- Purchase
-- Sale
-- Death
-- Slaughtered / Processed
-- Other
-
-Purpose- or species-specific events may include:
-
-**Dairy**
-- Morning Milk
-- Evening Milk
-- Freshened
-- Dry Off
-
-**Layers**
-- Egg Collection
-
-**Beehives**
-- Inspection
-- Honey Harvest
-- Split
-- Requeened
-
-Species-specific shortcuts should remain limited. Anything uncommon belongs under **Other**.
+Species/purpose may influence Suggested Tasks, Yield types, and useful Journal shortcuts, but should not create a separate application for each species.
 
 ## Land Records
 
-Land represents managed places.
+Land represents managed places such as pasture, garden, orchard, hay field, woodlot, pond, or wetland.
 
-Examples:
+Useful information may include size, current use, occupants, rotation/rest stage, and meaningful history such as seeding, grazing, mowing, soil tests, amendments, or irrigation.
 
-- Pasture
-- Garden plot
-- Orchard
-- Hay field
-- Woodlot
-- Pond
-- Wetland
-- Other
-
-### Identity
-
-- Name
-- Land type
-- Size, optional
-- Status
-- Photo, optional
-
-### Stewardship
-
-May include:
-
-- Current use
-- Current occupants, optional
-- Rotation or rest stage, optional
-
-### Common Events
-
-- Seeded
-- Fertilized
-- Grazed
-- Rest Started
-- Mowed
-- Irrigated
-- Soil Test
-- Tilled
-- Limed / Amended
-- Other
-
-Harvest belongs to the crop or product being harvested, not automatically to the land.
+Production belongs in Yield and should be linked appropriately rather than automatically treated as a property of Land alone.
 
 ## Equipment Records
 
-Equipment should remain intentionally simple.
+Equipment remains intentionally practical.
 
-### Identity
+Useful identity may include make, model, serial number, purchase information, and status. Stewardship may include location, responsibility, and service information.
 
-- Name
-- Equipment type
-- Make, optional
-- Model, optional
-- Serial number, optional
-- Purchase date, optional
-- Status
-- Photo, optional
-
-Suggested statuses:
-
-- Active
-- Out of Service
-- Sold
-- Archived
-
-### Stewardship
-
-May include:
-
-- Current location
-- Assigned household member, optional
-- Service interval, optional
-
-### Common Events
-
-- Maintenance
-- Repair
-- Inspection
-- Cleaned
-- Fueled
-- Hour Meter
-- Used
-- Other
-
-Measurements such as engine hours are Events, not Identity fields.
+Maintenance, repairs, inspections, meter readings, and condition changes belong in dated history rather than being overwritten as identity facts.
 
 ## Structure Records
 
-Structures represent lasting built assets.
+Structures represent lasting built assets or systems worth managing individually: barns, coops, woodsheds, greenhouses, fence lines, rooms, or other durable improvements.
+
+Keep Structure fields simple until actual use proves a need for deeper facilities management.
+
+## Work Records
+
+A Work is a temporary managed project answering: **What are we trying to accomplish?**
+
+Examples include building a woodshed, installing fence, replacing a door, establishing an orchard, or repairing a roof.
+
+Useful states include Planned, Active, Waiting, Completed, Cancelled, and Archived.
+
+A Work may create, improve, or relate to another Record. Completion may preserve a relationship to the resulting Record rather than copying all Tasks/history into a new object.
+
+## Plain Stewardship Language
+
+Prefer language a household naturally understands.
 
 Examples:
 
-- Barn
-- Coop
-- Woodshed
-- Greenhouse
-- Fence line
-- Cheese cave
-- Farmhouse room or system when useful
+- Record / Journal entry rather than database event
+- What happened? rather than choose event type
+- Record Expense rather than add financial object
+- Other Work rather than unwindowed task projection
 
-### Identity
+Implementation terminology belongs in diagnostics and technical documentation, not ordinary workflows.
 
-- Name
-- Structure type
-- Status
-- Location, optional
-- Photo, optional
+## Record-Type Rules
 
-### Stewardship
+Every Record type should:
 
-May include:
-
-- Current use
-- Responsible household member, optional
-- Current condition, optional
-
-### Common Events
-
-- Inspected
-- Repaired
-- Cleaned
-- Painted / Finished
-- Modified
-- Damage Observed
-- Other
-
-Structures should remain simple until real use proves a need for more detail.
-
-## Works Records
-
-A Work is temporary. It exists to answer:
-
-> What are we trying to accomplish?
-
-Examples:
-
-- Build woodshed
-- Install north fence
-- Replace kitchen door
-- Establish orchard
-- Repair barn roof
-
-### Identity
-
-- Work name
-- Work type
-- Status
-- Start date, optional
-- Target completion date, optional
-- Linked record, optional
-- Photo, optional
-
-Suggested statuses:
-
-- Planned
-- Active
-- Waiting
-- Completed
-- Cancelled
-- Archived
-
-### Stewardship
-
-May include:
-
-- Responsible person, optional
-- Current stage, optional
-- Blocked by, optional
-
-### Common Events
-
-- Started
-- Progress Update
-- Inspection
-- Delay
-- Material Delivered
-- Milestone Reached
-- Completed
-- Other
-
-### Completion
-
-When a Work is completed, the app should offer:
-
-- Complete and archive
-- Complete and keep visible
-- Link to an existing record
-- Convert to another record type
-
-Examples:
-
-- Build woodshed → Structure: Woodshed
-- Install fence → Structure: North Fence
-- Establish orchard → Land: South Orchard
-- Rebuild splitter → Equipment: Wood Splitter
-
-Conversion should carry forward:
-
-- Name
-- Main photo
-- Relevant notes
-- Relevant ledger history
-- Chronicle summary
-- Link back to the completed Work
-
-Completed tasks remain with the Work and should not be copied blindly.
-
-The governing rule is:
-
-> A Work may create, improve, or relate to another record.
+- use the universal foundation;
+- define only fields that change decisions or preserve important identity;
+- avoid duplicate information;
+- remain usable with one hand on a phone;
+- prefer configuration/shared behavior over a separate mini-application;
+- use progressive disclosure for uncommon detail.
 
 ## Design Test
 
-Before adding a field, event, or action, ask:
+Before adding a field, action, relationship, or new domain concept, ask:
 
-1. Does this help the steward make a decision, remember something important, or complete meaningful work?
-2. Would someone realistically record this while standing outside with dirty boots and a phone in one hand?
-3. Does this belong as Identity, Stewardship, Task, Event, Note, Ledger, or Photo?
-4. Does the same information already exist elsewhere?
-5. Can an uncommon case be handled by **Other** instead?
+1. Does this help the steward remember, decide, act, or preserve meaningful history?
+2. Would someone realistically record or use this while standing outside with a phone in one hand?
+3. Does it belong in Record, Task, Journal, Yield, or Ledger?
+4. Is it actually a supporting concept such as a Chore Window, Event, person, or attachment?
+5. Does the same fact already have an authoritative home?
+6. Can progressive disclosure or a general-purpose workflow handle the uncommon case?
+7. Does this justify its long-term maintenance cost?
 
 If the answer is unclear, leave it out until real use proves the need.
 
 ## Versioning
 
-This document is **Record Standard v1.0**.
+Version 2.0 reflects the application's evolution from the original Record-centric foundation into a robust but still unified stewardship application.
 
-It should evolve slowly. Changes should reflect lessons from actual use rather than speculative completeness.
-
-The standard exists to protect simplicity, consistency, and useful stewardship as Regula Rustica grows.
+The standard should evolve slowly. Implementation details may change frequently; the meaning of Records, Tasks, Journal, Yield, and Ledger should not.
