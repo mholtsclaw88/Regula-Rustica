@@ -955,7 +955,9 @@ function renderToday() {
     const marker = document.createElement('span');
     marker.className = 'today-timeline-marker';
     marker.setAttribute('aria-hidden', 'true');
-    marker.textContent = item.type === 'window' ? '⌂' : '✦';
+    marker.innerHTML = item.type === 'window'
+      ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v6l4 2M9 3h6"/></svg>'
+      : '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="1"/><path d="M4 9h16M8 3v4M16 3v4M8 13h3M13 13h3M8 16h3"/></svg>';
     const content = document.createElement('div');
     content.className = 'today-timeline-content';
     if (item.type === 'event') {

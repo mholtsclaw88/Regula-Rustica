@@ -37,11 +37,11 @@ const DOMAIN_LABELS = Object.freeze({
 });
 
 const HEADER_STATUS_ICONS = Object.freeze({
-  synced: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.8 4.5 4.5 0 0 0 7 18Z"/><path d="m9 13 2 2 4-5"/><circle cx="19" cy="18" r="2"/>',
-  syncing: '<path d="M19 8a7 7 0 0 0-12-2L5 8M5 5v3h3M5 16a7 7 0 0 0 12 2l2-2m0 3v-3h-3"/><circle cx="19" cy="19" r="2"/>',
-  issue: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.8 4.5 4.5 0 0 0 7 18Z"/><path d="M12 10v3m0 2h.01"/><circle cx="19" cy="18" r="2"/>',
-  offline: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.8 4.5 4.5 0 0 0 7 18Z"/><path d="m9 11 6 6m0-6-6 6"/><circle cx="19" cy="18" r="2"/>',
-  local: '<path d="M7 4h10v16H7zM10 17h4"/><circle cx="18" cy="18" r="3"/>'
+  synced: '<path d="M6.5 17h10a4 4 0 0 0 .5-8A6 6 0 0 0 5.5 7.8 4.5 4.5 0 0 0 6.5 17Z"/><path d="m9 12 2.2 2.2 4.3-5"/>',
+  syncing: '<path d="M6 16h9a4 4 0 0 0 .5-8A6 6 0 0 0 4.5 7 4.5 4.5 0 0 0 6 16Z"/><circle cx="18" cy="17" r="3.5"/><path d="M18 11.5v2M18 20.5v2M12.5 17h2M21.5 17h2M14.1 13.1l1.4 1.4M20.5 19.5l1.4 1.4M21.9 13.1l-1.4 1.4M15.5 19.5l-1.4 1.4"/>',
+  issue: '<path d="M6.5 17h10a4 4 0 0 0 .5-8A6 6 0 0 0 5.5 7.8 4.5 4.5 0 0 0 6.5 17Z"/><path d="M12 9v4m0 2h.01M18 14l4 7h-8z"/>',
+  offline: '<path d="M6.5 17h10a4 4 0 0 0 .5-8A6 6 0 0 0 5.5 7.8 4.5 4.5 0 0 0 6.5 17Z"/><path d="M4 4l16 16"/>',
+  local: '<rect x="7" y="3" width="10" height="18" rx="1"/><path d="M10 17h4"/><circle cx="19" cy="18" r="3"/>'
 });
 
 window.RegulaRusticaSync = Object.freeze({

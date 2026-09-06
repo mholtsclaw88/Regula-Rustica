@@ -5,7 +5,7 @@
 .cloud-status {
   border-left: 3px solid var(--gold);
   padding: 9px 11px;
-  background: #faf5e9;
+  background: var(--raised);
   color: var(--muted);
   font: normal .8rem Arial, sans-serif;
 }
@@ -31,8 +31,8 @@
 }
 
 .invitation-result {
-  background: #edf4ec;
-  border: 1px solid #c9d8c9;
+  background: var(--flax);
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 14px;
 }
