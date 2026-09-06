@@ -1,112 +1,65 @@
 # Regula Rustica Architecture
 
-**Version:** 1.0  
-**Applies to:** v5 Record Foundation
+**Version:** 2.0  
+**Status:** Current architectural overview  
+**Applies to:** current `main`
 
 ## Purpose
 
-This document defines the technical structure for Regula Rustica v5. It should be read together with `CONSTITUTION.md` and `RECORD_STANDARD.md`.
+This document describes the current architectural shape of Regula Rustica. It should be read with `CONSTITUTION.md`, `RECORD_STANDARD.md`, `DESIGN_LANGUAGE.md`, `DATABASE_SCHEMA.md`, `CLOUD_ARCHITECTURE.md`, and `SYNC_ARCHITECTURE.md`.
 
-The architecture should preserve three priorities:
+Unlike historical v4/v5 planning documents, this file describes the application as it exists now: a local-first PWA with optional authenticated multi-device cloud synchronization.
 
-1. Simplicity for the household using the app.
-2. Durability and maintainability for future development.
-3. A clean path from local-only storage to shared cloud storage later.
+## Architectural Priorities
 
-## Current Delivery Model
+1. Ordinary Homestead work remains available locally and offline.
+2. Shared Homestead data converges safely across authorized devices.
+3. The domain model remains understandable and durable.
+4. Recovery is explicit and testable.
+5. The UI stays simple even when the underlying application is capable.
+6. New features extend the stewardship model rather than bypass it.
 
-Regula Rustica is a static progressive web application deployed through Netlify.
+## Delivery Model
 
-Current stack:
+Regula Rustica is an installable progressive web application deployed through Netlify.
 
-- HTML
-- CSS
-- Vanilla JavaScript
-- Browser local storage
-- Web app manifest
-- Service worker for offline use
+The application remains intentionally lightweight and web-native. It includes:
 
-No framework or build system is required for v5.
+- HTML/CSS/JavaScript application UI
+- service worker and web app manifest
+- local browser persistence for the working copy and synchronization state
+- local attachment storage where appropriate
+- Supabase authentication and PostgreSQL persistence for synchronized Homesteads
+- protected database functions/RPCs and Row Level Security
+- database migrations and pgTAP coverage
+- application/domain/synchronization tests
 
-## v5 Scope
+The project should not adopt a framework or large dependency merely because the product has grown. Added tooling must solve a concrete maintainability or capability problem.
 
-v5 is a local-first architectural refactor.
+## Local First, Not Local Only
 
-It includes:
+Local-first is a product requirement, not a temporary migration stage.
 
-- Separation of HTML, CSS, and JavaScript
-- Universal record model
-- Record, task, event, note, and ledger engines
-- Migration from the prior local-storage schema
-- Continued offline capability
-- Backup and restore
+A user should be able to create and edit Records, complete Tasks, record Journal activity and Yield, and enter Ledger activity without waiting for a network request.
 
-It does not include:
+For a synchronized Homestead:
 
-- Supabase
-- Authentication
-- Shared household sync
-- Photo uploads
-- ChatGPT or MCP integration
-- Push notifications
+- the device holds the immediate working copy;
+- local mutations are recorded durably for synchronization;
+- the cloud holds the Homestead's shared authoritative state;
+- authorized devices eventually converge to that state.
 
-## Recommended File Structure
+Cloud failure must not prevent ordinary local stewardship work.
 
-```text
-/
-├── index.html
-├── styles.css
-├── app.js
-├── manifest.webmanifest
-├── service-worker.js
-├── icons/
-├── CONSTITUTION.md
-├── RECORD_STANDARD.md
-└── ARCHITECTURE.md
-```
+## Domain Model
 
-The first v5 refactor should remain deliberately small. Further JavaScript splitting is allowed only when the single `app.js` becomes difficult to understand or test.
-
-A future structure may separate concerns into:
-
-```text
-js/
-├── app.js
-├── storage.js
-├── records.js
-├── tasks.js
-├── events.js
-├── ledger.js
-└── ui.js
-```
-
-Do not create this additional structure prematurely.
-
-## Core Data Model
-
-The local data object should use an explicit schema version.
-
-```json
-{
-  "schemaVersion": 7,
-  "settings": {},
-  "records": [],
-  "people": [],
-  "tasks": [],
-  "assignments": [],
-  "events": [],
-  "calendarEvents": [],
-  "yieldEntries": [],
-  "notes": [],
-  "ledger": []
-}
-```
+The durable product model has five primary concepts.
 
 ### Records
 
-Records describe things entrusted to the household's care.
+Records describe things entrusted to care.
 
-Supported v5 types:
+Current core types:
 
 - Animal
 - Land
@@ -114,293 +67,196 @@ Supported v5 types:
 - Structure
 - Work
 
-Each record contains:
-
-```json
-{
-  "id": "stable-id",
-  "type": "Animal",
-  "name": "Daisy",
-  "status": "Active",
-  "identity": {},
-  "stewardship": {},
-  "createdAt": "ISO-8601 timestamp",
-  "updatedAt": "ISO-8601 timestamp"
-}
-```
-
-Type-specific fields belong inside `identity` and `stewardship`. They should not create separate databases or separate page architectures.
+Records use stable IDs and shared foundations rather than separate application architectures for each type.
 
 ### Tasks
 
-Tasks represent future work.
+Tasks describe work that should happen.
 
-```json
-{
-  "id": "stable-id",
-  "title": "Trim hooves",
-  "availableFrom": "YYYY-MM-DD",
-  "dueDate": "YYYY-MM-DD",
-  "recordId": "optional-record-id",
-  "completed": false,
-  "createdAt": "ISO-8601 timestamp",
-  "completedAt": null
-}
-```
+They may be:
 
-`availableFrom` and `dueDate` are independently optional. Schema version 6 adds distinct local collections for shared calendar events and canonical Milk/Egg yield entries. Schema version 7 adds an assignable Homestead people directory and normalized task assignments. Older schema-version 5 and 6 backups remain importable.
+- one-time or recurring;
+- linked to one or more Records where supported;
+- assigned to a Homestead person;
+- scheduled/due on a date;
+- associated with a Chore Window;
+- linked to Yield capture;
+- generated from a curated Suggested Task definition.
 
-Optional recurrence metadata uses a daily, weekly, or monthly frequency, a positive interval, and either a fixed schedule based on the prior due date or a schedule based on completion. Completing a recurring task creates only its next occurrence. A Homestead that has never initialized cloud synchronization generates that occurrence locally; after cloud initialization, the idempotent database completion path owns generation and the client receives the next occurrence through synchronization.
+Recurring Tasks use durable series/occurrence semantics. Completion, skip, disable, and deletion must remain distinct operations.
 
-### Homestead People and Task Assignments
+### Journal
 
-`people` is the local-first assignee directory. Account-backed entries have `personType: "member"` and a membership link supplied by the cloud; `personType: "child"` entries have no account, role, membership, or access. Tasks reference people through the separate `assignments` collection so assignment history is not duplicated on the task. The first UI exposes one active assignee while the underlying model continues to support multiple assignments.
+Journal represents dated history and intentional documentation: what happened and what should be remembered.
 
-Completing a linked task may create a Chronicle event automatically.
+Journal/history may include observations, significant Record activity, supporting notes, photos/documents, and other dated stewardship information. Historical data should be corrected deliberately rather than silently rewritten.
 
-### Events
+### Yield
 
-Events represent dated happenings and form the Chronicle.
+Yield represents production output such as milk, eggs, and harvests. Yield is first-class operational data rather than merely a generic Event value.
 
-```json
-{
-  "id": "stable-id",
-  "recordId": "record-id",
-  "eventType": "Morning Milk",
-  "date": "YYYY-MM-DD",
-  "value": "1.6",
-  "unit": "gal",
-  "details": "optional text",
-  "createdAt": "ISO-8601 timestamp"
-}
-```
-
-The UI action is labeled **Record** and asks **What happened?**
-
-### Notes
-
-Notes contain enduring knowledge rather than dated happenings.
-
-```json
-{
-  "id": "stable-id",
-  "recordId": "record-id",
-  "text": "Stands better when fed first.",
-  "createdAt": "ISO-8601 timestamp",
-  "updatedAt": "ISO-8601 timestamp"
-}
-```
+Yield may be linked to Records and may be captured as part of completing an appropriate Task.
 
 ### Ledger
 
-The ledger is intentionally simple.
+Ledger represents financial stewardship: expenses and income. A transaction is canonical and may allocate amounts across Records rather than duplicating the full transaction for every relationship.
 
-```json
-{
-  "id": "stable-id",
-  "type": "expense",
-  "date": "YYYY-MM-DD",
-  "amount": 42.00,
-  "description": "Layer feed",
-  "recordId": "optional-record-id",
-  "createdAt": "ISO-8601 timestamp"
-}
-```
+## Supporting Domain Concepts
 
-Supported types are `expense` and `income`.
+### People and assignments
 
-## Storage Layer
+The Homestead maintains a people directory for responsibility and Task assignment. Account-backed members and non-account household people are distinct concepts; assignment does not itself grant application access.
 
-v5 uses browser local storage as the source of truth.
+### Chore Windows
 
-Requirements:
+Chore Windows represent recurring periods of necessary work such as Morning and Evening. They own start/end times and group recurring Tasks into a human daily rhythm.
 
-- Use one primary storage key for schema version 5.
-- Detect the prior v3/v4 key and migrate once.
-- Preserve a backup before destructive migrations when practical.
-- Normalize missing arrays and settings during load.
-- Never silently discard unknown legacy data.
-- Keep JSON export and restore available.
+Ordinary Tasks do not require individual times.
 
-The storage interface should be conceptually limited to:
+### Calendar Events
 
-- `loadData()`
-- `saveData(data)`
-- `migrateData(data)`
-- `exportData()`
-- `importData(file)`
+Calendar Events represent scheduled happenings and may have their own time. They are distinct from Tasks and Journal history.
 
-## UI Architecture
+### Suggested Tasks
 
-The primary navigation for v5 is:
+Suggested Tasks are curated recommendations associated with relevant Record types/purposes. Built-in suggestions should be reversible through Enabled/Disabled state rather than permanently destroyed as ordinary Tasks can be.
 
-- Today
-- Records
-- Tasks
-- Ledger
-- Settings
+## Presentation Architecture
+
+The principal user-facing modes are:
+
+- Today — run the current day
+- Records — understand and care for enduring things
+- Tasks — manage work
+- Yield — review production
+- Ledger — review financial stewardship
+- Calendar — inspect and plan dates
+- Settings — Homestead, people, daily rhythm, cloud/sharing, data/recovery, and app settings
+
+Journal is integrated into stewardship history and Record workflows rather than treated as an unrelated application.
 
 ### Today
 
-Answers: **What requires attention now?**
+Today is operational. It answers: **Where are we in the day, and what needs to happen next?**
 
-Displays:
+It should project from Chore Windows, Tasks, Events, completion state, and legitimate overdue work rather than persist a second Today-specific source of truth.
 
-- Morning, Evening, and custom Chore Windows with due recurring Tasks
-- Due and overdue ordinary Tasks
-- Today's Calendar Events
-- Quick add task
-- Quick add record
-- Basic counts
+### Calendar
 
-Recurring work uses one synchronized Task series with dated occurrences. A
-series may be skipped for one date, disabled for later reuse, or deleted through
-a hidden soft-deleted controller while completed history remains recoverable.
-Completed Chore Windows collapse quietly, and Yield-backed Tasks can record
-Yield without requiring a second completion action.
+Calendar is a planning projection:
 
-### Records
+- Day — inspect a date in detail
+- Week — plan near-term workload
+- Month — orient around overall scheduled load
 
-Answers: **What do we know about the things entrusted to us?**
+Chore Window Tasks, Other Work, and Events remain distinguishable. Month/Week summaries are derived projections, not persisted summary records.
 
-Groups records by type:
+## Persistence Layers
 
-- Animals
-- Land
-- Equipment
-- Structures
-- Works
+### Local working copy
 
-### Record Detail
+The local application state supports immediate/offline operation. Stable schema versioning and normalization protect upgrades.
 
-Every record uses the same layout:
+### Attachments
 
-- Identity summary
-- Stewardship summary
-- Record action
-- Add task
-- Add note
-- Record expense or income
-- Edit record
-- Tasks panel
-- Chronicle panel
-- Notes panel
-- Ledger panel
-- Photos placeholder
+Attachment metadata and attachment bytes may have different persistence/synchronization paths. Large binary data should not be forced through ordinary JSON synchronization merely for conceptual uniformity.
 
-### Tasks
+### Cloud persistence
 
-Provides a consolidated task list with simple status, record, assignee, timing, and due-date filtering. The task menu supports daily, weekly, and monthly recurrence from either the due date or completion date.
+Supabase PostgreSQL stores synchronized Homestead data. Every synchronized domain object is scoped to a Homestead and protected through authentication, membership, capabilities, RLS, and protected write paths.
 
-### Ledger
+See `DATABASE_SCHEMA.md` and `CLOUD_ARCHITECTURE.md` for current details.
 
-Provides total expenses, total income, net amount, and linked entries.
+## Synchronization Boundary
 
-### Settings
+Synchronization is a distinct subsystem and should remain explicit.
 
-Contains:
+Key principles:
 
-- Homestead name
-- Backup and restore
-- Reset sample data
-- Future sync settings placeholder only when needed
+- local changes are durable before network transmission;
+- active domains use explicit supported synchronization routes;
+- retryable, blocked, dependency-blocked, and conflict states are distinguishable;
+- cloud and local representations are normalized before deciding that a meaningful change exists;
+- tombstones/deletions must converge without recreating obsolete data;
+- current visible Homestead data is user data;
+- obsolete historical synchronization bookkeeping is not itself user data.
 
-## Record Type Configuration
+### Reset to Cloud
 
-Record types should share one engine and differ through configuration.
+**Reset this device from cloud** is a deliberate hard synchronization boundary.
 
-Configuration may define:
+It means:
 
-- Display name
-- Identity fields
-- Stewardship fields
-- Status choices
-- Common event choices
+> Discard this device's local synchronization history and make the current cloud Homestead the authoritative baseline for this device.
 
-Every event list includes `Other`.
+A successful reset downloads current supported cloud data, establishes it as the accepted local baseline, and leaves no historical pending/conflict/retry work. It must not upload the discarded local synchronization history during the reset.
 
-Purpose- or species-specific event shortcuts may be added for Animals, but should remain limited.
+This operation affects the device working copy/sync state, not the authoritative cloud Homestead.
 
-## Work Completion
+See `SYNC_ARCHITECTURE.md` for detailed rules.
 
-A Work may be:
+## Authentication and Authorization
 
-- Completed and archived
-- Completed and kept visible
-- Linked to an existing record
-- Converted into another record type
+Authentication identifies an account. Homestead membership grants access. Capabilities determine permitted actions.
 
-For v5, completion status and linking are required. Full conversion may be implemented only if it can be done safely without duplicating tasks or losing Chronicle history. Otherwise, leave a clear TODO.
+Client-side permission checks are presentation aids only. Cloud authorization is enforced server-side.
 
-## Offline Behavior
+Every Homestead must retain at least one Steward. Household people who are not authenticated members may still exist for assignment purposes without receiving data access.
 
-The service worker should cache only the current static assets required to load the app:
+See `AUTH_FLOW.md` and `CLOUD_ARCHITECTURE.md`.
 
-- `/`
-- `index.html`
-- `styles.css`
-- `app.js`
-- `manifest.webmanifest`
-- required icons
+## Backup and Recovery
 
-Increment the cache name whenever cached assets change materially.
+Local-first does not remove the need for recovery.
 
-Avoid aggressive caching strategies that make updates difficult to receive.
+The application should preserve:
 
-## Security and Privacy
+- open/documented exports where practical;
+- deliberate restore behavior;
+- device recovery from the cloud for synchronized Homesteads;
+- safe handling of schema upgrades;
+- clear separation between user data and disposable synchronization bookkeeping.
 
-For v5:
+Destructive recovery actions require explicit user intent.
 
-- All data remains in the user's browser.
-- No analytics are required.
-- No external scripts are required.
-- No secrets or credentials belong in client code.
+## Service Worker and Updates
 
-For future cloud sync:
+The service worker caches the assets required for installable/offline operation. Cache versions must change when required to prevent stale application shells from surviving meaningful releases.
 
-- Supabase Row Level Security is mandatory.
-- Service-role credentials must never be exposed to the browser.
-- Household membership must scope every shared record.
+Caching must favor reliable offline loading without making production updates difficult to receive.
+
+## Testing Expectations
+
+Changes should be tested at the layer they affect.
+
+Important coverage includes:
+
+- schema normalization/migration
+- Record CRUD and relationships
+- Task recurrence, skip, disable, completion, and deletion
+- Chore Window materialization
+- Yield-linked completion
+- Calendar/Today projections
+- local-first persistence
+- synchronization and clean-device convergence
+- authorization/RLS and protected database functions
+- backup/recovery
+- narrow mobile layouts and desktop
+
+Synchronization changes require focused sync tests and database tests where server behavior is involved.
 
 ## Development Rules
 
-- Work on `v5-record-foundation` until the refactor is reviewed.
-- Preserve a functioning app after each logical commit.
-- Prefer a small number of understandable files over premature modularization.
-- Avoid adding features outside the v5 scope.
-- Test mobile layout at narrow widths.
-- Test create, edit, complete, delete, export, restore, and migration flows.
-- Keep the current green, cream, and muted-gold visual character unless usability requires a change.
+- Start from current `main` unless a sprint explicitly says otherwise.
+- Preserve a functioning application after each logical change.
+- Diagnose root causes before adding compatibility/recovery code.
+- Do not add historical recovery layers merely to preserve obsolete sync bookkeeping.
+- Prefer small explicit modules/helpers over broad rewrites.
+- Avoid schema or synchronization changes for presentation-only work.
+- Keep mobile use around 360–390px as a first-class validation target.
+- Preserve the established forest, parchment, brass, ink, and muted-sepia visual language.
+- Update technical documentation when architecture materially changes.
 
-## Acceptance Criteria for v5 Foundation
+## Governing Principle
 
-The foundation is ready for review when:
-
-1. The app loads without console errors.
-2. HTML, CSS, and JavaScript are separated.
-3. Existing local data migrates without crashing.
-4. Records use the five approved types.
-5. Individual and group Animal records can be created.
-6. Common events plus `Other` can be recorded.
-7. Events appear in each record's Chronicle.
-8. Tasks can be linked, edited, completed, and filtered.
-9. Notes and ledger entries can be linked to records.
-10. Backup and restore work.
-11. The app remains installable and usable offline.
-12. No cloud sync or authentication has been added.
-
-## Future Architecture
-
-After v5 stabilizes, the same data model may move behind a repository interface.
-
-```text
-UI
- ↓
-Application services
- ↓
-Data repository
- ├── Local storage repository
- └── Supabase repository
-```
-
-This allows cloud sync to change where data is stored without changing the meaning of records, tasks, events, notes, or ledger entries.
+The architecture should be robust enough to protect years of Homestead history while remaining simple enough that the software itself never becomes the Homestead's main chore.
