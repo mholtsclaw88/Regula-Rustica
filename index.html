@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#284536">
+  <meta name="theme-color" content="#23422e">
   <meta name="description" content="Regula Rustica — a simple homestead record and task manager.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=today-daily-planner-v2">
-  <link rel="stylesheet" href="housekeeping.css?v=today-operational-v4">
+  <link rel="stylesheet" href="styles.css?v=monastic-palette-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=section-language-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=today-operational-v4" defer></script>
@@ -19,11 +19,11 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=today-operational-v4" defer></script>
-  <script src="ui-refinements.js?v=yield-ledger-ui-v1" defer></script>
+  <script src="app.js?v=settings-study-v1" defer></script>
+  <script src="ui-refinements.js?v=monastic-icons-v3" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
-  <script src="sync/runtime.mjs?v=clean-cloud-baseline-v1" type="module"></script>
+  <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
 </head>
 <body>
   <header class="top">
@@ -34,7 +34,7 @@
     </div>
     <div class="top-actions">
       <button class="header-sync-status is-local" id="headerSyncStatus" type="button" aria-label="Local only" title="Local only">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4h10v16H7zM10 17h4"/><circle cx="18" cy="18" r="3"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="3" width="10" height="18" rx="1"/><path d="M10 17h4"/><circle cx="19" cy="18" r="3"/></svg>
         <span><strong id="headerSyncLabel">Local only</strong><small id="headerSyncDetail">Saved on this device</small></span>
       </button>
       <button class="btn primary" id="globalAddTask">+ Task</button>
@@ -97,7 +97,7 @@
 
     <section id="records" class="view">
       <div class="section-head">
-        <div><span class="label">The things entrusted to your care.</span><h2>Homestead Records</h2></div>
+        <div><span class="label">Custodia</span><h2>Homestead Records</h2><p class="muted">The animals, land, equipment, structures, and work entrusted to your keeping.</p></div>
         <button class="btn primary" id="addRecord">+ Record</button>
       </div>
       <fieldset class="choice-filter record-type-filter">
@@ -132,7 +132,7 @@
 
     <section id="tasks" class="view">
       <div class="section-head">
-        <div><span class="label">What needs to happen?</span><h2>Tasks</h2></div>
+        <div><span class="label">Agenda</span><h2>Tasks</h2><p class="muted">What needs to be done, when, and by whom.</p></div>
         <button class="btn primary" id="tasksAddTask">+ Task</button>
       </div>
       <div class="card">
@@ -186,7 +186,7 @@
 
     <section id="calendar" class="view">
       <div class="section-head">
-        <div><span class="label">Shared Homestead time</span><h2>Calendar</h2></div>
+        <div><span class="label">Tempora</span><h2>Calendar</h2><p class="muted">Shared dates, events, and the rhythm of homestead life.</p></div>
         <button class="btn primary" id="addCalendarEvent">+ Event</button>
       </div>
       <div class="card calendar-card">
@@ -217,7 +217,7 @@
 
     <section id="yield" class="view reporting-page">
       <div class="section-head">
-        <div><span class="label">Daily provision</span><h2>Yield</h2></div>
+        <div><span class="label">Fructus</span><h2>Homestead Yield</h2><p class="muted">What your homestead produces, harvests, and provides.</p></div>
       </div>
       <article class="report-quick-entry">
         <div>
@@ -270,7 +270,7 @@
 
     <section id="ledger" class="view reporting-page">
       <div class="section-head">
-        <div><span class="label">Financial stewardship</span><h2>Ledger</h2></div>
+        <div><span class="label">Rationes</span><h2>Ledger</h2><p class="muted">Income, expenses, and the stewardship of household resources.</p></div>
         <button class="btn primary" id="addLedger">+ Entry</button>
       </div>
       <div class="stats report-stats">
@@ -307,7 +307,7 @@
     </section>
 
     <section id="settings" class="view">
-      <div class="settings-page-head"><span class="label">Homestead administration</span><h2 tabindex="-1">Settings</h2><p class="muted">Manage the homestead, its people, daily rhythm, and the records entrusted to this device.</p></div>
+      <div class="settings-page-head"><span class="label">Ordo</span><h2 tabindex="-1">Settings</h2><p class="muted">Shape your homestead, household, daily rhythm, and devices.</p></div>
       <article class="settings-home" id="settingHome">
         <section class="settings-summary" aria-labelledby="settingsSummaryTitle">
           <div><span class="label">About your homestead</span><h3 id="settingsSummaryTitle">At a glance</h3></div>
@@ -319,30 +319,49 @@
           </dl>
         </section>
         <div class="settings-category-grid" aria-label="Settings categories">
-          <button class="settings-category-card" type="button" data-settings-category="identity">
-            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M4 15 16 5l12 10v13H4zM9 13V8h4v2M12 28v-9h8v9M7 16h4v5H7zM21 16h4v5h-4z"/><path class="icon-detail" d="M2 16 16 3l14 13M10 28h12"/></svg></span>
-            <span><strong>Homestead</strong><small>Identity and general homestead information.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-          </button>
-          <button class="settings-category-card" type="button" data-settings-category="people">
-            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="11" cy="10" r="4"/><circle cx="22" cy="12" r="3.5"/><path d="M3 27c0-6 3-10 8-10s8 4 8 10M17 27c.2-4.7 2.1-7.5 5.5-7.5S28 22.3 29 27"/><path class="icon-detail" d="M8 8c1.8.8 3.8.8 6 0M20 11c1.5.6 3 .6 4.5 0"/></svg></span>
-            <span><strong>People &amp; Stewardship</strong><small>Household participants and assignable children.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-          </button>
-          <button class="settings-category-card" type="button" data-settings-category="rhythm">
-            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/><path d="M16 8v9l6 3M12 3h8M16 3v2"/><path class="icon-detail" d="M7.5 7.5 5 5M24.5 7.5 27 5M16 27v2"/></svg></span>
-            <span><strong>Daily Rhythm</strong><small>Configure Chore Windows and task timing.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-          </button>
-          <button class="settings-category-card" type="button" data-settings-category="cloud">
-            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 25h16a6 6 0 0 0 1-11.9A9 9 0 0 0 8.2 11 7 7 0 0 0 8 25Z"/><path class="icon-detail" d="M11 19h10M13 16l-3 3 3 3M19 16l3 3-3 3"/></svg></span>
-            <span><strong>Cloud &amp; Sharing</strong><small>Optional account, sync, and household invitations.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-          </button>
-          <button class="settings-category-card" type="button" data-settings-category="backup">
-            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><ellipse cx="16" cy="7" rx="11" ry="4"/><path d="M5 7v18c0 2.2 4.9 4 11 4s11-1.8 11-4V7M5 13c0 2.2 4.9 4 11 4s11-1.8 11-4M5 19c0 2.2 4.9 4 11 4s11-1.8 11-4"/><path class="icon-detail" d="M11 9c3.3.8 6.7.8 10 0"/></svg></span>
-            <span><strong>Data &amp; Backup</strong><small>Download, restore, or reset local records.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-          </button>
-          <button class="settings-category-card" type="button" data-settings-category="about">
-            <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/><path d="M16 14v9M16 9v1"/><path class="icon-detail" d="M12 14h4M13 23h7"/></svg></span>
-            <span><strong>App / About</strong><small>Version and local-first operating principles.</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-          </button>
+          <section class="settings-category-group" aria-labelledby="settingsStewardshipGroup">
+            <h3 class="settings-category-group-title" id="settingsStewardshipGroup">Stewardship</h3>
+            <div class="settings-category-list">
+              <button class="settings-category-card" type="button" data-settings-category="identity">
+                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .7-1.5l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+                <span><strong>Homestead</strong><small>Name and household details</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-category="people">
+                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></span>
+                <span><strong>People &amp; Roles</strong><small>Members, children, invitations, and permissions</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </section>
+          <section class="settings-category-group" aria-labelledby="settingsRhythmGroup">
+            <h3 class="settings-category-group-title" id="settingsRhythmGroup">Daily Rhythm</h3>
+            <div class="settings-category-list">
+              <button class="settings-category-card" type="button" data-settings-category="rhythm">
+                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6h4.5"/></svg></span>
+                <span><strong>Chore Windows</strong><small>Morning, evening, and custom periods</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-view="calendar">
+                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></svg></span>
+                <span><strong>Calendar</strong><small>Shared dates and event preferences</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </section>
+          <section class="settings-category-group" aria-labelledby="settingsDeviceGroup">
+            <h3 class="settings-category-group-title" id="settingsDeviceGroup">Cloud &amp; Device</h3>
+            <div class="settings-category-list">
+              <button class="settings-category-card" type="button" data-settings-category="cloud">
+                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+                <span><strong>Cloud Sync</strong><small>Account, sync, and household invitations</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-category="backup">
+                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12l-3 3 3 3"/><path d="M7 15h7a3 3 0 0 1 3 3"/></svg></span>
+                <span><strong>Backup &amp; Restore</strong><small>Download a backup or restore local data</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-category="about">
+                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span>
+                <span><strong>App &amp; Installation</strong><small>Offline readiness and install status</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </section>
         </div>
       </article>
       <div class="settings-panels">
