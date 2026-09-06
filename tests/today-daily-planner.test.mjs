@@ -60,6 +60,15 @@ test('Chore Window Tasks never duplicate under Other Work and general work is pr
   assert.equal(projection.windowItems.find(item => item.window.id === 'midday').tasks[0].id, 'window-task');
 });
 
+test('undated Chore Window work appears today without repeating across other dates', () => {
+  const undated = task('custom-task-2', { choreWindowId: 'evening' });
+  const todayProjection = housekeeping.dailyPlannerProjection({ workDate, now, choreWindows: windows, tasks: [undated] });
+  const futureProjection = housekeeping.calendarDaySummary({ workDate: '2026-08-31', now, choreWindows: windows, tasks: [undated] });
+  assert.deepEqual(todayProjection.windowItems.find(item => item.window.id === 'evening').tasks.map(item => item.id), ['custom-task-2']);
+  assert.equal(todayProjection.otherWork.length, 0);
+  assert.equal(futureProjection.choreCount, 0);
+});
+
 test('Needs Attention deduplicates presentation without modifying recurrence history', () => {
   const taskList = [
     task('old-1', { title: 'Morning Milking', recordId: 'daisy', choreWindowId: 'morning', dueDate: '2026-08-12', recurrenceRule: { frequency: 'daily', seriesId: 'milk-series' } }),
@@ -151,6 +160,7 @@ test('Week and Month cells share selected-date Day navigation without event dots
   assert.match(app, /renderCalendarWeek[\s\S]*cell\.addEventListener\('click', \(\) => openCalendarDay\(date\)\)/);
   assert.match(app, /renderCalendarMonth[\s\S]*cell\.addEventListener\('click', \(\) => openCalendarDay\(date\)\)/);
   assert.match(app, /calendarView = input\.value; renderCalendar\(\)/);
+  assert.match(app, /let calendarMonth = new Date\(\);/);
   assert.doesNotMatch(app, /eventdot|event-dot/);
   assert.match(css, /\.calendar-month-day\.workload-5/);
 });

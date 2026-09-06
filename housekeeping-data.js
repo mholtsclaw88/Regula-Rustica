@@ -146,7 +146,11 @@
 
   function dailyPlannerProjection({ tasks = [], choreWindows = [], calendarEvents = [], workDate = localDate(new Date()), now = new Date(), calendarRange = false, includeCompleted = false } = {}) {
     const visibleTask = task => !task.deletedAt && task.recurrenceRule?.enabled !== false && task.recurrenceRule?.seriesDeleted !== true;
-    const occursOnDate = task => calendarRange ? Boolean(taskCalendarSegment(task, workDate)) : taskWorkDate(task) === workDate;
+    const occursOnDate = task => {
+      const datedOccurrence = calendarRange ? Boolean(taskCalendarSegment(task, workDate)) : taskWorkDate(task) === workDate;
+      const undatedWindowWorkToday = Boolean(task.choreWindowId && !taskWorkDate(task) && workDate === localDate(now));
+      return datedOccurrence || undatedWindowWorkToday;
+    };
     const windows = choreWindows
       .filter(window => !window.deletedAt && window.enabled && window.startTime && window.endTime)
       .sort((a, b) => a.startTime.localeCompare(b.startTime) || Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
