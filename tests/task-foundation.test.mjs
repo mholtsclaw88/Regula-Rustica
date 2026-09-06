@@ -60,6 +60,25 @@ test('an enabled catalog suggestion can be disabled by Record and key', () => {
   assert.equal(tasks.suggestionEnabled(list,'hens','laying-collect-eggs'),false);
 });
 
+test('inactivating a Record disables its recurring work without changing history or unrelated Tasks', () => {
+  const rule={frequency:'daily',mode:'fixed_schedule',interval:1,enabled:true};
+  const list=[
+    {id:'cow-open',recordId:'cow',dueDate:'2026-09-06',recurrenceRule:{...rule,seriesId:'cow-series'},deletedAt:null,completed:false,status:'open'},
+    {id:'cow-done',recordId:'cow',dueDate:'2026-09-05',recurrenceRule:{...rule,seriesId:'cow-series'},deletedAt:null,completed:true,status:'completed'},
+    {id:'cow-one-time',recordId:'cow',dueDate:'2026-09-06',recurrenceRule:null,deletedAt:null,completed:false,status:'open'},
+    {id:'hen-open',recordId:'hens',dueDate:'2026-09-06',recurrenceRule:{...rule,seriesId:'hen-series'},deletedAt:null,completed:false,status:'open'}
+  ];
+  const disabled=tasks.disableRecordRecurringTasks(list,'cow','2026-09-06T12:00:00Z');
+  assert.deepEqual(disabled.map(task=>task.id),['cow-open']);
+  assert.equal(list[0].recurrenceRule.enabled,false);
+  assert.equal(list[0].updatedAt,'2026-09-06T12:00:00Z');
+  assert.equal(list[1].completed,true);
+  assert.equal(list[1].deletedAt,null);
+  assert.equal(list[2].deletedAt,null);
+  assert.equal(list[3].recurrenceRule.enabled,true);
+  assert.deepEqual(tasks.disableRecordRecurringTasks(list,'cow','2026-09-06T13:00:00Z'),[]);
+});
+
 test('missing and previously deleted built-in suggestions are available as Disabled without creating work', () => {
   const record={id:'hens',type:'Animal',identity:{purpose:'Eggs'}};
   const suggestion=tasks.suggestedTasks(record).find(item=>item.key==='laying-collect-eggs');

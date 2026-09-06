@@ -2387,7 +2387,12 @@ $('#modalForm').addEventListener('submit', async event => {
     if (existing) {
       const previousStatus = existing.status;
       Object.assign(existing, values, { updatedAt: nowIso() });
-      if (previousStatus !== existing.status) addEvent(existing.id, 'Status changed', `${previousStatus} → ${existing.status}`);
+      if (previousStatus !== existing.status) {
+        addEvent(existing.id, 'Status changed', `${previousStatus} → ${existing.status}`);
+        if (!INACTIVE_RECORD_STATUSES.has(previousStatus) && INACTIVE_RECORD_STATUSES.has(existing.status)) {
+          window.RegulaRusticaTasks.disableRecordRecurringTasks(data.tasks, existing.id, timestamp);
+        }
+      }
     } else {
       const created = { id: uid(), ...values, createdAt: timestamp };
       data.records.push(created);
