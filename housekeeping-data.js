@@ -144,14 +144,15 @@
     return taskWorkDate(task) === localDate(now) && (task.completed || !taskIsOverdue(task, choreWindow, now));
   }
 
-  function dailyPlannerProjection({ tasks = [], choreWindows = [], calendarEvents = [], workDate = localDate(new Date()), now = new Date() } = {}) {
+  function dailyPlannerProjection({ tasks = [], choreWindows = [], calendarEvents = [], workDate = localDate(new Date()), now = new Date(), calendarRange = false, includeCompleted = false } = {}) {
     const visibleTask = task => !task.deletedAt && task.recurrenceRule?.enabled !== false && task.recurrenceRule?.seriesDeleted !== true;
+    const occursOnDate = task => calendarRange ? Boolean(taskCalendarSegment(task, workDate)) : taskWorkDate(task) === workDate;
     const windows = choreWindows
       .filter(window => !window.deletedAt && window.enabled && window.startTime && window.endTime)
       .sort((a, b) => a.startTime.localeCompare(b.startTime) || Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
     const windowById = new Map(windows.map(window => [window.id, window]));
     const windowItems = windows.map(window => {
-      const windowTasks = tasks.filter(task => visibleTask(task) && task.choreWindowId === window.id && taskWorkDate(task) === workDate);
+      const windowTasks = tasks.filter(task => visibleTask(task) && task.choreWindowId === window.id && occursOnDate(task) && (includeCompleted || !task.completed));
       return {
         id: `window:${window.id}`,
         type: 'window',
@@ -186,8 +187,9 @@
       return Boolean(!task.availableFrom && task.dueDate && task.dueDate <= workDate);
     };
     const overdue = openTasks.filter(task => taskIsOverdue(task, windowById.get(task.choreWindowId) || null, now));
-    const otherWork = openTasks
-      .filter(task => !task.choreWindowId && isActionable(task) && !overdue.includes(task))
+    const otherWork = tasks
+      .filter(task => visibleTask(task) && !task.choreWindowId && (includeCompleted || !task.completed)
+        && (calendarRange ? occursOnDate(task) : isActionable(task) && !overdue.includes(task)))
       .sort((a, b) => {
         const priority = { urgent: 0, high: 1, normal: 2, low: 3 };
         return (priority[a.priority] ?? 2) - (priority[b.priority] ?? 2)
@@ -217,6 +219,29 @@
       nextId: next?.id || null,
       windowItems,
       eventCount: events.length
+    };
+  }
+
+  function calendarWorkloadLevel(total = 0) {
+    if (total <= 0) return 0;
+    if (total <= 2) return 1;
+    if (total <= 4) return 2;
+    if (total <= 6) return 3;
+    if (total <= 9) return 4;
+    return 5;
+  }
+
+  function calendarDaySummary(options = {}) {
+    const projection = dailyPlannerProjection({ ...options, calendarRange: true });
+    const choreCount = projection.windowItems.reduce((total, item) => total + item.tasks.length, 0);
+    const otherWorkCount = projection.otherWork.length;
+    const totalLoad = choreCount + otherWorkCount + projection.eventCount;
+    return {
+      ...projection,
+      choreCount,
+      otherWorkCount,
+      totalLoad,
+      workloadLevel: calendarWorkloadLevel(totalLoad)
     };
   }
 
@@ -328,7 +353,7 @@
 
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, normalizeCalendarRecurrenceRule, calendarEventOccurrence, nextRecurringDueDate, recurrenceSummary,
-    taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, dailyPlannerProjection, yieldDefaultsForTask,
+    taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, dailyPlannerProjection, calendarDaySummary, calendarWorkloadLevel, yieldDefaultsForTask,
     matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
     linkedYieldsForTask, reopenTask,
     taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment,
