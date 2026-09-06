@@ -1,136 +1,133 @@
 # Regula Rustica Constitution
 
-*"Ora et Labora"*  
-*"Pray and Work"*
+*Ora et labora · Ut in omnibus glorificetur Deus.*  
+*Pray and work · That in all things God may be glorified.*
 
 ---
 
 ## Preamble
 
-Regula Rustica exists to help households faithfully steward the land, animals, homes, and resources entrusted to their care.
+Regula Rustica exists to help households faithfully steward the land, animals, homes, work, production, and resources entrusted to their care.
 
-We recognize that creation is a gift from God and that stewardship is a vocation requiring prudence, diligence, gratitude, humility, and perseverance.
+Creation is a gift from God. Stewardship requires prudence, diligence, gratitude, humility, perseverance, and right order. This software supports that vocation; it does not replace the judgment or responsibility of the steward.
 
-This software exists to support that vocation. It does not replace the judgment of the steward, but seeks to make faithful daily work simpler, more orderly, and more sustainable.
+Regula Rustica should be quiet, dependable software that helps a household remember what matters, do the work in front of it, preserve useful history, and then get out of the way.
 
-Regula Rustica should be quiet, dependable software that serves the household rather than competing for its attention.
-
----
-
-# I. Stewardship
+## I. Stewardship
 
 Stewardship is the purpose of Regula Rustica.
 
-Every feature should help users care more faithfully for their families, homes, land, livestock, gardens, equipment, and resources.
+Every feature should help a household care more faithfully for family, home, land, livestock, gardens, equipment, work, production, and resources.
 
 Technology exists to support the work—not become the work.
 
-# II. Simplicity
+## II. Simplicity
 
 Simplicity is a feature.
 
-When multiple solutions exist, choose the one that is easier to understand, maintain, and teach.
+When several solutions are adequate, prefer the one that is easier to understand, maintain, recover, and teach. Complexity must justify itself through real stewardship value.
 
-Complexity must justify itself.
+## III. Information Serves Action
 
-# III. Information Serves Action
+Information exists to help the steward remember, decide, act, or preserve meaningful history.
 
-Information exists to support wise action.
+Collect nothing merely because it is possible. Do not turn ordinary homestead life into data entry for its own sake.
 
-Data should only be collected when it helps the steward remember, decide, or act.
+## IV. One Source of Truth
 
-Collect nothing merely because it is possible.
+Every fact should have one authoritative home.
 
-# IV. One Source of Truth
+Records should reference related information rather than duplicate it. Derived views such as Today, Calendar, summaries, and reports should project from authoritative data rather than create competing copies.
 
-Every fact should have one home.
+## V. The Stewardship Model
 
-Records should reference one another rather than duplicate information.
+Regula Rustica organizes homestead information around five durable concepts:
 
-Duplication creates confusion.
+- **Records** — what is entrusted to care.
+- **Tasks** — what should happen.
+- **Journal** — what happened and what should be remembered.
+- **Yield** — what the Homestead produced.
+- **Ledger** — what was spent or earned.
 
-# V. The Record Standard
+Chore Windows, Calendar, Today, people, assignments, photos, documents, and other supporting features should strengthen these concepts rather than fragment the application into unrelated mini-apps.
 
-Every record follows the same foundation.
-
-- Identity
-- Stewardship
-- Tasks
-- Chronicle
-- Ledger
-- Notes
-- Photos
-
-Additional fields may extend this foundation but should never replace it.
-
-Consistency is more valuable than novelty.
-
-# VI. Human Rhythm
+## VI. Human Rhythm
 
 The application should reflect the natural rhythm of homestead life.
 
-Technology should adapt to these rhythms rather than interrupt them.
+Necessary recurring care, intentionally scheduled work, events, seasonal work, and historical recordkeeping are related but not identical. Regula Rustica should preserve those distinctions instead of flattening everything into a generic task list or office calendar.
 
-# VII. Privacy
+Technology should adapt to the household's rhythm rather than interrupt it.
 
-The homestead owns its information.
+## VII. Local First and Privacy
 
-Users should always know where their data is stored, who has access to it, and why.
+The Homestead owns its information.
 
-# VIII. Artificial Intelligence
+Ordinary work should remain possible without a network connection. Cloud services may provide private synchronization, recovery, and sharing, but they should not make the Homestead dependent on constant connectivity.
+
+Users should know where their information is stored, who has access to it, and why.
+
+## VIII. Shared Stewardship
+
+A Homestead may be cared for by more than one person and used from more than one device.
+
+Shared access should remain private, understandable, and appropriately limited. The Homestead—not an individual device—is the enduring unit of shared stewardship.
+
+## IX. Artificial Intelligence
 
 Artificial intelligence is an assistant, not a steward.
 
-Regula Rustica remains the system of record.
+Regula Rustica remains the system of record. AI may reduce effort, improve understanding, and assist decisions, but responsibility remains with people.
 
-AI exists to reduce effort, improve understanding, and assist decision-making—not to replace human responsibility.
+Recommend before automating. Ask when uncertainty matters. Confirm consequential actions.
 
-# IX. Build Slowly
+## X. Build from Real Use
 
-Features should solve real problems observed through use.
+Features should solve problems observed through use.
 
-Ideas belong in the parking lot until experience proves they are needed.
+Ideas belong in the parking lot until experience proves they are needed. Refinement is preferred over accumulation, even as Regula Rustica grows into a capable application.
 
-Refinement is preferred over accumulation.
+Robustness is welcome; unnecessary complexity is not.
 
-# X. Durability
+## XI. Durability and Recovery
 
-Every release should leave the software easier to understand and maintain than before.
+Every release should leave the application understandable, maintainable, testable, and recoverable.
 
-Architecture is an investment.
+Architecture is an investment. Data migrations, synchronization, and recovery paths deserve the same care as visible features.
 
-Shortcuts should remain the exception.
+A failure in connectivity or synchronization should not imply that safely stored local work has been lost.
 
-# XI. Beauty
+## XII. Beauty
 
 Beauty serves clarity.
 
-The application should reflect the quiet beauty of a well-kept homestead through thoughtful craftsmanship, restrained design, and natural aesthetics.
+Regula Rustica should reflect the quiet character of a well-kept farm ledger or almanac through thoughtful craftsmanship, restrained design, natural materials and colors, and durable typography.
 
 Decoration should never compete with usefulness.
 
-# XII. Order
+## XIII. Order
 
 Good stewardship requires right order.
 
-Technology should reinforce habits of planning, diligence, and care with humility.
+Technology should reinforce habits of planning, diligence, care, and truthful recordkeeping without turning productivity into an end in itself.
 
-# XIII. Rest
+## XIV. Rest
 
 Stewardship includes rest.
 
-The application should encourage sustainable rhythms of work and recognize that worship, family, and restoration are themselves acts of faithful stewardship.
+The application should respect sustainable rhythms of work and recognize that worship, family, and restoration are themselves part of faithful stewardship.
 
-# XIV. Stewardship Over Productivity
+Necessary care remains necessary; discretionary work should not be treated as equally urgent at all times.
 
-The measure of success is not how many tasks are completed or how much information is recorded.
+## XV. Stewardship Over Productivity
+
+Success is not measured by the number of tasks completed, notifications generated, screens visited, or data points recorded.
 
 Success is measured by whether the household is better able to care for what has been entrusted to it.
 
-The highest achievement of Regula Rustica is that it quietly supports the work, then gets out of the way.
+The highest achievement of Regula Rustica is that it quietly supports the work, preserves what matters, and then gets out of the way.
 
 ---
 
-> *Ad majorem Dei gloriam.*
->
+> *Ad majorem Dei gloriam.*  
 > *For the greater glory of God.*
