@@ -2568,6 +2568,7 @@ $$('[name="recordTypeFilter"]').forEach(input => input.addEventListener('change'
 $$('[name="yieldTypeFilter"], [name="yieldDateFilter"]').forEach(input => input.addEventListener('change', renderYield));
 $$('[name="ledgerTypeFilter"], [name="ledgerDateFilter"]').forEach(input => input.addEventListener('change', renderLedger));
 $$('[data-settings-category]').forEach(button => button.addEventListener('click', () => showSettingsSection(button.dataset.settingsCategory)));
+$$('[data-settings-view]').forEach(button => button.addEventListener('click', () => $(`.nav button[data-view="${button.dataset.settingsView}"]`)?.click()));
 $$('.settings-back').forEach(button => button.addEventListener('click', () => showSettingsSection('home')));
 if (window.matchMedia('(max-width: 520px)').matches) $('#taskAdvancedFilters').removeAttribute('open');
 ['#calendarShowTasks', '#calendarShowEvents', '#calendarShowCompleted']

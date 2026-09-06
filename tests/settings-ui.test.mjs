@@ -14,6 +14,8 @@ test('Settings home exposes one focused destination for every category', () => {
   assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'cloud', 'backup', 'about']);
   assert.deepEqual(panels.sort(), [...categories].sort());
   assert.match(app, /showSettingsSection\(button\.dataset\.settingsCategory\)/);
+  assert.match(html, /data-settings-view="calendar"/);
+  assert.match(app, /button\.dataset\.settingsView/);
   assert.match(app, /showSettingsSection\('home'\)/);
 });
 
@@ -42,7 +44,7 @@ test('Settings summary derives from real local and cloud state', () => {
 });
 
 test('Settings index has responsive desktop and mobile layouts', () => {
-  assert.match(css, /\.settings-category-grid\s*\{[^}]*repeat\(2,/s);
+  assert.match(css, /\.settings-category-grid\s*\{[^}]*repeat\(3,/s);
   assert.match(css, /@media \(max-width: 520px\)[\s\S]*\.settings-category-grid\s*\{\s*grid-template-columns: 1fr;/);
   assert.match(css, /\.settings-section-head\s*\{[^}]*background:/s);
 });

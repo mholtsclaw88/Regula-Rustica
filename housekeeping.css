@@ -679,38 +679,44 @@ summary:focus-visible {
 .settings-summary dl > div { min-width: 0; padding: 2px 14px; border-left: 1px solid rgba(216,193,143,.36); }
 .settings-summary dt { margin-bottom: 5px; color: #d8cdb9; font: 700 .62rem Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; }
 .settings-summary dd { margin: 0; overflow-wrap: anywhere; color: #fff8e9; font-weight: 700; line-height: 1.25; }
-.settings-category-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.settings-category-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.settings-category-group { min-width: 0; }
+.settings-category-group-title { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; color: var(--forest2); font: 700 .68rem Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+.settings-category-group-title::after { content: ''; height: 1px; flex: 1; background: var(--line); }
+.settings-category-list { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); }
 .settings-category-card {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  gap: 13px;
+  width: 100%;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
-  min-height: 94px;
-  padding: 14px 15px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
+  min-height: 88px;
+  padding: 12px 13px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
   background: var(--paper);
   color: var(--ink);
   text-align: left;
-  box-shadow: 0 5px 16px rgba(45,49,39,.06);
   cursor: pointer;
-  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  transition: background .15s ease;
 }
-.settings-category-card:hover { border-color: #b5965e; box-shadow: 0 8px 20px rgba(40,69,54,.1); transform: translateY(-1px); }
+.settings-category-card:last-child { border-bottom: 0; }
+.settings-category-card:hover { background: var(--raised); }
 .settings-category-card:focus-visible { outline: 3px solid rgba(164,123,60,.4); outline-offset: 2px; }
-.settings-category-card strong { display: block; margin-bottom: 4px; color: var(--forest); font: 700 .78rem Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.settings-category-card strong { display: block; margin-bottom: 4px; color: var(--ink); font: 700 1rem Georgia, serif; }
 .settings-category-card small { display: block; color: var(--muted); font: .78rem/1.35 Arial, sans-serif; }
 .settings-card-icon {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border: 1px solid #6d806f;
-  border-radius: 10px;
-  background: var(--forest);
-  color: #ead8ae;
+  width: 52px;
+  height: 52px;
+  border: 1px solid #bbaa80;
+  border-radius: 50%;
+  background: var(--flax);
+  color: var(--forest);
 }
-.settings-card-icon svg { width: 31px; height: 31px; fill: none; stroke: currentColor; stroke-width: 1.45; stroke-linecap: round; stroke-linejoin: round; }
+.settings-card-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
 .settings-card-icon .icon-detail { opacity: .65; stroke-width: 1; }
 .settings-chevron { color: var(--gold); font-size: 1.6rem; line-height: 1; }
 .settings-panels { display: grid; justify-items: center; }
@@ -772,6 +778,7 @@ summary:focus-visible {
 .settings-about-note { margin: 24px 0 5px; color: var(--forest); font-style: italic; text-align: center; }
 
 @media (max-width: 800px) {
+  .settings-category-grid { grid-template-columns: 1fr; }
   .settings-summary { grid-template-columns: 1fr; gap: 13px; }
   .settings-summary dl > div:first-child { border-left: 0; padding-left: 0; }
   .reporting-controls { grid-template-columns: 1fr; }
@@ -792,10 +799,10 @@ summary:focus-visible {
   .settings-summary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 0; }
   .settings-summary dl > div { padding: 1px 10px; }
   .settings-summary dl > div:nth-child(odd) { border-left: 0; padding-left: 0; }
-  .settings-category-grid { grid-template-columns: 1fr; gap: 8px; }
-  .settings-category-card { grid-template-columns: 43px minmax(0, 1fr) auto; min-height: 78px; padding: 11px 12px; }
-  .settings-card-icon { width: 43px; height: 43px; }
-  .settings-card-icon svg { width: 28px; height: 28px; }
+  .settings-category-grid { gap: 16px; }
+  .settings-category-card { grid-template-columns: 48px minmax(0, 1fr) auto; min-height: 82px; padding: 10px 12px; }
+  .settings-card-icon { width: 48px; height: 48px; }
+  .settings-card-icon svg { width: 22px; height: 22px; }
   .settings-section { padding: 14px; border-radius: 12px; }
   .settings-section-head { margin: -14px -14px 17px; padding: 17px 16px 14px; }
   .settings-back { min-height: 40px; margin-bottom: 8px; }
