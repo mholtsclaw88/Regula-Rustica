@@ -88,7 +88,7 @@ assert(/minimum_password_length\s*=\s*8/.test(config), 'Minimum password length 
 assert(/id="cloudAuthForm"/.test(html) && /id="cloudOnboarding"/.test(html), 'Cloud auth UI is incomplete.');
 assert(/select plan\(48\)/.test(tests), 'pgTAP plan must match the test suite.');
 assert(/select plan\(21\)/.test(invitationTests), 'Invitation pgTAP plan must match the test suite.');
-assert(/select plan\(39\)/.test(housekeepingTests), 'Housekeeping pgTAP plan must match the test suite.');
+assert(/select plan\(41\)/.test(housekeepingTests), 'Housekeeping pgTAP plan must match the test suite.');
 assert(/select plan\(37\)/.test(peopleTests), 'Homestead people pgTAP plan must match the test suite.');
 assert(/select plan\(35\)/.test(routineTests), 'Routine pgTAP plan must match the test suite.');
 assert(/drop constraint if exists invitations_role_check/i.test(invitationMigration), 'Steward invitations must be permitted.');

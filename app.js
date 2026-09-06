@@ -8,8 +8,8 @@ const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
 const RECORD_TYPES = ['Animal', 'Land', 'Equipment', 'Structure', 'Work'];
-const CURRENT_SCHEMA_VERSION = 13;
-const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, 12, CURRENT_SCHEMA_VERSION];
+const CURRENT_SCHEMA_VERSION = 14;
+const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, 12, 13, CURRENT_SCHEMA_VERSION];
 let startupMigrationBefore = null;
 
 const RECORD_CONFIG = {
@@ -263,6 +263,7 @@ function normalizeCalendarEvent(event = {}) {
     location: event.location || '',
     notes: event.notes || '',
     recordId: event.recordId || null,
+    recurrenceRule: window.RegulaRusticaHousekeeping.normalizeCalendarRecurrenceRule(event.recurrenceRule),
     createdAt,
     updatedAt: event.updatedAt || createdAt,
     deletedAt: event.deletedAt || null
@@ -1605,10 +1606,11 @@ function renderCalendar() {
         items.appendChild(item);
       });
     if (showEvents) {
-      data.calendarEvents.filter(event => !event.deletedAt && event.startDate <= dateKey && event.endDate >= dateKey).forEach(event => {
+      data.calendarEvents.filter(event => !event.deletedAt && window.RegulaRusticaHousekeeping.calendarEventOccurrence(event, dateKey)).forEach(event => {
+        const occurrence = window.RegulaRusticaHousekeeping.calendarEventOccurrence(event, dateKey);
         const item = document.createElement('span');
         item.className = 'calendar-item event-item';
-        item.textContent = `${event.startDate === dateKey ? `${calendarEventTime(event)} · ` : ''}${event.title}`;
+        item.textContent = `${occurrence.starts ? `${calendarEventTime(event)} · ` : ''}${event.recurrenceRule ? '↻ ' : ''}${event.title}`;
         item.addEventListener('click', click => { click.stopPropagation(); openModal('calendar', event.id, event.recordId); });
         items.appendChild(item);
       });
@@ -2094,6 +2096,21 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     root.append(field('All day', 'allDay', 'checkbox', calendarEvent.allDay !== false));
     root.append(field('Start time (optional)', 'startTime', 'time', calendarEvent.startTime));
     root.append(field('End time (optional)', 'endTime', 'time', calendarEvent.endTime));
+    const recurrence = window.RegulaRusticaHousekeeping.normalizeCalendarRecurrenceRule(calendarEvent.recurrenceRule);
+    const repeat = field('Repeat', 'recurrenceFrequency', 'select', recurrence?.frequency || '', ['', 'daily', 'weekly', 'monthly']);
+    repeat.querySelector('option[value=""]').textContent = 'Does not repeat';
+    root.append(repeat);
+    const recurrenceDetails = formRow(
+      field('Repeat every', 'recurrenceInterval', 'number', recurrence?.interval || 1),
+      field('Repeat until (optional)', 'recurrenceUntil', 'date', recurrence?.until || '')
+    );
+    recurrenceDetails.classList.add('calendar-recurrence-details');
+    recurrenceDetails.querySelector('[name=recurrenceInterval]').min = '1';
+    recurrenceDetails.querySelector('[name=recurrenceInterval]').step = '1';
+    root.append(recurrenceDetails);
+    const toggleRecurrence = () => recurrenceDetails.classList.toggle('hidden', !repeat.querySelector('select').value);
+    repeat.querySelector('select').addEventListener('change', toggleRecurrence);
+    toggleRecurrence();
     root.append(field('Location (optional)', 'location', 'text', calendarEvent.location));
     root.append(field('Notes (optional)', 'notes', 'textarea', calendarEvent.notes));
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || calendarEvent.recordId);
@@ -2287,11 +2304,20 @@ $('#modalForm').addEventListener('submit', async event => {
       alert('The event end cannot be before its start.');
       return;
     }
+    if (form.recurrenceUntil && form.recurrenceUntil < form.startDate) {
+      alert('The repeat-until date cannot be before the event starts.');
+      return;
+    }
     const existing = data.calendarEvents.find(item => item.id === editId);
+    const recurrenceRule = window.RegulaRusticaHousekeeping.normalizeCalendarRecurrenceRule({
+      frequency: form.recurrenceFrequency,
+      interval: form.recurrenceInterval,
+      until: form.recurrenceUntil
+    });
     const values = {
       title: form.title.trim(), startDate: form.startDate, endDate: form.endDate,
       allDay: form.allDay === 'true', startTime: form.startTime || '', endTime: form.endTime || '',
-      location: form.location.trim(), notes: form.notes.trim(), recordId: form.recordId || null
+      location: form.location.trim(), notes: form.notes.trim(), recordId: form.recordId || null, recurrenceRule
     };
     if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
     else data.calendarEvents.push(normalizeCalendarEvent({ id: uid(), ...values, createdAt: nowIso() }));

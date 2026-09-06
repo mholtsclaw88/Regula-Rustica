@@ -27,7 +27,8 @@ async function dataApi() {
     window: {
       RegulaRusticaHousekeeping: {
         historicalYieldCandidate: () => null,
-        normalizeRecurrenceRule: value => value || null
+        normalizeRecurrenceRule: value => value || null,
+        normalizeCalendarRecurrenceRule: value => value || null
       },
       RegulaRusticaTasks: {
         DEFAULT_WINDOWS: [],
@@ -131,6 +132,18 @@ test('normalization does not materialize recurring Tasks as a read side effect',
   assert.equal(normalized.tasks[0].id, 'recurring-task');
 });
 
+test('recurring Calendar Events survive normalize, persistence, and reload', async () => {
+  const api = await dataApi();
+  const source = currentData([]);
+  source.calendarEvents = [{
+    id: 'market', title: 'Farmers market', startDate: '2026-09-05', endDate: '2026-09-05',
+    recurrenceRule: { frequency: 'weekly', interval: 2, until: '2027-09-05' }
+  }];
+  const normalized = api.normalizeData(source);
+  api.localStorage.setItem(api.storageKey, JSON.stringify(normalized));
+  assert.equal(JSON.stringify(api.loadData().calendarEvents[0].recurrenceRule), '{"frequency":"weekly","interval":2,"until":"2027-09-05"}');
+});
+
 test('cloud replacement can preserve an intentionally empty Chore Window collection', async () => {
   const api = await dataApi();
   api.window.RegulaRusticaTasks.DEFAULT_WINDOWS = [{ id: 'local-default', systemKey: 'morning' }];
@@ -138,9 +151,9 @@ test('cloud replacement can preserve an intentionally empty Chore Window collect
   assert.deepEqual(Array.from(normalized.choreWindows), []);
 });
 
-test('v5 through v12 backups remain supported and legacy data still migrates', async () => {
+test('v5 through v13 backups remain supported and legacy data still migrates', async () => {
   const api = await dataApi();
-  for (const schemaVersion of [5, 6, 7, 8, 9, 10, 11, 12]) {
+  for (const schemaVersion of [5, 6, 7, 8, 9, 10, 11, 12, 13]) {
     const imported = api.prepareImportedData({
       ...currentData([record('Animal', { purpose: 'Dairy' }, { location: 'Milking barn' })]),
       schemaVersion

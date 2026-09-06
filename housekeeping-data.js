@@ -44,6 +44,50 @@
     return normalized;
   }
 
+  function normalizeCalendarRecurrenceRule(rule = null) {
+    const normalized = normalizeRecurrenceRule(rule);
+    if (!normalized) return null;
+    const until = String(rule?.until || '').slice(0, 10);
+    return {
+      frequency: normalized.frequency,
+      interval: normalized.interval,
+      ...(dateParts(until) ? { until } : {})
+    };
+  }
+
+  function calendarEventOccurrence(event = {}, date = '') {
+    const start = dateParts(event.startDate);
+    const end = dateParts(event.endDate || event.startDate);
+    const target = dateParts(date);
+    if (!start || !end || !target) return null;
+    const startTime = Date.UTC(start.year, start.month - 1, start.day);
+    const endTime = Date.UTC(end.year, end.month - 1, end.day);
+    const targetTime = Date.UTC(target.year, target.month - 1, target.day);
+    const duration = Math.max(0, Math.round((endTime - startTime) / 86400000));
+    const rule = normalizeCalendarRecurrenceRule(event.recurrenceRule);
+    if (!rule) return targetTime >= startTime && targetTime <= endTime
+      ? { starts: targetTime === startTime, ends: targetTime === endTime }
+      : null;
+
+    for (let offset = 0; offset <= duration; offset += 1) {
+      const occurrenceTime = targetTime - offset * 86400000;
+      if (occurrenceTime < startTime) continue;
+      const occurrenceDate = new Date(occurrenceTime);
+      const occurrenceKey = formatDateParts(occurrenceDate.getUTCFullYear(), occurrenceDate.getUTCMonth() + 1, occurrenceDate.getUTCDate());
+      if (rule.until && occurrenceKey > rule.until) continue;
+      const dayDifference = Math.round((occurrenceTime - startTime) / 86400000);
+      let matches = rule.frequency === 'daily' && dayDifference % rule.interval === 0;
+      if (rule.frequency === 'weekly') matches = dayDifference % (rule.interval * 7) === 0;
+      if (rule.frequency === 'monthly') {
+        const monthDifference = (occurrenceDate.getUTCFullYear() - start.year) * 12 + occurrenceDate.getUTCMonth() - (start.month - 1);
+        const expectedDay = Math.min(start.day, new Date(Date.UTC(occurrenceDate.getUTCFullYear(), occurrenceDate.getUTCMonth() + 1, 0)).getUTCDate());
+        matches = monthDifference >= 0 && monthDifference % rule.interval === 0 && occurrenceDate.getUTCDate() === expectedDay;
+      }
+      if (matches) return { starts: offset === 0, ends: offset === duration };
+    }
+    return null;
+  }
+
   function taskWorkDate(task = {}) {
     return task.dueDate || task.availableFrom || '';
   }
@@ -118,7 +162,7 @@
         completed: windowTasks.filter(task => task.completed).length
       };
     });
-    const events = calendarEvents.filter(event => !event.deletedAt && event.startDate <= workDate && event.endDate >= workDate);
+    const events = calendarEvents.filter(event => !event.deletedAt && calendarEventOccurrence(event, workDate));
     const allDayEvents = events.filter(event => event.allDay || !event.startTime);
     const eventItems = events.filter(event => !event.allDay && event.startTime).map(event => ({
       id: `event:${event.id}`,
@@ -283,7 +327,7 @@
   }
 
   return {
-    historicalYieldCandidate, normalizeRecurrenceRule, nextRecurringDueDate, recurrenceSummary,
+    historicalYieldCandidate, normalizeRecurrenceRule, normalizeCalendarRecurrenceRule, calendarEventOccurrence, nextRecurringDueDate, recurrenceSummary,
     taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, dailyPlannerProjection, yieldDefaultsForTask,
     matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
     linkedYieldsForTask, reopenTask,

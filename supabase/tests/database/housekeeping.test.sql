@@ -1,9 +1,10 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(39);
+select plan(41);
 
 select has_table('public', 'calendar_events', 'calendar events table exists');
+select has_column('public', 'calendar_events', 'recurrence_rule', 'calendar events support recurrence');
 select has_table('public', 'yield_entries', 'yield entries table exists');
 select has_column('public', 'tasks', 'available_from', 'tasks retain an available date');
 select has_column('public', 'tasks', 'due_date', 'tasks retain a due date');
@@ -43,10 +44,11 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','81000000-0000-0000-0000-000000000001',true);
 select public.apply_housekeeping_sync_operation(
   'calendar-create-1','86000000-0000-0000-0000-000000000001','calendar_events','84000000-0000-0000-0000-000000000001','create',null,'2026-08-10T12:00:00Z',
-  jsonb_build_object('id','84000000-0000-0000-0000-000000000001','homestead_id',:'homestead_b','record_id','83000000-0000-0000-0000-000000000001','title','Vet visit','start_date','2026-08-12','end_date','2026-08-12','all_day',false,'start_time','09:00','end_time','10:00','location','Barn')
+  jsonb_build_object('id','84000000-0000-0000-0000-000000000001','homestead_id',:'homestead_b','record_id','83000000-0000-0000-0000-000000000001','title','Vet visit','start_date','2026-08-12','end_date','2026-08-12','all_day',false,'start_time','09:00','end_time','10:00','location','Barn','recurrence_rule',jsonb_build_object('frequency','monthly','interval',1,'until','2027-08-12'))
 ) as calendar_created \gset
 select is((:'calendar_created'::jsonb ->> 'status'), 'applied', 'Steward can sync a calendar event');
 select is((select homestead_id from public.calendar_events where id='84000000-0000-0000-0000-000000000001'), :'homestead_a'::uuid, 'calendar sync derives its Homestead');
+select is((select recurrence_rule from public.calendar_events where id='84000000-0000-0000-0000-000000000001'), '{"frequency":"monthly","interval":1,"until":"2027-08-12"}'::jsonb, 'calendar recurrence survives the sync RPC');
 
 select public.apply_housekeeping_sync_operation(
   'yield-create-1','86000000-0000-0000-0000-000000000001','yield_entries','85000000-0000-0000-0000-000000000001','create',null,'2026-08-10T12:00:00Z',

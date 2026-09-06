@@ -82,6 +82,18 @@ test('all-day Events stay above the timeline and are not duplicated', () => {
   assert.equal(projection.eventCount, 1);
 });
 
+test('recurring Events project onto daily, weekly, and clamped monthly dates', () => {
+  const daily = event('Feed store', { startDate: '2026-08-30', endDate: '2026-08-30', recurrenceRule: { frequency: 'daily', interval: 2, until: '2026-09-05' } });
+  const weekly = event('Farmers market', { startDate: '2026-08-30', endDate: '2026-08-31', recurrenceRule: { frequency: 'weekly', interval: 1 } });
+  const monthly = event('Month end', { startDate: '2026-01-31', endDate: '2026-01-31', recurrenceRule: { frequency: 'monthly', interval: 1 } });
+  assert.ok(housekeeping.calendarEventOccurrence(daily, '2026-09-05'));
+  assert.equal(housekeeping.calendarEventOccurrence(daily, '2026-09-07'), null);
+  assert.deepEqual(housekeeping.calendarEventOccurrence(weekly, '2026-09-07'), { starts: false, ends: true });
+  assert.ok(housekeeping.calendarEventOccurrence(monthly, '2026-02-28'));
+  assert.equal(housekeeping.calendarEventOccurrence(monthly, '2026-03-30'), null);
+  assert.equal(housekeeping.dailyPlannerProjection({ workDate: '2026-09-06', now, calendarEvents: [weekly] }).eventCount, 1);
+});
+
 test('empty days and multiple custom Chore Windows remain valid projections', () => {
   const empty = housekeeping.dailyPlannerProjection({ workDate, now, choreWindows: [], tasks: [], calendarEvents: [] });
   assert.deepEqual(empty.schedule, []);
