@@ -597,7 +597,7 @@ let priorView = 'records';
 let modalMode = '';
 let editId = null;
 let contextRecordId = null;
-let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calendarMonth = new Date();
 let calendarView = 'month';
 let calendarDefaultDate = null;
 let yieldCompletionTaskId = null;
@@ -853,29 +853,8 @@ function taskYieldIndicator(task) {
   return `<span class="task-yield-meta"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">${indicator.path}</svg><span>${indicator.label}</span></span>`;
 }
 
-function sharedTaskRow(task, { suggestionActions = false } = {}) {
-  const row = document.createElement('div');
-  const disabledSeries = window.RegulaRusticaTasks.isDisabledRecurringTask(task);
-  row.className = `task record-task-row shared-task-row${task.completed ? ' done' : ''}${disabledSeries ? ' disabled-series' : ''}`;
-  const assignedTo = assigneeName(task.id);
-  const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
-  const choreWindow = choreWindowForTask(task)?.name || '';
-  const metadata = [taskDateText(task), recurrence, choreWindow, assignedTo, task.recordId ? recordName(task.recordId) : '', task.priority !== 'normal' ? task.priority : '']
-    .filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
-  if (disabledSeries) metadata.unshift('<span>Disabled</span>');
-  else if (taskIsOverdue(task)) metadata.unshift('<span class="task-overdue-meta">Overdue</span>');
-  const yieldIndicator = taskYieldIndicator(task);
-  if (yieldIndicator) metadata.push(yieldIndicator);
-  const metadataHtml = metadata.join('<span class="record-task-separator" aria-hidden="true">·</span>');
-  const recurringActions = disabledSeries
-    ? '<button class="reenable" type="button">Re-enable</button>'
-    : window.RegulaRusticaTasks.recurringOccurrenceActions(task).length
-      ? '<button class="recurrence-actions" type="button">Skip / disable…</button>'
-      : window.RegulaRusticaTasks.isBuiltInSuggestedTask(task)
-        ? ''
-        : '<button class="del" type="button">Delete</button>';
-  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${disabledSeries ? 'disabled' : ''} aria-label="${disabledSeries ? 'Disabled' : 'Complete'} ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${recurringActions}</div></details>`;
-  row.querySelector('.shared-task-check').addEventListener('change', event => {
+function wireTaskCheckbox(checkbox, task) {
+  checkbox.addEventListener('change', event => {
     if (event.target.checked && task.yieldType && !task.completed) {
       const existingYield = window.RegulaRusticaHousekeeping.matchingYieldForTask(data.yieldEntries, task);
       if (existingYield && (!existingYield.taskId || existingYield.taskId === task.id)) {
@@ -909,6 +888,31 @@ function sharedTaskRow(task, { suggestionActions = false } = {}) {
     if (!wasCompleted && task.completed && task.recurrenceRule && !window.RegulaRusticaSync?.isInitialized?.()) createNextLocalOccurrence(task);
     saveData();
   });
+}
+
+function sharedTaskRow(task, { suggestionActions = false } = {}) {
+  const row = document.createElement('div');
+  const disabledSeries = window.RegulaRusticaTasks.isDisabledRecurringTask(task);
+  row.className = `task record-task-row shared-task-row${task.completed ? ' done' : ''}${disabledSeries ? ' disabled-series' : ''}`;
+  const assignedTo = assigneeName(task.id);
+  const recurrence = window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule);
+  const choreWindow = choreWindowForTask(task)?.name || '';
+  const metadata = [taskDateText(task), recurrence, choreWindow, assignedTo, task.recordId ? recordName(task.recordId) : '', task.priority !== 'normal' ? task.priority : '']
+    .filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
+  if (disabledSeries) metadata.unshift('<span>Disabled</span>');
+  else if (taskIsOverdue(task)) metadata.unshift('<span class="task-overdue-meta">Overdue</span>');
+  const yieldIndicator = taskYieldIndicator(task);
+  if (yieldIndicator) metadata.push(yieldIndicator);
+  const metadataHtml = metadata.join('<span class="record-task-separator" aria-hidden="true">·</span>');
+  const recurringActions = disabledSeries
+    ? '<button class="reenable" type="button">Re-enable</button>'
+    : window.RegulaRusticaTasks.recurringOccurrenceActions(task).length
+      ? '<button class="recurrence-actions" type="button">Skip / disable…</button>'
+      : window.RegulaRusticaTasks.isBuiltInSuggestedTask(task)
+        ? ''
+        : '<button class="del" type="button">Delete</button>';
+  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${disabledSeries ? 'disabled' : ''} aria-label="${disabledSeries ? 'Disabled' : 'Complete'} ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${recurringActions}</div></details>`;
+  wireTaskCheckbox(row.querySelector('.shared-task-check'), task);
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
   row.querySelector('.reenable')?.addEventListener('click', () => {
     const timestamp = nowIso();
@@ -1488,19 +1492,132 @@ function calendarEventTime(event) {
   return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-function calendarTaskLabel(task) {
-  const assignedTo = assigneeName(task.id);
-  return `${task.recurrenceRule ? '↻ ' : ''}${task.title}${assignedTo ? ` · ${assignedTo}` : ''}`;
+function calendarDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function calendarTaskTitle(task) {
-  const assignedTo = assigneeName(task.id);
-  return `${taskDateText(task)}${assignedTo ? ` · Assigned to ${assignedTo}` : ''}${task.recurrenceRule ? ' · Recurring' : ''}`;
+function calendarProjection(dateKey) {
+  return window.RegulaRusticaHousekeeping.calendarDaySummary({
+    tasks: $('#calendarShowTasks').checked ? data.tasks : [],
+    choreWindows: data.choreWindows,
+    calendarEvents: $('#calendarShowEvents').checked ? data.calendarEvents : [],
+    workDate: dateKey,
+    now: new Date(),
+    includeCompleted: $('#calendarShowCompleted').checked
+  });
 }
 
-function openCalendarTask(task, event) {
-  event.stopPropagation();
-  openModal('task', task.id, task.recordId);
+function openCalendarDay(date) {
+  calendarView = 'today';
+  calendarMonth = new Date(date);
+  document.querySelector('[name="calendarView"][value="today"]').checked = true;
+  renderCalendar();
+}
+
+function calendarCompactTaskRow(task) {
+  const row = document.createElement('div');
+  row.className = `calendar-task-row${task.completed ? ' done' : ''}`;
+  const record = task.recordId ? recordName(task.recordId) : '';
+  const assigned = assigneeName(task.id);
+  const quietMeta = [record, assigned].filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
+  const yieldIndicator = taskYieldIndicator(task);
+  if (yieldIndicator) quietMeta.push(yieldIndicator);
+  const expandedMeta = [taskDateText(task), window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule), choreWindowForTask(task)?.name || '', record, assigned]
+    .filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`).join('<span aria-hidden="true">·</span>');
+  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete ${escapeHtml(task.title)}"><details class="calendar-task-disclosure"><summary><span class="calendar-task-copy"><strong>${escapeHtml(task.title)}</strong>${quietMeta.length ? `<span class="calendar-task-meta">${quietMeta.join('<span aria-hidden="true">·</span>')}</span>` : ''}</span><span class="caret" aria-hidden="true">⌄</span></summary><div class="calendar-task-detail">${expandedMeta ? `<span class="calendar-task-detail-meta">${expandedMeta}</span>` : ''}${task.description ? `<p>${escapeHtml(task.description)}</p>` : ''}<button class="btn secondary edit" type="button">Edit task</button></div></details>`;
+  const checkbox = row.querySelector('.shared-task-check');
+  wireTaskCheckbox(checkbox, task);
+  row.querySelector('.edit').addEventListener('click', event => {
+    event.preventDefault();
+    openModal('task', task.id, task.recordId);
+  });
+  return row;
+}
+
+function calendarEventCard(event, { allDay = false } = {}) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'calendar-ledger-event';
+  const time = allDay ? 'All day' : calendarEventTime(event);
+  card.innerHTML = `<span class="calendar-ledger-time">${escapeHtml(time)} · Event</span><strong>${escapeHtml(event.title)}</strong>${event.location ? `<small>${escapeHtml(event.location)}</small>` : ''}`;
+  card.addEventListener('click', () => openModal('calendar', event.id, event.recordId));
+  return card;
+}
+
+function renderCalendarDay(root, anchor) {
+  const dateKey = calendarDateKey(anchor);
+  const projection = calendarProjection(dateKey);
+  root.className = 'calendar-ledger calendar-today';
+  if (projection.allDayEvents.length) {
+    const allDay = document.createElement('section');
+    allDay.className = 'calendar-ledger-all-day';
+    allDay.innerHTML = '<h4>All-day Events</h4>';
+    projection.allDayEvents.forEach(event => allDay.append(calendarEventCard(event, { allDay: true })));
+    root.append(allDay);
+  }
+  const timeline = document.createElement('div');
+  timeline.className = 'calendar-ledger-timeline';
+  const scheduledItems = projection.schedule.filter(item => item.type === 'event' || item.tasks.length);
+  scheduledItems.forEach(item => {
+    if (item.type === 'event') {
+      timeline.append(calendarEventCard(item.event));
+      return;
+    }
+    const group = document.createElement('section');
+    group.className = 'calendar-ledger-group';
+    group.innerHTML = `<header><time datetime="${item.time}">${escapeHtml(clockTimeText(item.time))}</time><h4>${escapeHtml(item.window.name)}</h4><span>${item.tasks.length} ${item.tasks.length === 1 ? 'chore' : 'chores'}</span></header><div class="calendar-ledger-tasks"></div>`;
+    item.tasks.forEach(task => group.querySelector('.calendar-ledger-tasks').append(calendarCompactTaskRow(task)));
+    timeline.append(group);
+  });
+  if (!scheduledItems.length) timeline.innerHTML = '<p class="calendar-empty-inline">No Chore Windows or timed Events for this day.</p>';
+  root.append(timeline);
+  const other = document.createElement('section');
+  other.className = 'calendar-ledger-other';
+  other.innerHTML = `<header><h4>Other Work</h4><span>${projection.otherWork.length} ${projection.otherWork.length === 1 ? 'task' : 'tasks'}</span></header><div class="calendar-ledger-tasks"></div>`;
+  projection.otherWork.forEach(task => other.querySelector('.calendar-ledger-tasks').append(calendarCompactTaskRow(task)));
+  if (!projection.otherWork.length) other.querySelector('.calendar-ledger-tasks').innerHTML = '<p class="calendar-empty-inline">No other work for this day.</p>';
+  root.append(other);
+}
+
+function renderCalendarWeek(root, start) {
+  root.className = 'calendar-week-scroll';
+  const grid = document.createElement('div');
+  grid.className = 'calendar-week calendar-summary-grid';
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => grid.insertAdjacentHTML('beforeend', `<div class="calendar-weekday">${day}</div>`));
+  for (let offset = 0; offset < 7; offset += 1) {
+    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset);
+    const dateKey = calendarDateKey(date);
+    const projection = calendarProjection(dateKey);
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = `calendar-summary-day${dateKey === today() ? ' current' : ''}`;
+    cell.setAttribute('aria-label', `Open ${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} in Day view`);
+    cell.innerHTML = `<span class="calendar-summary-date">${date.getDate()}</span><span class="calendar-summary-items"></span>`;
+    const items = cell.querySelector('.calendar-summary-items');
+    projection.windowItems.filter(item => item.tasks.length).forEach(item => items.insertAdjacentHTML('beforeend', `<span class="calendar-window-summary"><strong>${escapeHtml(item.window.name)}</strong><small>${item.tasks.length} ${item.tasks.length === 1 ? 'chore' : 'chores'}</small></span>`));
+    [...projection.allDayEvents, ...projection.schedule.filter(item => item.type === 'event').map(item => item.event)].forEach(event => items.insertAdjacentHTML('beforeend', `<span class="calendar-event-summary"><strong>${escapeHtml(event.title)}</strong><small>${event.allDay || !event.startTime ? 'All day' : escapeHtml(calendarEventTime(event))}</small></span>`));
+    items.insertAdjacentHTML('beforeend', `<span class="calendar-other-summary"><strong>Other Work</strong><small>${projection.otherWorkCount} ${projection.otherWorkCount === 1 ? 'task' : 'tasks'}</small></span>`);
+    cell.addEventListener('click', () => openCalendarDay(date));
+    grid.append(cell);
+  }
+  root.append(grid);
+}
+
+function renderCalendarMonth(root, anchor, start) {
+  root.className = 'calendar-month calendar-summary-grid';
+  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => root.insertAdjacentHTML('beforeend', `<div class="calendar-weekday">${day}</div>`));
+  for (let offset = 0; offset < 42; offset += 1) {
+    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset);
+    const dateKey = calendarDateKey(date);
+    const projection = calendarProjection(dateKey);
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = `calendar-month-day workload-${projection.workloadLevel}${date.getMonth() !== anchor.getMonth() ? ' outside' : ''}${dateKey === today() ? ' current' : ''}`;
+    cell.setAttribute('aria-label', `Open ${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}: ${projection.choreCount} chores, ${projection.otherWorkCount} other tasks, ${projection.eventCount} events`);
+    cell.innerHTML = `<span class="calendar-summary-date">${date.getDate()}</span><span class="calendar-month-counts"><span>${projection.choreCount} <em>chore${projection.choreCount === 1 ? '' : 's'}</em></span><span>${projection.otherWorkCount} <em>other work</em></span><span>${projection.eventCount} <em>event${projection.eventCount === 1 ? '' : 's'}</em></span></span>`;
+    cell.addEventListener('click', () => openCalendarDay(date));
+    root.append(cell);
+  }
 }
 
 function renderCalendar() {
@@ -1513,124 +1630,17 @@ function renderCalendar() {
     : calendarView === 'week'
       ? new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - anchor.getDay())
       : anchor;
-  const dayCount = calendarView === 'month' ? 42 : calendarView === 'week' ? 7 : 1;
   $('#calendarMonthLabel').textContent = calendarView === 'today'
     ? anchor.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
     : calendarView === 'week'
       ? `Week of ${start.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}`
       : anchor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-  root.className = `calendar-grid calendar-${calendarView}`;
-  (calendarView === 'today' ? [anchor.toLocaleDateString(undefined, { weekday: 'long' })] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']).forEach(day => {
-    const heading = document.createElement('div');
-    heading.className = 'calendar-weekday';
-    heading.textContent = day;
-    root.appendChild(heading);
-  });
-  const showTasks = $('#calendarShowTasks').checked;
-  const showEvents = $('#calendarShowEvents').checked;
-  const showCompleted = $('#calendarShowCompleted').checked;
-  const visibleTasks = data.tasks
-    .filter(task => {
-      if (!isTaskVisible(task) || (task.completed && !showCompleted)) return false;
-      return showTasks;
-    })
-    .sort((a, b) => {
-      const aBounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(a);
-      const bBounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(b);
-      return (aBounds?.start || '').localeCompare(bBounds?.start || '') || a.title.localeCompare(b.title);
-    });
-  const rangeTasks = visibleTasks.filter(task => {
-    const bounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(task);
-    return bounds && bounds.start !== bounds.end;
-  });
-  const singleDateTasks = visibleTasks.filter(task => {
-    const bounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(task);
-    return bounds && bounds.start === bounds.end;
-  });
-  for (let offset = 0; offset < dayCount; offset += 1) {
-    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset);
-    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const cell = document.createElement('button');
-    cell.type = 'button';
-    cell.className = `calendar-day${calendarView === 'month' && date.getMonth() !== anchor.getMonth() ? ' outside' : ''}${dateKey === today() ? ' current' : ''}`;
-    const dayName = date.toLocaleDateString(undefined, { weekday: 'short' });
-    cell.innerHTML = `<span class="calendar-day-heading"><span class="calendar-day-name">${escapeHtml(dayName)}</span><span class="calendar-date">${date.getDate()}</span></span><span class="calendar-items"></span>`;
-    cell.addEventListener('click', () => {
-      if (calendarView === 'month' && window.matchMedia('(max-width: 520px)').matches) {
-        calendarView = 'today';
-        calendarMonth = date;
-        document.querySelector('[name="calendarView"][value="today"]').checked = true;
-        renderCalendar();
-        return;
-      }
-      openModal('calendar', null, null, '', dateKey);
-    });
-    const items = cell.querySelector('.calendar-items');
-    const weekStart = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
-    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
-    const weekStartKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
-    const weekEndKey = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}-${String(weekEnd.getDate()).padStart(2, '0')}`;
-    rangeTasks
-      .filter(task => {
-        const bounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(task);
-        return calendarView === 'today'
-          ? Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey))
-          : bounds.start <= weekEndKey && bounds.end >= weekStartKey;
-      })
-      .forEach(task => {
-        const occursToday = Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey));
-        if (!occursToday) {
-          const placeholder = document.createElement('span');
-          placeholder.className = 'calendar-item calendar-placeholder';
-          placeholder.textContent = '\u00a0';
-          placeholder.setAttribute('aria-hidden', 'true');
-          items.appendChild(placeholder);
-          return;
-        }
-        const barSegment = window.RegulaRusticaHousekeeping.taskCalendarBarSegment(task, dateKey, date.getDay());
-        const item = document.createElement('span');
-        item.className = `calendar-item calendar-range-bar task-item${barSegment.starts ? ' bar-start' : ''}${barSegment.ends ? ' bar-end' : ''}${task.completed ? ' completed-item' : ''}`;
-        item.textContent = barSegment.showLabel ? calendarTaskLabel(task) : '\u00a0';
-        item.title = calendarTaskTitle(task);
-        item.addEventListener('click', event => openCalendarTask(task, event));
-        items.appendChild(item);
-      });
-    singleDateTasks
-      .filter(task => window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey))
-      .forEach(task => {
-        const item = document.createElement('span');
-        item.className = `calendar-item calendar-single-item task-item${task.completed ? ' completed-item' : ''}`;
-        item.textContent = calendarTaskLabel(task);
-        item.title = calendarTaskTitle(task);
-        item.addEventListener('click', event => openCalendarTask(task, event));
-        items.appendChild(item);
-      });
-    if (showEvents) {
-      data.calendarEvents.filter(event => !event.deletedAt && window.RegulaRusticaHousekeeping.calendarEventOccurrence(event, dateKey)).forEach(event => {
-        const occurrence = window.RegulaRusticaHousekeeping.calendarEventOccurrence(event, dateKey);
-        const item = document.createElement('span');
-        item.className = 'calendar-item event-item';
-        item.textContent = `${occurrence.starts ? `${calendarEventTime(event)} · ` : ''}${event.recurrenceRule ? '↻ ' : ''}${event.title}`;
-        item.addEventListener('click', click => { click.stopPropagation(); openModal('calendar', event.id, event.recordId); });
-        items.appendChild(item);
-      });
-    }
-    if (calendarView === 'today' && !items.children.length) {
-      items.innerHTML = '<span class="calendar-empty">Nothing scheduled for this day.</span>';
-    }
-    if (calendarView === 'week') {
-      const visibleItems = [...items.children].filter(item => !item.classList.contains('calendar-placeholder'));
-      visibleItems.slice(3).forEach(item => item.classList.add('calendar-mobile-overflow'));
-      if (visibleItems.length > 3) items.insertAdjacentHTML('beforeend', `<span class="calendar-more">+${visibleItems.length - 3} more</span>`);
-    }
-    if (calendarView === 'month') {
-      const itemRows = [...items.children];
-      const hiddenCount = itemRows.slice(3).filter(item => !item.classList.contains('calendar-placeholder')).length;
-      itemRows.slice(3).forEach(item => item.classList.add('calendar-mobile-overflow'));
-      if (hiddenCount) items.insertAdjacentHTML('beforeend', `<span class="calendar-more">+${hiddenCount} more</span>`);
-    }
-    root.appendChild(cell);
-  }
+  const periodName = calendarView === 'today' ? 'day' : calendarView;
+  $('#calendarPrevious').setAttribute('aria-label', `Previous ${periodName}`);
+  $('#calendarNext').setAttribute('aria-label', `Next ${periodName}`);
+  if (calendarView === 'today') renderCalendarDay(root, anchor);
+  else if (calendarView === 'week') renderCalendarWeek(root, start);
+  else renderCalendarMonth(root, anchor, start);
 }
 
 function summarizeYield(entries) {
@@ -2560,7 +2570,7 @@ $$('.settings-back').forEach(button => button.addEventListener('click', () => sh
 if (window.matchMedia('(max-width: 520px)').matches) $('#taskAdvancedFilters').removeAttribute('open');
 ['#calendarShowTasks', '#calendarShowEvents', '#calendarShowCompleted']
   .forEach(selector => $(selector).addEventListener('change', renderCalendar));
-$$('[name="calendarView"]').forEach(input => input.addEventListener('change', () => { calendarView = input.value; calendarMonth = new Date(); renderCalendar(); }));
+$$('[name="calendarView"]').forEach(input => input.addEventListener('change', () => { calendarView = input.value; renderCalendar(); }));
 $('#calendarPrevious').addEventListener('click', () => { const amount = calendarView === 'month' ? -1 : calendarView === 'week' ? -7 : -1; calendarMonth = calendarView === 'month' ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + amount, 1) : new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), calendarMonth.getDate() + amount); renderCalendar(); });
 $('#calendarNext').addEventListener('click', () => { const amount = calendarView === 'month' ? 1 : calendarView === 'week' ? 7 : 1; calendarMonth = calendarView === 'month' ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + amount, 1) : new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), calendarMonth.getDate() + amount); renderCalendar(); });
 $('#calendarToday').addEventListener('click', () => { calendarMonth = new Date(); renderCalendar(); });

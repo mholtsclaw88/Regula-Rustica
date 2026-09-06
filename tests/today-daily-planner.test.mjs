@@ -60,6 +60,15 @@ test('Chore Window Tasks never duplicate under Other Work and general work is pr
   assert.equal(projection.windowItems.find(item => item.window.id === 'midday').tasks[0].id, 'window-task');
 });
 
+test('undated Chore Window work appears today without repeating across other dates', () => {
+  const undated = task('custom-task-2', { choreWindowId: 'evening' });
+  const todayProjection = housekeeping.dailyPlannerProjection({ workDate, now, choreWindows: windows, tasks: [undated] });
+  const futureProjection = housekeeping.calendarDaySummary({ workDate: '2026-08-31', now, choreWindows: windows, tasks: [undated] });
+  assert.deepEqual(todayProjection.windowItems.find(item => item.window.id === 'evening').tasks.map(item => item.id), ['custom-task-2']);
+  assert.equal(todayProjection.otherWork.length, 0);
+  assert.equal(futureProjection.choreCount, 0);
+});
+
 test('Needs Attention deduplicates presentation without modifying recurrence history', () => {
   const taskList = [
     task('old-1', { title: 'Morning Milking', recordId: 'daisy', choreWindowId: 'morning', dueDate: '2026-08-12', recurrenceRule: { frequency: 'daily', seriesId: 'milk-series' } }),
@@ -102,6 +111,61 @@ test('empty days and multiple custom Chore Windows remain valid projections', ()
   const custom = housekeeping.dailyPlannerProjection({ workDate, now: new Date(2026, 7, 30, 12, 30), choreWindows: windows, tasks: [] });
   assert.equal(custom.currentId, 'window:midday');
   assert.deepEqual(custom.windowItems.map(item => item.window.id), ['morning', 'midday', 'evening']);
+});
+
+test('Calendar summaries count Chore Windows, Other Work, and Events without duplication', () => {
+  const taskList = [
+    task('morning-milk', { choreWindowId: 'morning', dueDate: workDate }),
+    task('evening-eggs', { choreWindowId: 'evening', dueDate: workDate }),
+    task('fence', { dueDate: workDate }),
+    task('range-work', { availableFrom: '2026-08-29', dueDate: '2026-08-31' })
+  ];
+  const projection = housekeeping.calendarDaySummary({
+    workDate, now, choreWindows: windows, tasks: taskList,
+    calendarEvents: [event('Mass'), event('Fair', { allDay: true, startTime: '' })]
+  });
+  assert.equal(projection.choreCount, 2);
+  assert.equal(projection.otherWorkCount, 2);
+  assert.equal(projection.eventCount, 2);
+  assert.equal(projection.totalLoad, 6);
+  assert.equal(projection.workloadLevel, 3);
+  assert.deepEqual(projection.otherWork.map(item => item.id), ['fence', 'range-work']);
+  assert.equal(projection.otherWork.some(item => item.id === 'morning-milk'), false);
+  assert.deepEqual(projection.schedule.map(item => item.type === 'window' ? item.window.name : item.event.title), [
+    'Morning Chores', 'Mass', 'Midday Check', 'Evening Chores'
+  ]);
+});
+
+test('Calendar workload intensity includes every visible category', () => {
+  assert.equal(housekeeping.calendarWorkloadLevel(0), 0);
+  assert.equal(housekeeping.calendarWorkloadLevel(2), 1);
+  assert.equal(housekeeping.calendarWorkloadLevel(4), 2);
+  assert.equal(housekeeping.calendarWorkloadLevel(6), 3);
+  assert.equal(housekeeping.calendarWorkloadLevel(9), 4);
+  assert.equal(housekeeping.calendarWorkloadLevel(10), 5);
+  const choresOnly = housekeeping.calendarDaySummary({ workDate, now, choreWindows: windows, tasks: [task('milk', { choreWindowId: 'morning', dueDate: workDate })] });
+  const otherOnly = housekeeping.calendarDaySummary({ workDate, now, choreWindows: windows, tasks: [task('fence', { dueDate: workDate })] });
+  const eventsOnly = housekeeping.calendarDaySummary({ workDate, now, choreWindows: windows, calendarEvents: [event('Mass')] });
+  assert.equal(choresOnly.totalLoad, 1);
+  assert.equal(otherOnly.totalLoad, 1);
+  assert.equal(eventsOnly.totalLoad, 1);
+});
+
+test('Week and Month cells share selected-date Day navigation without event dots', async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL('../app.js', import.meta.url), 'utf8'),
+    readFile(new URL('../housekeeping.css', import.meta.url), 'utf8')
+  ]);
+  assert.match(app, /function openCalendarDay\(date\)[\s\S]*calendarMonth = new Date\(date\)/);
+  assert.match(app, /renderCalendarWeek[\s\S]*cell\.addEventListener\('click', \(\) => openCalendarDay\(date\)\)/);
+  assert.match(app, /renderCalendarMonth[\s\S]*cell\.addEventListener\('click', \(\) => openCalendarDay\(date\)\)/);
+  assert.match(app, /calendarView = input\.value; renderCalendar\(\)/);
+  assert.match(app, /let calendarMonth = new Date\(\);/);
+  assert.match(app, /No other work for this day\./);
+  assert.match(app, /<em>other work<\/em>/);
+  assert.match(app, /calendar-other-summary[\s\S]*projection\.otherWorkCount/);
+  assert.doesNotMatch(app, /eventdot|event-dot/);
+  assert.match(css, /\.calendar-month-day\.workload-5/);
 });
 
 test('Today reuses Task completion and Yield-linked Task presentation paths', async () => {
