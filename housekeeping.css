@@ -524,6 +524,7 @@ summary:focus-visible {
 .compact-pills label { min-height: 31px; padding: 6px 10px; font-size: .68rem; }
 .reporting-range { margin: 4px 0 0; color: var(--muted); font: .8rem Arial, sans-serif; }
 .reporting-page > .section-head { align-items: flex-end; margin-bottom: 18px; }
+.section-head .muted { margin: 4px 0 0; }
 .report-quick-entry { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; background: rgba(229,223,200,.68); }
 .report-quick-entry .muted { margin: 3px 0 0; }
 .report-quick-entry .quick { justify-content: flex-end; margin: 0; }
