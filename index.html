@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=today-daily-planner-v2">
-  <link rel="stylesheet" href="housekeeping.css?v=mobile-calendar-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=yield-ledger-ui-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=recurring-events-v1" defer></script>
@@ -19,8 +19,8 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=recurring-events-v1" defer></script>
-  <script src="ui-refinements.js?v=data-entry-forms-v2" defer></script>
+  <script src="app.js?v=yield-ledger-ui-v1" defer></script>
+  <script src="ui-refinements.js?v=yield-ledger-ui-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js" type="module"></script>
   <script src="sync/runtime.mjs?v=clean-cloud-baseline-v1" type="module"></script>
@@ -217,33 +217,31 @@
       </div>
     </section>
 
-    <section id="yield" class="view">
+    <section id="yield" class="view reporting-page">
       <div class="section-head">
-        <div><span class="label">Daily provision</span><h2>Homestead Yield</h2></div>
+        <div><span class="label">Daily provision</span><h2>Yield</h2></div>
       </div>
-      <div class="grid2">
-        <article class="card">
+      <article class="report-quick-entry">
+        <div>
           <span class="label">Quick entry</span>
-          <h3>Record today’s yield</h3>
-          <p class="muted">Keep harvest and production records close to the work itself.</p>
-          <div class="quick">
-            <button class="btn primary milk-action" id="addMilkYield">Record milk</button>
-            <button class="btn secondary egg-action" id="addEggYield">Record eggs</button>
-            <button class="btn secondary" id="addMeatYield">Record meat harvest</button>
-            <button class="btn secondary" id="addHarvestYield">Record crop harvest</button>
-            <button class="btn secondary" id="addForageYield">Record hay / forage</button>
-          </div>
-        </article>
-        <aside class="card">
-          <span class="label" id="yieldSummaryPeriod">Last 30 Days</span>
-          <div class="stats yield-stats">
-            <div class="stat stat-milk"><strong id="todayMilkYield">0</strong><span>Milk</span></div>
-            <div class="stat stat-eggs"><strong id="todayEggYield">0</strong><span>Eggs</span></div>
-          </div>
-        </aside>
+          <p class="muted">Record today’s production or harvest.</p>
+        </div>
+        <div class="quick">
+          <button class="btn primary milk-action" id="addMilkYield">Milk</button>
+          <button class="btn secondary egg-action" id="addEggYield">Eggs</button>
+          <button class="btn secondary" id="addMeatYield">Meat harvest</button>
+          <button class="btn secondary" id="addHarvestYield">Crop harvest</button>
+          <button class="btn secondary" id="addForageYield">Hay / forage</button>
+        </div>
+      </article>
+      <div class="stats report-stats">
+        <div class="stat stat-milk"><strong id="todayMilkYield">0</strong><span>Milk</span></div>
+        <div class="stat stat-eggs"><strong id="todayEggYield">0</strong><span>Eggs</span></div>
+        <div class="stat stat-net"><strong id="todayOtherYield">0</strong><span>Other yield</span></div>
       </div>
-      <div class="section-head yield-recent-head"><div><span class="label">Recorded provision</span><h3>Yield entries</h3><p class="reporting-range" id="yieldDateRange"></p></div></div>
-      <div class="reporting-controls">
+      <details class="reporting-filter-panel">
+        <summary><span class="reporting-range" id="yieldDateRange"></span><span>Filters</span></summary>
+        <div class="reporting-controls">
         <fieldset class="choice-filter">
           <legend>Date range</legend>
           <div class="choice-pills compact-pills">
@@ -266,22 +264,25 @@
             <label><input type="radio" name="yieldTypeFilter" value="forage">Hay / Forage</label>
           </div>
         </fieldset>
-      </div>
+        </div>
+      </details>
+      <div class="report-list-head"><span class="label">Recorded provision</span><h3>Recent yield</h3></div>
       <div id="yieldList" class="stack"></div>
     </section>
 
-    <section id="ledger" class="view">
+    <section id="ledger" class="view reporting-page">
       <div class="section-head">
         <div><span class="label">Financial stewardship</span><h2>Ledger</h2></div>
         <button class="btn primary" id="addLedger">+ Entry</button>
       </div>
-      <div class="stats stats-spaced">
+      <div class="stats report-stats">
         <div class="stat stat-expense"><strong id="expenseTotal">$0</strong><span>Expenses</span></div>
         <div class="stat stat-income"><strong id="incomeTotal">$0</strong><span>Income</span></div>
         <div class="stat stat-net"><strong id="ledgerNet">$0</strong><span>Net</span></div>
       </div>
-      <p class="reporting-range" id="ledgerDateRange"></p>
-      <div class="reporting-controls">
+      <details class="reporting-filter-panel">
+        <summary><span class="reporting-range" id="ledgerDateRange"></span><span>Filters</span></summary>
+        <div class="reporting-controls">
         <fieldset class="choice-filter">
           <legend>Date range</legend>
           <div class="choice-pills compact-pills">
@@ -301,7 +302,9 @@
             <label><input type="radio" name="ledgerTypeFilter" value="income">Income</label>
           </div>
         </fieldset>
-      </div>
+        </div>
+      </details>
+      <div class="report-list-head"><span class="label">Financial record</span><h3>Recent entries</h3></div>
       <div id="ledgerList" class="stack"></div>
     </section>
 

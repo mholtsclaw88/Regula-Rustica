@@ -263,7 +263,7 @@
       if (photos[entry.id]) showReceipt(entry.id);
       else pickReceipt(entry.id);
     });
-    const actions = row.querySelector('.actions');
+    const actions = row.querySelector('.task-more-menu, .actions');
     if (actions) actions.prepend(button);
     else row.appendChild(button);
   }

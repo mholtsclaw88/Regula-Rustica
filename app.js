@@ -1651,13 +1651,22 @@ function reportingRangeText(range) {
   return `${labels[range.period] || 'Selected period'} · ${formatDate(range.start)} – ${formatDate(range.end)}`;
 }
 
+function addReportEntryActions(row, label, edit, remove) {
+  const menu = document.createElement('details');
+  menu.className = 'task-more report-entry-actions';
+  menu.innerHTML = `<summary aria-label="Actions for ${escapeHtml(label)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button><button class="del" type="button">Delete</button></div>`;
+  menu.querySelector('.edit').addEventListener('click', edit);
+  menu.querySelector('.del').addEventListener('click', remove);
+  row.append(menu);
+}
+
 function yieldRow(entry) {
   const row = document.createElement('div');
-  row.className = 'task yield-row';
+  row.className = 'task report-entry yield-row';
   const yieldLabel = window.RegulaRusticaTasks.YIELD_TYPES[entry.type]?.label || 'Yield';
-  row.innerHTML = `<div class="yield-mark" aria-hidden="true">${escapeHtml(yieldLabel.charAt(0))}</div><div class="task-body"><strong>${escapeHtml(recordName(entry.recordId) || 'Unlinked record')}</strong><div class="meta">${new Date(entry.occurredAt).toLocaleString()} · ${escapeHtml(entry.session)}</div>${entry.details ? `<div class="task-description">${escapeHtml(entry.details)}</div>` : ''}</div><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong>${entry.unusableQuantity ? `<span class="meta">${escapeHtml(entry.unusableQuantity)} unusable</span>` : ''}<div class="actions"><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button></div>`;
-  row.querySelector('.edit').addEventListener('click', () => openModal('yield', entry.id, entry.recordId, entry.type));
-  row.querySelector('.del').addEventListener('click', () => {
+  const title = recordName(entry.recordId) || 'Unlinked record';
+  row.innerHTML = `<div class="yield-mark" aria-hidden="true">${escapeHtml(yieldLabel.charAt(0))}</div><div class="task-body"><strong>${escapeHtml(title)}</strong><div class="meta">${escapeHtml(yieldLabel)} · ${new Date(entry.occurredAt).toLocaleString()} · ${escapeHtml(entry.session)}</div>${entry.details ? `<div class="task-description">${escapeHtml(entry.details)}</div>` : ''}</div><div class="report-entry-amount"><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong>${entry.unusableQuantity ? `<span class="meta">${escapeHtml(entry.unusableQuantity)} unusable</span>` : ''}</div>`;
+  addReportEntryActions(row, title, () => openModal('yield', entry.id, entry.recordId, entry.type), () => {
     if (confirm('Delete this yield entry?')) {
       entry.deletedAt = nowIso();
       entry.updatedAt = entry.deletedAt;
@@ -1672,10 +1681,10 @@ function renderYield() {
   const range = selectedReportingRange('yieldDateFilter');
   const ranged = active.filter(entry => window.RegulaRusticaHousekeeping.matchesReportingDate(localDateTime(entry.occurredAt).slice(0, 10), range));
   const rangeText = reportingRangeText(range);
-  $('#yieldSummaryPeriod').textContent = rangeText.split(' · ')[0];
   $('#yieldDateRange').textContent = rangeText;
   $('#todayMilkYield').textContent = summarizeYield(ranged.filter(entry => entry.type === 'milk'));
   $('#todayEggYield').textContent = summarizeYield(ranged.filter(entry => entry.type === 'eggs'));
+  $('#todayOtherYield').textContent = summarizeYield(ranged.filter(entry => !['milk', 'eggs'].includes(entry.type)));
   const root = $('#yieldList');
   root.innerHTML = '';
   const filter = document.querySelector('[name="yieldTypeFilter"]:checked')?.value || 'all';
@@ -1685,7 +1694,7 @@ function renderYield() {
 
 function ledgerRow(entry, options = {}) {
   const row = document.createElement('div');
-  row.className = 'task';
+  row.className = 'task report-entry ledger-entry';
   const amount = options.amount ?? entry.amount;
   const recordContext = Boolean(options.recordId);
   const allocationSummary = window.RegulaRusticaLedgerAllocations.entryAllocationSummary(data, entry);
@@ -1693,9 +1702,8 @@ function ledgerRow(entry, options = {}) {
     ? `Allocated ${formatMoney(allocationSummary.allocated)} · ${allocationSummary.items.map(item => item.record?.name).filter(Boolean).join(', ')}${allocationSummary.unallocated > .004 ? ` · ${formatMoney(allocationSummary.unallocated)} unallocated` : ''}`
     : '';
   const meta = [formatDate(entry.date), recordContext && options.allocated ? 'Allocated share' : '', !recordContext && entry.recordId ? recordName(entry.recordId) : ''].filter(Boolean).join(' · ');
-  row.innerHTML = `<div class="task-body"><strong>${escapeHtml(entry.description)}</strong><div class="meta">${escapeHtml(meta)}</div>${allocationText ? `<div class="meta allocation-ledger-summary">${escapeHtml(allocationText)}</div>` : ''}</div><strong class="${entry.type === 'income' ? 'money-in' : 'money-out'}">${entry.type === 'income' ? '+' : '−'}${formatMoney(amount)}</strong><button class="btn ghost edit">Edit</button><button class="btn ghost del">Delete</button>`;
-  row.querySelector('.edit').addEventListener('click', () => openModal('ledger', entry.id, entry.recordId));
-  row.querySelector('.del').addEventListener('click', () => {
+  row.innerHTML = `<div class="task-body"><strong>${escapeHtml(entry.description)}</strong><div class="meta">${escapeHtml(meta)}</div>${allocationText ? `<div class="meta allocation-ledger-summary">${escapeHtml(allocationText)}</div>` : ''}</div><strong class="report-entry-amount ${entry.type === 'income' ? 'money-in' : 'money-out'}">${entry.type === 'income' ? '+' : '−'}${formatMoney(amount)}</strong>`;
+  addReportEntryActions(row, entry.description, () => openModal('ledger', entry.id, entry.recordId), () => {
     if (confirm('Delete this ledger entry?')) {
       entry.deletedAt = nowIso();
       entry.updatedAt = entry.deletedAt;
