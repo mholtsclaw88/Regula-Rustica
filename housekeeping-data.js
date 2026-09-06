@@ -181,8 +181,10 @@
     const timeNow = localDate(now) === workDate
       ? `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
       : '00:00';
-    const current = schedule.find(item => item.time <= timeNow && item.endTime >= timeNow) || null;
-    const next = schedule.find(item => item.time >= timeNow && item.id !== current?.id) || null;
+    const meaningfulSchedule = schedule.filter(item => item.type === 'event' || item.tasks.some(task => !task.completed));
+    const current = meaningfulSchedule.find(item => item.time <= timeNow && item.endTime >= timeNow) || null;
+    const next = meaningfulSchedule.find(item => item.time >= timeNow && item.id !== current?.id) || null;
+    const pastIds = schedule.filter(item => item.endTime < timeNow).map(item => item.id);
 
     const openTasks = tasks.filter(task => visibleTask(task) && !task.completed);
     const isActionable = task => {
@@ -193,7 +195,7 @@
     const overdue = openTasks.filter(task => taskIsOverdue(task, windowById.get(task.choreWindowId) || null, now));
     const otherWork = tasks
       .filter(task => visibleTask(task) && !task.choreWindowId && (includeCompleted || !task.completed)
-        && (calendarRange ? occursOnDate(task) : isActionable(task) && !overdue.includes(task)))
+        && (calendarRange ? occursOnDate(task) : task.completed ? occursOnDate(task) : isActionable(task) && !overdue.includes(task)))
       .sort((a, b) => {
         const priority = { urgent: 0, high: 1, normal: 2, low: 3 };
         return (priority[a.priority] ?? 2) - (priority[b.priority] ?? 2)
@@ -221,6 +223,7 @@
       overdueOccurrenceCount: overdue.length,
       currentId: current?.id || null,
       nextId: next?.id || null,
+      pastIds,
       windowItems,
       eventCount: events.length
     };

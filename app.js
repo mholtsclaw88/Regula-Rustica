@@ -940,13 +940,15 @@ function renderToday() {
     choreWindows: data.choreWindows,
     calendarEvents: data.calendarEvents,
     workDate,
-    now: new Date()
+    now: new Date(),
+    includeCompleted: true
   });
   const timeline = $('#todayTimeline');
   timeline.innerHTML = '';
   projection.schedule.forEach(item => {
     const timelineItem = document.createElement('article');
-    timelineItem.className = `today-timeline-item ${item.type}${item.id === projection.currentId ? ' current' : ''}${item.id === projection.nextId ? ' next' : ''}`;
+    const phase = item.id === projection.currentId ? ' current' : item.id === projection.nextId ? ' next' : projection.pastIds.includes(item.id) ? ' past' : '';
+    timelineItem.className = `today-timeline-item ${item.type}${phase}`;
     const time = document.createElement('time');
     time.dateTime = item.time;
     time.textContent = clockTimeText(item.time);
@@ -958,7 +960,7 @@ function renderToday() {
     content.className = 'today-timeline-content';
     if (item.type === 'event') {
       content.classList.add('today-event-card');
-      content.innerHTML = `<div><span class="label">Event</span><strong>${escapeHtml(item.event.title)}</strong>${item.event.location ? `<small>${escapeHtml(item.event.location)}</small>` : ''}${item.event.notes ? `<small>${escapeHtml(item.event.notes)}</small>` : ''}</div>`;
+      content.innerHTML = `<div><span class="label">Event${phase === ' current' ? ' · Now' : phase === ' next' ? ' · Next' : ''}</span><strong>${escapeHtml(item.event.title)}</strong>${item.event.location ? `<small>${escapeHtml(item.event.location)}</small>` : ''}${item.event.notes ? `<small>${escapeHtml(item.event.notes)}</small>` : ''}</div>`;
     } else {
       const due = item.tasks;
       const completed = item.completed;
@@ -966,9 +968,10 @@ function renderToday() {
       const yieldSummary = [summarizeYield(yields.filter(entry => entry.type === 'milk')), summarizeYield(yields.filter(entry => entry.type === 'eggs'))].filter(value => value !== '0').join(' · ');
       const section = document.createElement('details');
       section.className = `today-window-card${completed === due.length && due.length ? ' complete' : ''}`;
+      timelineItem.classList.toggle('complete', completed === due.length && due.length > 0);
       section.open = item.id === projection.currentId || item.id === projection.nextId;
-      section.innerHTML = `<summary><span><span class="label">Chore Window</span><strong>${escapeHtml(item.window.name)}</strong><small>${completed} of ${due.length} complete${yieldSummary ? ` · ${escapeHtml(yieldSummary)}` : ''}</small></span><span class="caret" aria-hidden="true">⌄</span></summary><div class="stack chore-occurrences"></div><button class="btn secondary complete-window" type="button">Complete ${escapeHtml(item.window.name)}</button>`;
-      due.forEach(task => section.querySelector('.chore-occurrences').append(taskRow(task)));
+      section.innerHTML = `<summary><span><span class="label">Chore Window${phase === ' current' ? ' · Now' : phase === ' next' ? ' · Next' : ''}</span><strong>${escapeHtml(item.window.name)}</strong><small>${completed} of ${due.length} complete${yieldSummary ? ` · ${escapeHtml(yieldSummary)}` : ''}</small></span><span class="caret" aria-hidden="true">⌄</span></summary><div class="calendar-ledger-tasks chore-occurrences"></div><button class="btn secondary complete-window" type="button">Complete ${escapeHtml(item.window.name)}</button>`;
+      due.forEach(task => section.querySelector('.chore-occurrences').append(calendarCompactTaskRow(task)));
       section.querySelector('.complete-window').disabled = !due.length || completed === due.length;
       section.querySelector('.complete-window').addEventListener('click', () => {
       let cancelled = false;
@@ -1004,16 +1007,20 @@ function renderToday() {
 
   const root = $('#todayTasks');
   root.innerHTML = '';
-  projection.otherWork.forEach(task => root.appendChild(taskRow(task)));
+  projection.otherWork.forEach(task => root.appendChild(calendarCompactTaskRow(task)));
   $('#todayEmpty').classList.toggle('hidden', projection.otherWork.length > 0);
   $('#todayTaskCount').textContent = projection.otherWork.length;
 
   const attentionRoot = $('#todayAttention');
   attentionRoot.innerHTML = '';
   projection.needsAttention.forEach(group => {
-    const row = taskRow(group.task);
+    const taskDate = window.RegulaRusticaHousekeeping.taskWorkDate(group.task);
+    const age = taskDate && taskDate < workDate
+      ? Math.max(1, Math.round((Date.parse(`${workDate}T00:00:00Z`) - Date.parse(`${taskDate}T00:00:00Z`)) / 86400000))
+      : 0;
+    const row = calendarCompactTaskRow(group.task, { quietPrefix: age ? `${age} day${age === 1 ? '' : 's'} overdue` : 'Chore Window elapsed' });
     if (group.count > 1) {
-      const meta = row.querySelector('.record-task-meta') || row.querySelector('.task-body');
+      const meta = row.querySelector('.calendar-task-meta') || row.querySelector('.calendar-task-copy');
       const history = document.createElement('span');
       history.className = 'attention-history-count';
       history.textContent = `${group.count} overdue occurrences`;
@@ -1025,21 +1032,14 @@ function renderToday() {
   $('#todayAttentionEmpty').classList.toggle('hidden', projection.needsAttention.length > 0);
   $('#todayAttentionHistoryNote').classList.toggle('hidden', projection.overdueOccurrenceCount <= projection.needsAttention.length);
 
-  const firstWindow = projection.windowItems[0] || null;
-  const lastWindow = projection.windowItems.length > 1 ? projection.windowItems.at(-1) : null;
-  $('#todayFirstWindow').classList.toggle('hidden', !firstWindow);
-  $('#todayFirstWindowName').textContent = firstWindow?.window.name || 'Chores';
-  $('#todayFirstWindowProgress').textContent = firstWindow ? `${firstWindow.completed} of ${firstWindow.tasks.length} complete` : '';
-  $('#todayLastWindow').classList.toggle('hidden', !lastWindow);
-  $('#todayLastWindowName').textContent = lastWindow?.window.name || 'Chores';
-  $('#todayLastWindowProgress').textContent = lastWindow ? `${lastWindow.completed} of ${lastWindow.tasks.length} complete` : '';
   const nextItem = projection.schedule.find(item => item.id === projection.currentId) || projection.schedule.find(item => item.id === projection.nextId) || null;
-  $('#todayNextLabel').textContent = projection.currentId ? 'Now' : 'Next up';
-  $('#todayNextUp').textContent = nextItem ? `${nextItem.type === 'window' ? nextItem.window.name : nextItem.event.title} at ${clockTimeText(nextItem.time)}` : 'Nothing scheduled';
+  $('#todayNextLabel').textContent = projection.currentId ? 'Now' : 'Next';
+  $('#todayNextUp').textContent = nextItem ? `${nextItem.type === 'window' ? nextItem.window.name : nextItem.event.title} · ${clockTimeText(nextItem.time)}` : 'Nothing scheduled';
   $('#todayNextUpDetail').textContent = nextItem?.type === 'event' ? nextItem.event.location : nextItem?.type === 'window' ? `${nextItem.completed} of ${nextItem.tasks.length} complete` : '';
   const choreCount = projection.windowItems.reduce((sum, item) => sum + item.tasks.length, 0);
-  $('#todayTotals').textContent = choreCount || projection.otherWork.length ? `${choreCount} chores · ${projection.otherWork.length} other task${projection.otherWork.length === 1 ? '' : 's'}` : 'A quiet day';
-  $('#todayEventTotal').textContent = `${projection.eventCount} event${projection.eventCount === 1 ? '' : 's'}`;
+  const completedChores = projection.windowItems.reduce((sum, item) => sum + item.completed, 0);
+  $('#todayChoreProgress').textContent = choreCount ? `${completedChores} of ${choreCount} chores complete` : 'No chores scheduled';
+  $('#todayTotals').textContent = choreCount || projection.otherWork.length || projection.eventCount ? `${projection.otherWork.length} other task${projection.otherWork.length === 1 ? '' : 's'} · ${projection.eventCount} event${projection.eventCount === 1 ? '' : 's'}` : 'A quiet day';
 
   ['todayWorkSection', 'todayAttentionSection'].forEach(id => {
     const section = $(`#${id}`);
@@ -1514,12 +1514,12 @@ function openCalendarDay(date) {
   renderCalendar();
 }
 
-function calendarCompactTaskRow(task) {
+function calendarCompactTaskRow(task, { quietPrefix = '' } = {}) {
   const row = document.createElement('div');
   row.className = `calendar-task-row${task.completed ? ' done' : ''}`;
   const record = task.recordId ? recordName(task.recordId) : '';
   const assigned = assigneeName(task.id);
-  const quietMeta = [record, assigned].filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
+  const quietMeta = [quietPrefix, record, assigned].filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
   const yieldIndicator = taskYieldIndicator(task);
   if (yieldIndicator) quietMeta.push(yieldIndicator);
   const expandedMeta = [taskDateText(task), window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule), choreWindowForTask(task)?.name || '', record, assigned]
