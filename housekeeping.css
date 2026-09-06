@@ -412,6 +412,25 @@ input[type="checkbox"] { width: 22px; height: 22px; }
   box-shadow: 0 -8px 18px rgba(54, 44, 29, .06);
 }
 .form-modal-long .dialog-actions .btn { min-height: 44px; }
+.yield-task-completion { max-width: 560px; }
+.yield-task-completion .form-modal-header h2 { text-transform: none; }
+.yield-task-completion #modalFields { gap: 16px; }
+.yield-completion-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 13px;
+  border-bottom: 1px solid rgba(164, 123, 60, .42);
+}
+.yield-completion-context strong { display: block; font-size: 1rem; }
+.yield-completion-context span { display: block; margin-top: 3px; color: var(--muted); font: .78rem Arial, sans-serif; text-transform: capitalize; }
+.yield-completion-edit { flex: 0 0 auto; color: var(--forest); }
+.yield-completion-details { border-top: 1px solid rgba(164, 123, 60, .34); }
+.yield-completion-details summary { min-height: 44px; padding: 13px 0 0; color: var(--forest); cursor: pointer; font: 700 .78rem Arial, sans-serif; }
+.yield-completion-optional { padding-top: 10px; }
+.yield-task-completion .dialog-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.yield-task-completion #modalCompleteWithoutYield { background: transparent; color: var(--muted); }
 .form-error {
   margin: 0;
   padding: 9px 11px;
@@ -431,6 +450,9 @@ input[type="checkbox"] { width: 22px; height: 22px; }
   .form-modal-long .dialog-actions .danger { width: 100%; margin: 0 0 3px; }
   .form-modal-long .dialog-actions #modalCancel,
   .form-modal-long .dialog-actions #modalSubmit { flex: 1 1 0; }
+  .yield-task-completion .dialog-actions { grid-template-columns: 1fr; }
+  .yield-task-completion #modalSubmit { grid-row: 1; }
+  .yield-task-completion #modalCompleteWithoutYield { grid-row: 2; }
 }
 
 .yield-recent-head { margin-top: 24px; }
