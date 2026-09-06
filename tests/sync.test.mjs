@@ -1215,14 +1215,16 @@ test('Record responsibility retains its canonical Homestead Person mapping', () 
   assert.equal(restored.stewardship.responsiblePersonId, personId);
 });
 
-test('calendar events retain all-day and optional time metadata', () => {
+test('calendar events retain timing and recurrence metadata', () => {
   const state = new LocalSyncState(new MemoryStorage());
-  const event = { id: crypto.randomUUID(), title: 'Farmers market', startDate: '2026-08-15', endDate: '2026-08-15', allDay: false, startTime: '08:30', endTime: '11:00', location: 'Town green', notes: '', createdAt: '2026-08-09T12:00:00Z' };
+  const event = { id: crypto.randomUUID(), title: 'Farmers market', startDate: '2026-08-15', endDate: '2026-08-15', allDay: false, startTime: '08:30', endTime: '11:00', location: 'Town green', notes: '', recurrenceRule: { frequency: 'weekly', interval: 2, until: '2026-12-19' }, createdAt: '2026-08-09T12:00:00Z' };
   const cloud = toCloud('calendar_events', event, state);
   assert.equal(cloud.start_time, '08:30');
   assert.equal(cloud.all_day, false);
+  assert.deepEqual(cloud.recurrence_rule, event.recurrenceRule);
   const local = fromCloud('calendar_events', { ...cloud, id: cloud.id, created_at: event.createdAt, updated_at: event.createdAt }, state);
   assert.equal(local.location, 'Town green');
+  assert.deepEqual(local.recurrenceRule, event.recurrenceRule);
 });
 
 test('Postgres Chore Window times normalize to local HH:MM precision', () => {

@@ -8,8 +8,8 @@ const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
 const RECORD_TYPES = ['Animal', 'Land', 'Equipment', 'Structure', 'Work'];
-const CURRENT_SCHEMA_VERSION = 13;
-const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, 12, CURRENT_SCHEMA_VERSION];
+const CURRENT_SCHEMA_VERSION = 14;
+const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, 12, 13, CURRENT_SCHEMA_VERSION];
 let startupMigrationBefore = null;
 
 const RECORD_CONFIG = {
@@ -263,6 +263,7 @@ function normalizeCalendarEvent(event = {}) {
     location: event.location || '',
     notes: event.notes || '',
     recordId: event.recordId || null,
+    recurrenceRule: window.RegulaRusticaHousekeeping.normalizeCalendarRecurrenceRule(event.recurrenceRule),
     createdAt,
     updatedAt: event.updatedAt || createdAt,
     deletedAt: event.deletedAt || null
@@ -1552,8 +1553,18 @@ function renderCalendar() {
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = `calendar-day${calendarView === 'month' && date.getMonth() !== anchor.getMonth() ? ' outside' : ''}${dateKey === today() ? ' current' : ''}`;
-    cell.innerHTML = `<span class="calendar-date">${date.getDate()}</span><span class="calendar-items"></span>`;
-    cell.addEventListener('click', () => openModal('calendar', null, null, '', dateKey));
+    const dayName = date.toLocaleDateString(undefined, { weekday: 'short' });
+    cell.innerHTML = `<span class="calendar-day-heading"><span class="calendar-day-name">${escapeHtml(dayName)}</span><span class="calendar-date">${date.getDate()}</span></span><span class="calendar-items"></span>`;
+    cell.addEventListener('click', () => {
+      if (calendarView === 'month' && window.matchMedia('(max-width: 520px)').matches) {
+        calendarView = 'today';
+        calendarMonth = date;
+        document.querySelector('[name="calendarView"][value="today"]').checked = true;
+        renderCalendar();
+        return;
+      }
+      openModal('calendar', null, null, '', dateKey);
+    });
     const items = cell.querySelector('.calendar-items');
     const weekStart = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
     const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
@@ -1562,7 +1573,9 @@ function renderCalendar() {
     rangeTasks
       .filter(task => {
         const bounds = window.RegulaRusticaHousekeeping.taskCalendarBounds(task);
-        return bounds.start <= weekEndKey && bounds.end >= weekStartKey;
+        return calendarView === 'today'
+          ? Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey))
+          : bounds.start <= weekEndKey && bounds.end >= weekStartKey;
       })
       .forEach(task => {
         const occursToday = Boolean(window.RegulaRusticaHousekeeping.taskCalendarSegment(task, dateKey));
@@ -1593,13 +1606,28 @@ function renderCalendar() {
         items.appendChild(item);
       });
     if (showEvents) {
-      data.calendarEvents.filter(event => !event.deletedAt && event.startDate <= dateKey && event.endDate >= dateKey).forEach(event => {
+      data.calendarEvents.filter(event => !event.deletedAt && window.RegulaRusticaHousekeeping.calendarEventOccurrence(event, dateKey)).forEach(event => {
+        const occurrence = window.RegulaRusticaHousekeeping.calendarEventOccurrence(event, dateKey);
         const item = document.createElement('span');
         item.className = 'calendar-item event-item';
-        item.textContent = `${event.startDate === dateKey ? `${calendarEventTime(event)} · ` : ''}${event.title}`;
+        item.textContent = `${occurrence.starts ? `${calendarEventTime(event)} · ` : ''}${event.recurrenceRule ? '↻ ' : ''}${event.title}`;
         item.addEventListener('click', click => { click.stopPropagation(); openModal('calendar', event.id, event.recordId); });
         items.appendChild(item);
       });
+    }
+    if (calendarView === 'today' && !items.children.length) {
+      items.innerHTML = '<span class="calendar-empty">Nothing scheduled for this day.</span>';
+    }
+    if (calendarView === 'week') {
+      const visibleItems = [...items.children].filter(item => !item.classList.contains('calendar-placeholder'));
+      visibleItems.slice(3).forEach(item => item.classList.add('calendar-mobile-overflow'));
+      if (visibleItems.length > 3) items.insertAdjacentHTML('beforeend', `<span class="calendar-more">+${visibleItems.length - 3} more</span>`);
+    }
+    if (calendarView === 'month') {
+      const itemRows = [...items.children];
+      const hiddenCount = itemRows.slice(3).filter(item => !item.classList.contains('calendar-placeholder')).length;
+      itemRows.slice(3).forEach(item => item.classList.add('calendar-mobile-overflow'));
+      if (hiddenCount) items.insertAdjacentHTML('beforeend', `<span class="calendar-more">+${hiddenCount} more</span>`);
     }
     root.appendChild(cell);
   }
@@ -2068,6 +2096,21 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     root.append(field('All day', 'allDay', 'checkbox', calendarEvent.allDay !== false));
     root.append(field('Start time (optional)', 'startTime', 'time', calendarEvent.startTime));
     root.append(field('End time (optional)', 'endTime', 'time', calendarEvent.endTime));
+    const recurrence = window.RegulaRusticaHousekeeping.normalizeCalendarRecurrenceRule(calendarEvent.recurrenceRule);
+    const repeat = field('Repeat', 'recurrenceFrequency', 'select', recurrence?.frequency || '', ['', 'daily', 'weekly', 'monthly']);
+    repeat.querySelector('option[value=""]').textContent = 'Does not repeat';
+    root.append(repeat);
+    const recurrenceDetails = formRow(
+      field('Repeat every', 'recurrenceInterval', 'number', recurrence?.interval || 1),
+      field('Repeat until (optional)', 'recurrenceUntil', 'date', recurrence?.until || '')
+    );
+    recurrenceDetails.classList.add('calendar-recurrence-details');
+    recurrenceDetails.querySelector('[name=recurrenceInterval]').min = '1';
+    recurrenceDetails.querySelector('[name=recurrenceInterval]').step = '1';
+    root.append(recurrenceDetails);
+    const toggleRecurrence = () => recurrenceDetails.classList.toggle('hidden', !repeat.querySelector('select').value);
+    repeat.querySelector('select').addEventListener('change', toggleRecurrence);
+    toggleRecurrence();
     root.append(field('Location (optional)', 'location', 'text', calendarEvent.location));
     root.append(field('Notes (optional)', 'notes', 'textarea', calendarEvent.notes));
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || calendarEvent.recordId);
@@ -2261,11 +2304,20 @@ $('#modalForm').addEventListener('submit', async event => {
       alert('The event end cannot be before its start.');
       return;
     }
+    if (form.recurrenceUntil && form.recurrenceUntil < form.startDate) {
+      alert('The repeat-until date cannot be before the event starts.');
+      return;
+    }
     const existing = data.calendarEvents.find(item => item.id === editId);
+    const recurrenceRule = window.RegulaRusticaHousekeeping.normalizeCalendarRecurrenceRule({
+      frequency: form.recurrenceFrequency,
+      interval: form.recurrenceInterval,
+      until: form.recurrenceUntil
+    });
     const values = {
       title: form.title.trim(), startDate: form.startDate, endDate: form.endDate,
       allDay: form.allDay === 'true', startTime: form.startTime || '', endTime: form.endTime || '',
-      location: form.location.trim(), notes: form.notes.trim(), recordId: form.recordId || null
+      location: form.location.trim(), notes: form.notes.trim(), recordId: form.recordId || null, recurrenceRule
     };
     if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
     else data.calendarEvents.push(normalizeCalendarEvent({ id: uid(), ...values, createdAt: nowIso() }));
