@@ -1064,6 +1064,8 @@ html:has(#calendar.active) { scrollbar-gutter: stable; }
 .calendar-task-row .caret { color: var(--forest); text-align: center; transition: transform .16s ease; }
 .calendar-task-disclosure[open] .caret { transform: rotate(180deg); }
 .calendar-task-row.done .calendar-task-copy strong { color: var(--muted); text-decoration: line-through; }
+.calendar-task-row.projected > .shared-task-check { opacity: .42; }
+.calendar-task-row.projected .calendar-task-copy strong { color: var(--ink); }
 .calendar-task-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 10px 10px 0; }
 .calendar-task-detail p { width: 100%; margin: 0; color: var(--muted); font-size: .82rem; }
 .calendar-task-detail .btn { min-height: 34px; margin-left: auto; padding: 6px 10px; }

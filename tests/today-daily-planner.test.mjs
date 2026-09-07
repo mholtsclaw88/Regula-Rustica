@@ -184,6 +184,26 @@ test('Calendar summaries count Chore Windows, Other Work, and Events without dup
   ]);
 });
 
+test('Calendar projects fixed recurring work without creating or replacing Task occurrences', () => {
+  const taskList = [
+    task('daily-anchor', { title: 'Collect eggs', choreWindowId: 'morning', dueDate: '2026-09-07', recurrenceRule: { frequency: 'daily', interval: 1, mode: 'fixed_schedule', seriesId: 'eggs' } }),
+    task('weekly-anchor', { title: 'Clean coop', dueDate: '2026-09-07', recurrenceRule: { frequency: 'weekly', interval: 2, mode: 'fixed_schedule', seriesId: 'coop' } }),
+    task('after-completion', { title: 'Service tractor', dueDate: '2026-09-07', recurrenceRule: { frequency: 'daily', interval: 1, mode: 'after_completion', seriesId: 'service' } }),
+    task('disabled', { title: 'Old chore', dueDate: '2026-09-07', recurrenceRule: { frequency: 'daily', interval: 1, enabled: false, seriesId: 'old' } }),
+    task('skipped', { title: 'Collect eggs', choreWindowId: 'morning', dueDate: '2026-09-08', deletedAt: '2026-09-08T12:00:00Z', recurrenceRule: { frequency: 'daily', interval: 1, mode: 'fixed_schedule', seriesId: 'eggs' } })
+  ];
+  const before = structuredClone(taskList);
+  const skippedDay = housekeeping.calendarDaySummary({ workDate: '2026-09-08', now: new Date(2026, 8, 6), choreWindows: windows, tasks: taskList });
+  const future = housekeeping.calendarDaySummary({ workDate: '2026-09-21', now: new Date(2026, 8, 6), choreWindows: windows, tasks: taskList });
+  assert.equal(skippedDay.choreCount, 0);
+  assert.deepEqual(future.windowItems.find(item => item.window.id === 'morning').tasks.map(item => item.title), ['Collect eggs']);
+  assert.deepEqual(future.otherWork.map(item => item.title), ['Clean coop']);
+  assert.equal(future.windowItems.find(item => item.window.id === 'morning').tasks[0].calendarProjection, true);
+  assert.equal(future.otherWork.some(item => item.title === 'Service tractor' || item.title === 'Old chore'), false);
+  assert.equal(housekeeping.fixedTaskRecurrenceOccurs(task('month-end', { dueDate: '2026-01-31', recurrenceRule: { frequency: 'monthly' } }), '2026-02-28'), true);
+  assert.deepEqual(taskList, before);
+});
+
 test('Calendar workload intensity includes every visible category', () => {
   assert.equal(housekeeping.calendarWorkloadLevel(0), 0);
   assert.equal(housekeeping.calendarWorkloadLevel(2), 1);
@@ -212,6 +232,8 @@ test('Week and Month cells share selected-date Day navigation without event dots
   assert.match(app, /No other work for this day\./);
   assert.match(app, /<em>other work<\/em>/);
   assert.match(app, /calendar-other-summary[\s\S]*projection\.otherWorkCount/);
+  assert.match(app, /calendarProjection/);
+  assert.match(app, /projected \? 'disabled' : ''/);
   assert.doesNotMatch(app, /eventdot|event-dot/);
   assert.match(css, /\.calendar-month-day\.workload-5/);
 });
