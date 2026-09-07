@@ -1521,20 +1521,21 @@ function openCalendarDay(date) {
 
 function calendarCompactTaskRow(task, { quietPrefix = '' } = {}) {
   const row = document.createElement('div');
-  row.className = `calendar-task-row${task.completed ? ' done' : ''}`;
+  const projected = Boolean(task.calendarProjection);
+  row.className = `calendar-task-row${task.completed ? ' done' : ''}${projected ? ' projected' : ''}`;
   const record = task.recordId ? recordName(task.recordId) : '';
   const assigned = assigneeName(task.id);
-  const quietMeta = [quietPrefix, record, assigned].filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
+  const quietMeta = [projected ? 'Scheduled' : quietPrefix, record, assigned].filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`);
   const yieldIndicator = taskYieldIndicator(task);
   if (yieldIndicator) quietMeta.push(yieldIndicator);
   const expandedMeta = [taskDateText(task), window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule), choreWindowForTask(task)?.name || '', record, assigned]
     .filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`).join('<span aria-hidden="true">·</span>');
-  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete ${escapeHtml(task.title)}"><details class="calendar-task-disclosure"><summary><span class="calendar-task-copy"><strong>${escapeHtml(task.title)}</strong>${quietMeta.length ? `<span class="calendar-task-meta">${quietMeta.join('<span aria-hidden="true">·</span>')}</span>` : ''}</span><span class="caret" aria-hidden="true">⌄</span></summary><div class="calendar-task-detail">${expandedMeta ? `<span class="calendar-task-detail-meta">${expandedMeta}</span>` : ''}${task.description ? `<p>${escapeHtml(task.description)}</p>` : ''}<button class="btn secondary edit" type="button">Edit task</button></div></details>`;
+  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${projected ? 'disabled' : ''} aria-label="${projected ? 'Scheduled' : 'Complete'} ${escapeHtml(task.title)}"><details class="calendar-task-disclosure"><summary><span class="calendar-task-copy"><strong>${escapeHtml(task.title)}</strong>${quietMeta.length ? `<span class="calendar-task-meta">${quietMeta.join('<span aria-hidden="true">·</span>')}</span>` : ''}</span><span class="caret" aria-hidden="true">⌄</span></summary><div class="calendar-task-detail">${expandedMeta ? `<span class="calendar-task-detail-meta">${expandedMeta}</span>` : ''}${task.description ? `<p>${escapeHtml(task.description)}</p>` : ''}<button class="btn secondary edit" type="button">Edit task</button></div></details>`;
   const checkbox = row.querySelector('.shared-task-check');
-  wireTaskCheckbox(checkbox, task);
+  if (!projected) wireTaskCheckbox(checkbox, task);
   row.querySelector('.edit').addEventListener('click', event => {
     event.preventDefault();
-    openModal('task', task.id, task.recordId);
+    openModal('task', task.projectionSourceId || task.id, task.recordId);
   });
   return row;
 }
@@ -1599,9 +1600,17 @@ function renderCalendarWeek(root, start) {
     cell.setAttribute('aria-label', `Open ${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} in Day view`);
     cell.innerHTML = `<span class="calendar-summary-date">${date.getDate()}</span><span class="calendar-summary-items"></span>`;
     const items = cell.querySelector('.calendar-summary-items');
-    projection.windowItems.filter(item => item.tasks.length).forEach(item => items.insertAdjacentHTML('beforeend', `<span class="calendar-window-summary"><strong>${escapeHtml(item.window.name)}</strong><small>${item.tasks.length} ${item.tasks.length === 1 ? 'chore' : 'chores'}</small></span>`));
+    projection.windowItems.filter(item => item.tasks.length).forEach(item => {
+      const names = item.tasks.slice(0, 2).map(task => task.title).join(' · ');
+      const more = item.tasks.length > 2 ? ` · +${item.tasks.length - 2} more` : '';
+      items.insertAdjacentHTML('beforeend', `<span class="calendar-window-summary"><strong>${escapeHtml(item.window.name)} · ${item.tasks.length}</strong><small>${escapeHtml(names + more)}</small></span>`);
+    });
     [...projection.allDayEvents, ...projection.schedule.filter(item => item.type === 'event').map(item => item.event)].forEach(event => items.insertAdjacentHTML('beforeend', `<span class="calendar-event-summary"><strong>${escapeHtml(event.title)}</strong><small>${event.allDay || !event.startTime ? 'All day' : escapeHtml(calendarEventTime(event))}</small></span>`));
-    items.insertAdjacentHTML('beforeend', `<span class="calendar-other-summary"><strong>Other Work</strong><small>${projection.otherWorkCount} ${projection.otherWorkCount === 1 ? 'task' : 'tasks'}</small></span>`);
+    if (projection.otherWorkCount) {
+      const names = projection.otherWork.slice(0, 2).map(task => task.title).join(' · ');
+      const more = projection.otherWorkCount > 2 ? ` · +${projection.otherWorkCount - 2} more` : '';
+      items.insertAdjacentHTML('beforeend', `<span class="calendar-other-summary"><strong>Other Work · ${projection.otherWorkCount}</strong><small>${escapeHtml(names + more)}</small></span>`);
+    }
     cell.addEventListener('click', () => openCalendarDay(date));
     grid.append(cell);
   }

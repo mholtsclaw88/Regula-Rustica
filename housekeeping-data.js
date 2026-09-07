@@ -144,7 +144,60 @@
     return taskWorkDate(task) === localDate(now) && (task.completed || !taskIsOverdue(task, choreWindow, now));
   }
 
+  function fixedTaskRecurrenceOccurs(task = {}, workDate = '') {
+    const rule = normalizeRecurrenceRule(task.recurrenceRule);
+    const start = dateParts(taskWorkDate(task));
+    const target = dateParts(workDate);
+    if (!rule || rule.mode !== 'fixed_schedule' || !start || !target) return false;
+    const startTime = Date.UTC(start.year, start.month - 1, start.day);
+    const targetTime = Date.UTC(target.year, target.month - 1, target.day);
+    if (targetTime < startTime) return false;
+    const dayDifference = Math.round((targetTime - startTime) / 86400000);
+    if (rule.frequency === 'daily') return dayDifference % rule.interval === 0;
+    if (rule.frequency === 'weekly') return dayDifference % (rule.interval * 7) === 0;
+    const monthDifference = (target.year - start.year) * 12 + target.month - start.month;
+    const expectedDay = Math.min(start.day, new Date(Date.UTC(target.year, target.month, 0)).getUTCDate());
+    return monthDifference >= 0 && monthDifference % rule.interval === 0 && target.day === expectedDay;
+  }
+
+  function calendarTaskOccurrences(tasks = [], workDate = '', now = new Date()) {
+    if (workDate < localDate(now)) return tasks;
+    const groups = new Map();
+    tasks.filter(task => task.recurrenceRule).forEach(task => {
+      const series = task.recurrenceRule.seriesId || `${task.recordId || ''}:${task.suggestionKey || task.title}:${task.choreWindowId || ''}`;
+      if (!groups.has(series)) groups.set(series, []);
+      groups.get(series).push(task);
+    });
+    const projected = [];
+    groups.forEach((group, series) => {
+      const latest = items => [...items].sort((a, b) => String(b.updatedAt || b.createdAt || b.id).localeCompare(String(a.updatedAt || a.createdAt || a.id)))[0];
+      const controller = latest(group.filter(task => !task.deletedAt && !task.completed)) || latest(group.filter(task => !task.deletedAt)) || latest(group);
+      const rule = normalizeRecurrenceRule(controller?.recurrenceRule);
+      if (!controller || !rule?.enabled || rule.seriesDeleted || rule.mode !== 'fixed_schedule') return;
+      if (group.some(task => taskWorkDate(task) === workDate)) return;
+      const anchor = [...group].filter(task => taskWorkDate(task)).sort((a, b) => taskWorkDate(a).localeCompare(taskWorkDate(b)))[0];
+      if (!anchor || !fixedTaskRecurrenceOccurs(anchor, workDate)) return;
+      const template = [...group]
+        .filter(task => taskWorkDate(task) && taskWorkDate(task) < workDate)
+        .sort((a, b) => taskWorkDate(b).localeCompare(taskWorkDate(a)))[0] || controller;
+      projected.push({
+        ...template,
+        recurrenceRule: { ...controller.recurrenceRule },
+        id: `calendar:${series}:${workDate}`,
+        availableFrom: '',
+        dueDate: workDate,
+        completed: false,
+        status: 'open',
+        deletedAt: null,
+        calendarProjection: true,
+        projectionSourceId: controller.id
+      });
+    });
+    return projected.length ? [...tasks, ...projected] : tasks;
+  }
+
   function dailyPlannerProjection({ tasks = [], choreWindows = [], calendarEvents = [], workDate = localDate(new Date()), now = new Date(), calendarRange = false, includeCompleted = false } = {}) {
+    if (calendarRange) tasks = calendarTaskOccurrences(tasks, workDate, now);
     const visibleTask = task => !task.deletedAt && task.recurrenceRule?.enabled !== false && task.recurrenceRule?.seriesDeleted !== true;
     const occursOnDate = task => {
       const datedOccurrence = calendarRange ? Boolean(taskCalendarSegment(task, workDate)) : taskWorkDate(task) === workDate;
@@ -360,7 +413,7 @@
 
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, normalizeCalendarRecurrenceRule, calendarEventOccurrence, nextRecurringDueDate, recurrenceSummary,
-    taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, dailyPlannerProjection, calendarDaySummary, calendarWorkloadLevel, yieldDefaultsForTask,
+    taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, fixedTaskRecurrenceOccurs, calendarTaskOccurrences, dailyPlannerProjection, calendarDaySummary, calendarWorkloadLevel, yieldDefaultsForTask,
     matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
     linkedYieldsForTask, reopenTask,
     taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment,
