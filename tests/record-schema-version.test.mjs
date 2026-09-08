@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
+import tasks from '../task-foundation.js';
 
 class MemoryStorage {
   constructor() { this.values = new Map(); }
@@ -31,10 +32,10 @@ async function dataApi() {
         normalizeCalendarRecurrenceRule: value => value || null
       },
       RegulaRusticaTasks: {
+        ...tasks,
         DEFAULT_WINDOWS: [],
         YIELD_TYPES: { milk: {}, eggs: {}, harvest: {}, hay_forage: {}, meat_harvest: {} },
-        normalizeWindow: value => value,
-        stabilizeRecurringTasks: () => ({ changed: false, created: 0, deduplicated: 0 })
+        normalizeWindow: value => value
       }
     }
   };
@@ -130,6 +131,31 @@ test('normalization does not materialize recurring Tasks as a read side effect',
   const normalized = api.normalizeData(source);
   assert.equal(normalized.tasks.length, 1);
   assert.equal(normalized.tasks[0].id, 'recurring-task');
+});
+
+test('normalization disables stale recurring work for inactive Records without erasing history', async () => {
+  const api = await dataApi();
+  const source = currentData([
+    { ...record('Animal', { purpose: 'Meat' }), id: 'processed-animal', status: 'Processed' },
+    { ...record('Animal', { purpose: 'Eggs' }), id: 'active-animal' }
+  ]);
+  const rule = { frequency: 'daily', mode: 'fixed_schedule', interval: 1, enabled: true };
+  source.tasks = [
+    { id: 'processed-open', title: 'Feed', recordId: 'processed-animal', dueDate: '2026-09-07', recurrenceRule: { ...rule, seriesId: 'processed-series' } },
+    { id: 'processed-done', title: 'Feed', recordId: 'processed-animal', dueDate: '2026-09-06', completed: true, status: 'completed', recurrenceRule: { ...rule, seriesId: 'processed-series' } },
+    { id: 'processed-one-time', title: 'Clean pen', recordId: 'processed-animal', dueDate: '2026-09-07' },
+    { id: 'active-open', title: 'Collect eggs', recordId: 'active-animal', dueDate: '2026-09-07', recurrenceRule: { ...rule, seriesId: 'active-series' } }
+  ];
+
+  const normalized = api.normalizeData(source);
+  api.localStorage.setItem(api.storageKey, JSON.stringify(normalized));
+  const reloaded = api.loadData();
+
+  assert.equal(reloaded.tasks.find(task => task.id === 'processed-open').recurrenceRule.enabled, false);
+  assert.equal(reloaded.tasks.find(task => task.id === 'processed-done').completed, true);
+  assert.equal(reloaded.tasks.find(task => task.id === 'processed-done').deletedAt, null);
+  assert.equal(reloaded.tasks.find(task => task.id === 'processed-one-time').deletedAt, null);
+  assert.equal(reloaded.tasks.find(task => task.id === 'active-open').recurrenceRule.enabled, true);
 });
 
 test('recurring Calendar Events survive normalize, persistence, and reload', async () => {
