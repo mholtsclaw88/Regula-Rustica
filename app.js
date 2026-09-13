@@ -8,6 +8,7 @@ const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
 const RECORD_TYPES = ['Animal', 'Land', 'Equipment', 'Structure', 'Work'];
+const INACTIVE_RECORD_STATUSES = new Set(['Sold', 'Deceased', 'Processed', 'Archived', 'Inactive', 'Out of Service', 'Completed', 'Cancelled']);
 const CURRENT_SCHEMA_VERSION = 14;
 const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, 12, 13, CURRENT_SCHEMA_VERSION];
 let startupMigrationBefore = null;
@@ -310,11 +311,15 @@ function normalizeData(source = {}, options = {}) {
       if (migrated) yieldEntries.push(migrated);
     });
   }
+  const records = asArray(source.records).map(normalizeRecord);
   const tasks = asArray(source.tasks).map(normalizeTask);
+  records
+    .filter(record => INACTIVE_RECORD_STATUSES.has(record.status))
+    .forEach(record => window.RegulaRusticaTasks.disableRecordRecurringTasks(tasks, record.id));
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
-    records: asArray(source.records).map(normalizeRecord),
+    records,
     tasks,
     people,
     relationships: asArray(source.relationships),
@@ -1060,8 +1065,6 @@ function renderToday() {
     section.dataset.collapseReady = 'true';
   });
 }
-
-const INACTIVE_RECORD_STATUSES = new Set(['Sold', 'Deceased', 'Processed', 'Archived', 'Inactive', 'Out of Service', 'Completed', 'Cancelled']);
 
 function profileAttachment(record) {
   if (!record?.profilePhotoAttachmentId) return null;
