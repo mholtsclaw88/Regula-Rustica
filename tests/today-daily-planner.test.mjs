@@ -246,6 +246,15 @@ test('Today reuses Task completion and Yield-linked Task presentation paths', as
   assert.match(app, /matchingYieldForTask\(data\.yieldEntries, task\)/);
 });
 
+test('new Calendar Events inherit the viewed date while edits preserve their stored date', async () => {
+  const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
+  assert.match(app, /#addCalendarEvent'[)]\.addEventListener\('click', \(\) => openModal\('calendar', null, null, '', calendarDateKey\(calendarMonth\)\)\)/);
+  assert.match(app, /const startDate = calendarEvent\.startDate \|\| calendarDefaultDate \|\| today\(\)/);
+  assert.match(app, /function followStartDate\(startInput, endInput, automatic = true\)/);
+  assert.match(app, /followStartDate\(availableFromField\.querySelector\('input'\), dueDateField\.querySelector\('input'\), !task\.dueDate\)/);
+  assert.match(app, /followStartDate\(startDateField\.querySelector\('input'\), endDateField\.querySelector\('input'\), !calendarEvent\.endDate \|\| calendarEvent\.endDate === calendarEvent\.startDate\)/);
+});
+
 test('Yield-linked Task completion uses the compact Yield-only editor', async () => {
   const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
   assert.match(app, /openModal\('yield', null, task\.recordId, yieldType, workDate, task\)/);

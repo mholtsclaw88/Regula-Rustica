@@ -1826,6 +1826,12 @@ function formRow(...items) {
   return row;
 }
 
+function followStartDate(startInput, endInput, automatic = true) {
+  let followsStart = automatic;
+  endInput.addEventListener('input', () => { followsStart = false; });
+  startInput.addEventListener('input', () => { if (followsStart) endInput.value = startInput.value; });
+}
+
 function addRecordSelect(root, labelText, name, selected = '', excludeId = '') {
   const label = document.createElement('label');
   label.className = `form-field${/\(optional\)/i.test(labelText) ? ' form-field-optional' : ''}`;
@@ -2061,10 +2067,10 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     addRecordSelect(taskPeople, 'Linked record (optional)', 'recordId', recordId || task.recordId);
     addPersonSelect(taskPeople, assignment?.personId || personForAssignment(assignment)?.id);
     root.append(taskPeople, formSection('Schedule'));
-    root.append(formRow(
-      field('Start date (optional)', 'availableFrom', 'date', task.availableFrom),
-      field('Due date (optional)', 'dueDate', 'date', task.dueDate)
-    ));
+    const availableFromField = field('Start date (optional)', 'availableFrom', 'date', task.availableFrom);
+    const dueDateField = field('Due date (optional)', 'dueDate', 'date', task.dueDate);
+    root.append(formRow(availableFromField, dueDateField));
+    followStartDate(availableFromField.querySelector('input'), dueDateField.querySelector('input'), !task.dueDate);
     const scheduleFields = formRow();
     const windowLabel=document.createElement('label');windowLabel.className='form-field form-field-optional';windowLabel.textContent='Chore Window (optional)';const windowSelect=document.createElement('select');windowSelect.name='choreWindowId';windowSelect.add(new Option('None',''));data.choreWindows.filter(item=>!item.deletedAt&&item.enabled).sort((a,b)=>a.displayOrder-b.displayOrder).forEach(item=>windowSelect.add(new Option(item.name,item.id)));windowSelect.value=task.choreWindowId||'';windowLabel.append(windowSelect);scheduleFields.append(windowLabel);
     addRecurrenceFields(scheduleFields, task.recurrenceRule);
@@ -2128,8 +2134,10 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     const calendarEvent = data.calendarEvents.find(item => item.id === id) || {};
     const startDate = calendarEvent.startDate || calendarDefaultDate || today();
     root.append(field('Event', 'title', 'text', calendarEvent.title));
-    root.append(field('Start date', 'startDate', 'date', startDate));
-    root.append(field('End date', 'endDate', 'date', calendarEvent.endDate || startDate));
+    const startDateField = field('Start date', 'startDate', 'date', startDate);
+    const endDateField = field('End date', 'endDate', 'date', calendarEvent.endDate || startDate);
+    root.append(startDateField, endDateField);
+    followStartDate(startDateField.querySelector('input'), endDateField.querySelector('input'), !calendarEvent.endDate || calendarEvent.endDate === calendarEvent.startDate);
     root.append(field('All day', 'allDay', 'checkbox', calendarEvent.allDay !== false));
     root.append(field('Start time (optional)', 'startTime', 'time', calendarEvent.startTime));
     root.append(field('End time (optional)', 'endTime', 'time', calendarEvent.endTime));
@@ -2474,7 +2482,7 @@ $('#globalAddTask').addEventListener('click', () => openModal('task'));
 $('#tasksAddTask').addEventListener('click', () => openModal('task'));
 $('#addRecord').addEventListener('click', () => openModal('record'));
 $('#addLedger').addEventListener('click', () => openModal('ledger'));
-$('#addCalendarEvent').addEventListener('click', () => openModal('calendar'));
+$('#addCalendarEvent').addEventListener('click', () => openModal('calendar', null, null, '', calendarDateKey(calendarMonth)));
 $('#addMilkYield').addEventListener('click', () => openModal('yield', null, null, 'milk'));
 $('#addEggYield').addEventListener('click', () => openModal('yield', null, null, 'eggs'));
 $('#addMeatYield')?.addEventListener('click', () => openModal('yield',null,null,'meat'));
