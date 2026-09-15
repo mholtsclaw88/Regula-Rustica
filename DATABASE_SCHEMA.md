@@ -202,6 +202,9 @@ Represents the top-level owner of all Regula Rustica data.
 | `slug` | `text` | No | Unique future URL/internal identifier |
 | `timezone` | `text` | Yes | Default `America/New_York` |
 | `currency_code` | `char(3)` | Yes | Default `USD` |
+| `motto` | `text` | No | Optional Homestead motto, maximum 160 characters |
+| `location` | `text` | No | Optional short freeform location, maximum 120 characters |
+| `logo_storage_path` | `text` | No | Private `record-documents` Storage path under this Homestead's `identity` folder |
 | `created_at` | `timestamptz` | Yes | Standard |
 | `updated_at` | `timestamptz` | Yes | Standard |
 | `created_by` | `uuid` | No | Creator |

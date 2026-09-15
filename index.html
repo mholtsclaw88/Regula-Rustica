@@ -8,21 +8,21 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=monastic-palette-v1">
+  <link rel="stylesheet" href="styles.css?v=homestead-identity-v1">
   <link rel="stylesheet" href="housekeeping.css?v=calendar-projections-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=calendar-projections-v1" defer></script>
   <script src="task-foundation.js?v=record-lifecycle-v1" defer></script>
-  <script src="record-documents.js?v=local-attachments-v1" defer></script>
+  <script src="record-documents.js?v=homestead-identity-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=calendar-projections-v1" defer></script>
+  <script src="app.js?v=homestead-identity-v1" defer></script>
   <script src="ui-refinements.js?v=monastic-icons-v3" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="cloud-auth.js" type="module"></script>
+  <script src="cloud-auth.js?v=homestead-identity-v1" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
 </head>
 <body>
@@ -53,6 +53,15 @@
 
   <main>
     <section id="today" class="view active">
+      <section class="homestead-bookplate" aria-labelledby="todayHomesteadName">
+        <span class="homestead-bookplate-logo hidden" id="todayHomesteadLogoWrap"><img id="todayHomesteadLogo" alt="" hidden></span>
+        <div class="homestead-bookplate-copy">
+          <span class="label">The Homestead</span>
+          <h2 id="todayHomesteadName">My Homestead</h2>
+          <p class="homestead-identity-motto hidden" id="todayHomesteadMotto"></p>
+          <p class="homestead-identity-location hidden" id="todayHomesteadLocation"></p>
+        </div>
+      </section>
       <header class="today-date-block">
         <span class="label">Today</span>
         <h2 id="todayDate"></h2>
@@ -96,6 +105,10 @@
     </section>
 
     <section id="records" class="view">
+      <div class="records-homestead-identity">
+        <span class="records-homestead-logo hidden" id="recordsHomesteadLogoWrap"><img id="recordsHomesteadLogo" alt="" hidden></span>
+        <span><span class="label">Farm book of</span> <strong id="recordsHomesteadName">My Homestead</strong></span>
+      </div>
       <div class="section-head">
         <div><span class="label">Custodia</span><h2>Homestead Records</h2><p class="muted">The animals, land, equipment, structures, and work entrusted to your keeping.</p></div>
         <button class="btn primary" id="addRecord">+ Record</button>
@@ -367,10 +380,25 @@
       <div class="settings-panels">
         <article class="card settings-section hidden" id="settingIdentity" data-settings-panel="identity">
           <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">Identity</span><h2 tabindex="-1">Your homestead</h2><p class="muted">The name used throughout this device and its records.</p></header>
+          <header class="settings-section-head"><span class="label">Identity</span><h2 tabindex="-1">Your homestead</h2><p class="muted">Name the shared household farm book without changing Regula Rustica itself.</p></header>
           <form id="homesteadForm" class="form-grid">
-            <label>Homestead name<input id="homesteadName"></label>
-            <button class="btn primary" type="submit">Save name</button>
+            <label>Homestead name<input id="homesteadName" maxlength="120" required></label>
+            <div class="homestead-logo-field">
+              <span class="form-label">Homestead logo or mark</span>
+              <div class="homestead-logo-editor">
+                <span class="homestead-logo-preview"><img id="homesteadLogoPreview" alt="" hidden><span id="homesteadLogoPreviewEmpty">No custom logo</span></span>
+                <div class="quick">
+                  <label class="btn secondary file-button">Choose image<input id="homesteadLogoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></label>
+                  <button class="btn ghost hidden" id="removeHomesteadLogo" type="button">Remove logo</button>
+                </div>
+              </div>
+              <small class="muted">A square or compact mark works best. Images are resized using the same rules as Record photos.</small>
+            </div>
+            <label>Motto <span class="optional">Optional</span><input id="homesteadMotto" maxlength="160"></label>
+            <label>Short location <span class="optional">Optional</span><input id="homesteadLocation" maxlength="120" placeholder="Northeast Ohio"></label>
+            <p class="muted hidden" id="homesteadIdentityPermission">Only a Steward can change shared Homestead identity.</p>
+            <p class="form-status" id="homesteadIdentityStatus" role="status"></p>
+            <button class="btn primary" id="saveHomesteadIdentity" type="submit">Save identity</button>
           </form>
         </article>
         <article class="card settings-section hidden" id="settingBackup" data-settings-panel="backup">

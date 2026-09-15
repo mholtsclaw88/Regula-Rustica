@@ -21,7 +21,8 @@ test('Settings home exposes one focused destination for every category', () => {
 
 test('existing Settings control contracts remain present exactly once', () => {
   [
-    'homesteadForm', 'homesteadName', 'childForm', 'childName', 'childList',
+    'homesteadForm', 'homesteadName', 'homesteadMotto', 'homesteadLocation',
+    'homesteadLogoInput', 'removeHomesteadLogo', 'saveHomesteadIdentity', 'childForm', 'childName', 'childList',
     'addChoreWindow', 'choreWindowList', 'cloudAuthForm', 'cloudStatus',
     'syncControls', 'syncRecovery', 'syncResetFromCloud', 'exportData', 'importData', 'resetData'
   ].forEach(id => assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id));
@@ -41,6 +42,29 @@ test('Settings summary derives from real local and cloud state', () => {
   assert.match(app, /data\.choreWindows\.filter/);
   assert.match(app, /REGULA_RUSTICA_CLOUD_CONTEXT/);
   assert.match(app, /data\.settings\.homesteadName/);
+});
+
+test('Homestead identity is restrained on Today and Records and omits absent optional lines', () => {
+  assert.match(html, /class="homestead-bookplate"/);
+  assert.match(html, /id="todayHomesteadName"/);
+  assert.match(html, /class="[^"]*hidden[^"]*" id="todayHomesteadMotto"/);
+  assert.match(html, /class="[^"]*hidden[^"]*" id="todayHomesteadLocation"/);
+  assert.match(html, /class="records-homestead-identity"/);
+  assert.match(app, /classList\.toggle\('hidden', !identity\.motto\)/);
+  assert.match(app, /classList\.toggle\('hidden', !identity\.location\)/);
+  assert.doesNotMatch(app, /homesteadLogo[^\n]*Regula Rustica/i);
+});
+
+test('shared Homestead identity uses the existing Homestead row and private image storage', async () => {
+  const [auth, documents] = await Promise.all([
+    readFile(new URL('../cloud-auth.js', import.meta.url), 'utf8'),
+    readFile(new URL('../record-documents.js', import.meta.url), 'utf8')
+  ]);
+  assert.match(auth, /from\('homesteads'\)\.select\('name,motto,location,logo_storage_path'\)/);
+  assert.match(app, /from\('homesteads'\)\.update\(/);
+  assert.match(documents, /homesteads\/\$\{context\.homesteadId\}\/identity\//);
+  assert.match(documents, /saveHomesteadLogo/);
+  assert.match(app, /removeHomesteadLogoRequested/);
 });
 
 test('Settings index has responsive desktop and mobile layouts', () => {

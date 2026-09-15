@@ -128,3 +128,25 @@ test('IndexedDB keeps the local copy through cloud upload failure and retries by
   assert.match(synced.storagePath, /stable-file-id\/local\.pdf$/);
   assert.equal(uploads.at(-1).options.upsert, true);
 });
+
+test('Homestead logos reuse local image storage and the tenant-scoped private bucket', async () => {
+  installFakeIndexedDb();
+  const file = new Blob(['logo'], { type: 'image/png' });
+  Object.defineProperty(file, 'name', { value: 'woodthief.png' });
+  Object.defineProperty(file, 'lastModified', { value: 1 });
+  const uploads = [];
+  documents.setContext({
+    client: { storage: { from: bucket => ({
+      upload: async (path, blob, options) => { uploads.push({ bucket, path, blob, options }); return { error: null }; }
+    }) } },
+    session: { user: {} },
+    homesteadId: 'home-1'
+  });
+  const local = await documents.saveHomesteadLogo(file, 'homestead-mark');
+  assert.equal(local.id, 'homestead-mark');
+  assert.equal('recordId' in local, false);
+  const synced = await documents.uploadHomesteadLogo(local);
+  assert.equal(uploads[0].bucket, documents.BUCKET);
+  assert.match(synced.storagePath, /^homesteads\/home-1\/identity\/homestead-mark\//);
+  assert.equal(uploads[0].options.upsert, false);
+});
