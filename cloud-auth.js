@@ -112,7 +112,7 @@ async function initializeCloud() {
       showStatus(invitationToken
         ? 'Private invitation detected. Sign in or create an account to review and accept it.'
         : 'Cloud access is ready. Sign in or create an account.');
-      window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session: null, homesteadId: null, role: null };
+      window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session: null, homesteadId: null, role: null, canManageHomestead: false, homesteadIdentity: null };
       window.dispatchEvent(new CustomEvent('regula-rustica:cloud-context', { detail: window.REGULA_RUSTICA_CLOUD_CONTEXT }));
       return;
     }
@@ -121,15 +121,23 @@ async function initializeCloud() {
     const [
       { data: homesteadId, error: homesteadError },
       { data: role, error: roleError },
-      { data: canManageMembers, error: capabilityError }
+      { data: canManageMembers, error: capabilityError },
+      { data: canManageHomestead, error: homesteadCapabilityError }
     ] = await Promise.all([
       client.rpc('current_homestead_id'),
       client.rpc('current_member_role'),
-      client.rpc('has_capability', { capability: 'manage_members' })
+      client.rpc('has_capability', { capability: 'manage_members' }),
+      client.rpc('has_capability', { capability: 'manage_homestead' })
     ]);
-    if (homesteadError || roleError || capabilityError) throw homesteadError || roleError || capabilityError;
+    if (homesteadError || roleError || capabilityError || homesteadCapabilityError) throw homesteadError || roleError || capabilityError || homesteadCapabilityError;
 
     const hasMembership = Boolean(homesteadId);
+    let homesteadIdentity = null;
+    if (hasMembership) {
+      const result = await client.from('homesteads').select('name,motto,location,logo_storage_path,logo_crop').eq('id', homesteadId).single();
+      if (result.error) throw result.error;
+      homesteadIdentity = result.data;
+    }
     const mayManageMembers = hasMembership && Boolean(canManageMembers);
     membership.classList.toggle('hidden', !hasMembership);
     onboarding.classList.toggle('hidden', hasMembership);
@@ -142,7 +150,7 @@ async function initializeCloud() {
         ? 'Invitation ready. Review it below and accept when you are ready.'
         : 'Account ready. Choose how this account joins a Homestead.');
     if (mayManageMembers) await refreshInvitations();
-    window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session, homesteadId, role };
+    window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session, homesteadId, role, canManageHomestead: Boolean(canManageHomestead), homesteadIdentity };
     window.dispatchEvent(new CustomEvent('regula-rustica:cloud-context', { detail: window.REGULA_RUSTICA_CLOUD_CONTEXT }));
   }
 

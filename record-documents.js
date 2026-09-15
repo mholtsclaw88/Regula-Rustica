@@ -179,6 +179,25 @@
     return { storagePath: path, syncState: 'synced', syncError: '' };
   }
 
+  async function saveHomesteadLogo(file, logoId = crypto.randomUUID()) {
+    const logo = await saveLocal(file, { attachmentId: logoId, recordId: null });
+    delete logo.recordId;
+    delete logo.documentId;
+    return logo;
+  }
+
+  async function uploadHomesteadLogo(logo) {
+    const context = requireCloud();
+    const stored = await readLocal(logo.id);
+    if (!stored?.blob) throw new Error('The local Homestead logo is unavailable.');
+    const path = logo.storagePath || `homesteads/${context.homesteadId}/identity/${logo.id}/${safeFilename(stored.filename)}`;
+    const { error } = await context.client.storage.from(BUCKET).upload(path, stored.blob, {
+      cacheControl: '3600', contentType: stored.mimeType, upsert: false
+    });
+    if (error && !/already exists/i.test(error.message || '')) throw error;
+    return { ...logo, storagePath: path, syncState: 'synced', syncError: '' };
+  }
+
   async function removeRemote(storagePaths) {
     if (!storagePaths.length) return;
     const context = requireCloud();
@@ -236,6 +255,7 @@
     BUCKET, IMAGE_TYPES, ALLOWED_TYPES, MAX_FILE_BYTES, DB_NAME, BLOB_STORE,
     normalizeDocument, normalizeAttachment, validateFile, safeFilename,
     setContext, canSync, saveLocal, readLocal, removeLocal, uploadStored, removeRemote,
-    signedUrl, localUrl, urlFor, syncLabel, profileReferenceAfterAttachmentDelete
+    signedUrl, localUrl, urlFor, syncLabel, profileReferenceAfterAttachmentDelete,
+    saveHomesteadLogo, uploadHomesteadLogo
   });
 }));

@@ -8,27 +8,26 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=monastic-palette-v1">
+  <link rel="stylesheet" href="styles.css?v=homestead-identity-v3">
   <link rel="stylesheet" href="housekeeping.css?v=calendar-projections-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=calendar-projections-v1" defer></script>
   <script src="task-foundation.js?v=record-lifecycle-v1" defer></script>
-  <script src="record-documents.js?v=local-attachments-v1" defer></script>
+  <script src="record-documents.js?v=homestead-identity-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=calendar-projections-v1" defer></script>
+  <script src="app.js?v=homestead-identity-v2" defer></script>
   <script src="ui-refinements.js?v=monastic-icons-v3" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="cloud-auth.js" type="module"></script>
+  <script src="cloud-auth.js?v=homestead-identity-v2" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
 </head>
 <body>
   <header class="top">
     <div class="top-brand">
-      <div id="homesteadHeader" class="brand-small">MY HOMESTEAD</div>
       <h1>Regula Rustica</h1>
       <p class="motto">Ora et labora · Ut in omnibus glorificetur Deus</p>
     </div>
@@ -53,6 +52,14 @@
 
   <main>
     <section id="today" class="view active">
+      <section class="homestead-bookplate" aria-labelledby="todayHomesteadName">
+        <span class="homestead-bookplate-logo hidden" id="todayHomesteadLogoWrap"><img id="todayHomesteadLogo" alt="" hidden></span>
+        <div class="homestead-bookplate-copy">
+          <h2 id="todayHomesteadName">My Homestead</h2>
+          <p class="homestead-identity-motto hidden" id="todayHomesteadMotto"></p>
+          <p class="homestead-identity-location hidden" id="todayHomesteadLocation"></p>
+        </div>
+      </section>
       <header class="today-date-block">
         <span class="label">Today</span>
         <h2 id="todayDate"></h2>
@@ -97,7 +104,7 @@
 
     <section id="records" class="view">
       <div class="section-head">
-        <div><span class="label">Custodia</span><h2>Homestead Records</h2><p class="muted">The animals, land, equipment, structures, and work entrusted to your keeping.</p></div>
+        <div><span class="label">Custodia</span><h2 id="recordsPageTitle">Homestead Records</h2><p class="muted">The animals, land, equipment, structures, and work entrusted to your keeping.</p></div>
         <button class="btn primary" id="addRecord">+ Record</button>
       </div>
       <fieldset class="choice-filter record-type-filter">
@@ -132,7 +139,7 @@
 
     <section id="tasks" class="view">
       <div class="section-head">
-        <div><span class="label">Agenda</span><h2>Tasks</h2><p class="muted">What needs to be done, when, and by whom.</p></div>
+        <div><span class="label">Agenda</span><h2 id="tasksPageTitle">Homestead Tasks</h2><p class="muted">What needs to be done, when, and by whom.</p></div>
         <button class="btn primary" id="tasksAddTask">+ Task</button>
       </div>
       <div class="card">
@@ -186,7 +193,7 @@
 
     <section id="calendar" class="view">
       <div class="section-head">
-        <div><span class="label">Tempora</span><h2>Calendar</h2><p class="muted">Shared dates, events, and the rhythm of homestead life.</p></div>
+        <div><span class="label">Tempora</span><h2 id="calendarPageTitle">Homestead Calendar</h2><p class="muted">Shared dates, events, and the rhythm of homestead life.</p></div>
         <button class="btn primary" id="addCalendarEvent">+ Event</button>
       </div>
       <div class="card calendar-card">
@@ -217,7 +224,7 @@
 
     <section id="yield" class="view reporting-page">
       <div class="section-head">
-        <div><span class="label">Fructus</span><h2>Homestead Yield</h2><p class="muted">What your homestead produces, harvests, and provides.</p></div>
+        <div><span class="label">Fructus</span><h2 id="yieldPageTitle">Homestead Yield</h2><p class="muted">What your homestead produces, harvests, and provides.</p></div>
       </div>
       <article class="report-quick-entry">
         <div>
@@ -270,7 +277,7 @@
 
     <section id="ledger" class="view reporting-page">
       <div class="section-head">
-        <div><span class="label">Rationes</span><h2>Ledger</h2><p class="muted">Income, expenses, and the stewardship of household resources.</p></div>
+        <div><span class="label">Rationes</span><h2 id="ledgerPageTitle">Homestead Ledger</h2><p class="muted">Income, expenses, and the stewardship of household resources.</p></div>
         <button class="btn primary" id="addLedger">+ Entry</button>
       </div>
       <div class="stats report-stats">
@@ -367,10 +374,29 @@
       <div class="settings-panels">
         <article class="card settings-section hidden" id="settingIdentity" data-settings-panel="identity">
           <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">Identity</span><h2 tabindex="-1">Your homestead</h2><p class="muted">The name used throughout this device and its records.</p></header>
+          <header class="settings-section-head"><span class="label">Identity</span><h2 tabindex="-1">Your homestead</h2><p class="muted">Name the shared household farm book without changing Regula Rustica itself.</p></header>
           <form id="homesteadForm" class="form-grid">
-            <label>Homestead name<input id="homesteadName"></label>
-            <button class="btn primary" type="submit">Save name</button>
+            <label>Homestead name<input id="homesteadName" maxlength="120" required></label>
+            <div class="homestead-logo-field">
+              <span class="form-label">Homestead logo or mark</span>
+              <div class="homestead-logo-editor">
+                <span class="homestead-logo-preview" id="homesteadLogoCropPreview"><img id="homesteadLogoPreview" alt="" hidden><span id="homesteadLogoPreviewEmpty">No custom logo</span></span>
+                <div class="quick">
+                  <label class="btn secondary file-button">Choose image<input id="homesteadLogoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></label>
+                  <button class="btn ghost hidden" id="removeHomesteadLogo" type="button">Remove logo</button>
+                </div>
+              </div>
+              <div class="homestead-logo-framing hidden" id="homesteadLogoFraming">
+                <small class="muted">Drag the image inside the circle to reposition it.</small>
+                <label for="homesteadLogoZoom">Zoom<input id="homesteadLogoZoom" type="range" min="1" max="3" step="0.05" value="1"></label>
+              </div>
+              <small class="muted">The original image is kept unchanged and resized using the same rules as Record photos.</small>
+            </div>
+            <label>Motto <span class="optional">Optional</span><input id="homesteadMotto" maxlength="160"></label>
+            <label>Short location <span class="optional">Optional</span><input id="homesteadLocation" maxlength="120" placeholder="Northeast Ohio"></label>
+            <p class="muted hidden" id="homesteadIdentityPermission">Only a Steward can change shared Homestead identity.</p>
+            <p class="form-status" id="homesteadIdentityStatus" role="status"></p>
+            <button class="btn primary" id="saveHomesteadIdentity" type="submit">Save identity</button>
           </form>
         </article>
         <article class="card settings-section hidden" id="settingBackup" data-settings-panel="backup">

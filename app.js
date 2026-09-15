@@ -298,6 +298,19 @@ function historicalYield(event) {
   return candidate ? normalizeYieldEntry(candidate) : null;
 }
 
+function normalizeHomesteadLogo(value) {
+  if (!value || (!value.id && !value.storagePath)) return null;
+  return {
+    id: value.id || `cloud:${value.storagePath}`,
+    storagePath: value.storagePath || '',
+    filename: value.filename || 'homestead-logo',
+    mimeType: value.mimeType || 'image/jpeg',
+    size: Number(value.size || 0),
+    syncState: value.storagePath ? 'synced' : value.syncState || 'local',
+    syncError: value.syncError || ''
+  };
+}
+
 function normalizeData(source = {}, options = {}) {
   const sourceVersion = Number(source.schemaVersion || source.version || 0);
   const events = asArray(source.events).map(normalizeEvent);
@@ -318,7 +331,13 @@ function normalizeData(source = {}, options = {}) {
     .forEach(record => window.RegulaRusticaTasks.disableRecordRecurringTasks(tasks, record.id));
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    settings: { homesteadName: source.settings?.homesteadName || 'My Homestead' },
+    settings: {
+      homesteadName: source.settings?.homesteadName || 'My Homestead',
+      homesteadMotto: source.settings?.homesteadMotto || '',
+      homesteadLocation: source.settings?.homesteadLocation || '',
+      homesteadLogo: normalizeHomesteadLogo(source.settings?.homesteadLogo),
+      homesteadLogoCrop: normalizeProfileCrop(source.settings?.homesteadLogoCrop)
+    },
     records,
     tasks,
     people,
@@ -610,6 +629,10 @@ let pendingDocumentFiles = [];
 let attachmentSyncPromise = null;
 let journalFilter = 'all';
 let profileCropAttachmentId = null;
+let pendingHomesteadLogoFile = null;
+let removeHomesteadLogoRequested = false;
+let homesteadLogoPreviewUrl = '';
+let homesteadLogoCropDraft = normalizeProfileCrop(data.settings.homesteadLogoCrop);
 let profileCropDraft = normalizeProfileCrop();
 let settingsSection = 'home';
 
@@ -1774,8 +1797,10 @@ function renderChoreWindows() {
 
 function renderAll() {
   $('#todayDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  $('#homesteadHeader').textContent = (data.settings.homesteadName || 'My Homestead').toUpperCase();
   $('#homesteadName').value = data.settings.homesteadName || '';
+  $('#homesteadMotto').value = data.settings.homesteadMotto || '';
+  $('#homesteadLocation').value = data.settings.homesteadLocation || '';
+  renderHomesteadIdentity();
   renderToday();
   renderRecords();
   renderTasks();
@@ -1786,6 +1811,36 @@ function renderAll() {
   renderYield();
   renderLedger();
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
+}
+
+function cloudHomesteadIdentity(row, currentLogo = null) {
+  const storagePath = row?.logo_storage_path || '';
+  const logo = storagePath
+    ? currentLogo?.storagePath === storagePath
+      ? currentLogo
+      : normalizeHomesteadLogo({ id: `cloud:${storagePath}`, storagePath })
+    : null;
+  return {
+    homesteadName: row?.name || 'My Homestead',
+    homesteadMotto: row?.motto || '',
+    homesteadLocation: row?.location || '',
+    homesteadLogo: logo,
+    homesteadLogoCrop: normalizeProfileCrop(row?.logo_crop)
+  };
+}
+
+function applyCloudHomesteadContext(context) {
+  const connected = Boolean(context?.homesteadId);
+  const editable = !connected || Boolean(context.canManageHomestead);
+  ['homesteadName', 'homesteadMotto', 'homesteadLocation', 'homesteadLogoInput', 'removeHomesteadLogo', 'saveHomesteadIdentity']
+    .forEach(id => { if ($(`#${id}`)) $(`#${id}`).disabled = !editable; });
+  $('#homesteadIdentityPermission').classList.toggle('hidden', editable);
+  if (!context?.homesteadIdentity) return;
+  const next = cloudHomesteadIdentity(context.homesteadIdentity, data.settings.homesteadLogo);
+  if (JSON.stringify(next) === JSON.stringify(data.settings)) return;
+  data.settings = next;
+  homesteadLogoCropDraft = normalizeProfileCrop(next.homesteadLogoCrop);
+  saveData(data, 'cloud-identity');
 }
 
 function field(labelText, name, type = 'text', value = '', options = []) {
@@ -1824,6 +1879,55 @@ function formRow(...items) {
   row.className = 'form-field-row';
   items.filter(Boolean).forEach(item => row.append(item));
   return row;
+}
+
+function homesteadIdentity() {
+  return {
+    name: data.settings.homesteadName || 'My Homestead',
+    motto: data.settings.homesteadMotto || '',
+    location: data.settings.homesteadLocation || '',
+    logo: normalizeHomesteadLogo(data.settings.homesteadLogo),
+    logoCrop: normalizeProfileCrop(data.settings.homesteadLogoCrop)
+  };
+}
+
+async function populateHomesteadLogo(img, identity, alt = '') {
+  if (!img) return;
+  img.hidden = true;
+  img.removeAttribute('src');
+  img.alt = alt;
+  if (!identity.logo) return;
+  try {
+    const url = await window.RegulaRusticaDocuments.urlFor(identity.logo);
+    if (!url || !img.isConnected || homesteadIdentity().logo?.storagePath !== identity.logo.storagePath) return;
+    img.src = url;
+    window.RegulaRusticaJournal.applyProfileCrop(img, identity.logoCrop);
+    img.hidden = false;
+  } catch (error) { console.warn('Homestead logo could not be displayed.', error); }
+}
+
+function renderHomesteadIdentity() {
+  const identity = homesteadIdentity();
+  $('#todayHomesteadName').textContent = identity.name;
+  $('#todayHomesteadMotto').textContent = identity.motto;
+  $('#todayHomesteadMotto').classList.toggle('hidden', !identity.motto);
+  $('#todayHomesteadLocation').textContent = identity.location;
+  $('#todayHomesteadLocation').classList.toggle('hidden', !identity.location);
+  $('#todayHomesteadLogoWrap').classList.toggle('hidden', !identity.logo);
+  populateHomesteadLogo($('#todayHomesteadLogo'), identity, `${identity.name} logo`);
+
+  const pageTitles = {
+    recordsPageTitle: 'Records', tasksPageTitle: 'Tasks', calendarPageTitle: 'Calendar',
+    yieldPageTitle: 'Yield', ledgerPageTitle: 'Ledger'
+  };
+  Object.entries(pageTitles).forEach(([id, section]) => { $(`#${id}`).textContent = `${identity.name} ${section}`; });
+
+  $('#homesteadLogoPreviewEmpty').classList.toggle('hidden', Boolean(identity.logo));
+  $('#homesteadLogoPreview').hidden = !identity.logo;
+  populateHomesteadLogo($('#homesteadLogoPreview'), { ...identity, logoCrop: homesteadLogoCropDraft }, `${identity.name} logo`);
+  $('#removeHomesteadLogo').classList.toggle('hidden', !identity.logo);
+  $('#homesteadLogoFraming').classList.toggle('hidden', !identity.logo);
+  $('#homesteadLogoZoom').value = String(homesteadLogoCropDraft.zoom);
 }
 
 function followStartDate(startInput, endInput, automatic = true) {
@@ -2648,10 +2752,120 @@ $$('[name="calendarView"]').forEach(input => input.addEventListener('change', ()
 $('#calendarPrevious').addEventListener('click', () => { const amount = calendarView === 'month' ? -1 : calendarView === 'week' ? -7 : -1; calendarMonth = calendarView === 'month' ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + amount, 1) : new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), calendarMonth.getDate() + amount); renderCalendar(); });
 $('#calendarNext').addEventListener('click', () => { const amount = calendarView === 'month' ? 1 : calendarView === 'week' ? 7 : 1; calendarMonth = calendarView === 'month' ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + amount, 1) : new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), calendarMonth.getDate() + amount); renderCalendar(); });
 $('#calendarToday').addEventListener('click', () => { calendarMonth = new Date(); renderCalendar(); });
-$('#homesteadForm').addEventListener('submit', event => {
+$('#homesteadLogoInput').addEventListener('change', event => {
+  pendingHomesteadLogoFile = event.target.files[0] || null;
+  removeHomesteadLogoRequested = false;
+  homesteadLogoCropDraft = normalizeProfileCrop();
+  if (homesteadLogoPreviewUrl) URL.revokeObjectURL(homesteadLogoPreviewUrl);
+  homesteadLogoPreviewUrl = pendingHomesteadLogoFile ? URL.createObjectURL(pendingHomesteadLogoFile) : '';
+  if (!pendingHomesteadLogoFile) return renderHomesteadIdentity();
+  $('#homesteadLogoPreview').src = homesteadLogoPreviewUrl;
+  window.RegulaRusticaJournal.applyProfileCrop($('#homesteadLogoPreview'), homesteadLogoCropDraft);
+  $('#homesteadLogoPreview').alt = `${$('#homesteadName').value.trim() || 'Homestead'} logo preview`;
+  $('#homesteadLogoPreview').hidden = false;
+  $('#homesteadLogoPreviewEmpty').classList.add('hidden');
+  $('#removeHomesteadLogo').classList.remove('hidden');
+  $('#homesteadLogoFraming').classList.remove('hidden');
+  $('#homesteadLogoZoom').value = '1';
+});
+$('#removeHomesteadLogo').addEventListener('click', () => {
+  pendingHomesteadLogoFile = null;
+  removeHomesteadLogoRequested = true;
+  homesteadLogoCropDraft = normalizeProfileCrop();
+  $('#homesteadLogoInput').value = '';
+  $('#homesteadLogoPreview').hidden = true;
+  $('#homesteadLogoPreviewEmpty').classList.remove('hidden');
+  $('#removeHomesteadLogo').classList.add('hidden');
+  $('#homesteadLogoFraming').classList.add('hidden');
+});
+const updateHomesteadLogoCropPreview = () => window.RegulaRusticaJournal.applyProfileCrop($('#homesteadLogoPreview'), homesteadLogoCropDraft);
+$('#homesteadLogoZoom').addEventListener('input', event => {
+  homesteadLogoCropDraft = normalizeProfileCrop({ ...homesteadLogoCropDraft, zoom: event.target.value });
+  updateHomesteadLogoCropPreview();
+});
+let homesteadLogoCropDrag = null;
+$('#homesteadLogoCropPreview').addEventListener('pointerdown', event => {
+  if ($('#homesteadLogoPreview').hidden) return;
+  homesteadLogoCropDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, crop: { ...homesteadLogoCropDraft } };
+  event.currentTarget.setPointerCapture(event.pointerId);
+});
+$('#homesteadLogoCropPreview').addEventListener('pointermove', event => {
+  if (!homesteadLogoCropDrag || homesteadLogoCropDrag.pointerId !== event.pointerId) return;
+  const bounds = event.currentTarget.getBoundingClientRect();
+  homesteadLogoCropDraft = normalizeProfileCrop({
+    ...homesteadLogoCropDraft,
+    x: homesteadLogoCropDrag.crop.x - ((event.clientX - homesteadLogoCropDrag.x) / bounds.width) * 100,
+    y: homesteadLogoCropDrag.crop.y - ((event.clientY - homesteadLogoCropDrag.y) / bounds.height) * 100
+  });
+  updateHomesteadLogoCropPreview();
+});
+const endHomesteadLogoCropDrag = event => {
+  if (homesteadLogoCropDrag?.pointerId === event.pointerId) homesteadLogoCropDrag = null;
+};
+$('#homesteadLogoCropPreview').addEventListener('pointerup', endHomesteadLogoCropDrag);
+$('#homesteadLogoCropPreview').addEventListener('pointercancel', endHomesteadLogoCropDrag);
+$('#homesteadForm').addEventListener('submit', async event => {
   event.preventDefault();
-  data.settings.homesteadName = $('#homesteadName').value.trim() || 'My Homestead';
-  saveData();
+  const status = $('#homesteadIdentityStatus');
+  const context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
+  const oldLogo = normalizeHomesteadLogo(data.settings.homesteadLogo);
+  const next = {
+    homesteadName: $('#homesteadName').value.trim() || 'My Homestead',
+    homesteadMotto: $('#homesteadMotto').value.trim(),
+    homesteadLocation: $('#homesteadLocation').value.trim(),
+    homesteadLogo: removeHomesteadLogoRequested ? null : oldLogo,
+    homesteadLogoCrop: normalizeProfileCrop(homesteadLogoCropDraft)
+  };
+  $('#saveHomesteadIdentity').disabled = true;
+  status.textContent = 'Saving Homestead identity…';
+  status.classList.remove('error');
+  let savedLocally = false;
+  try {
+    if (context?.homesteadId && !context.canManageHomestead) throw new Error('Only a Steward can change shared Homestead identity.');
+    if (pendingHomesteadLogoFile) {
+      next.homesteadLogo = await window.RegulaRusticaDocuments.saveHomesteadLogo(pendingHomesteadLogoFile);
+    }
+    data.settings = next;
+    saveData(data, 'homestead-identity');
+    savedLocally = true;
+    if (context?.homesteadId) {
+      if (pendingHomesteadLogoFile) {
+        next.homesteadLogo = await window.RegulaRusticaDocuments.uploadHomesteadLogo(next.homesteadLogo);
+        saveData(data, 'homestead-identity-logo-upload');
+      }
+      const result = await context.client.from('homesteads').update({
+        name: next.homesteadName,
+        motto: next.homesteadMotto || null,
+        location: next.homesteadLocation || null,
+        logo_storage_path: next.homesteadLogo?.storagePath || null,
+        logo_crop: next.homesteadLogoCrop
+      }).eq('id', context.homesteadId).select('name,motto,location,logo_storage_path,logo_crop').single();
+      if (result.error) throw result.error;
+      context.homesteadIdentity = result.data;
+    }
+    if (oldLogo && oldLogo.id !== next.homesteadLogo?.id) {
+      try {
+        await window.RegulaRusticaDocuments.removeLocal([oldLogo.id]);
+        if (oldLogo.storagePath && context?.homesteadId) await window.RegulaRusticaDocuments.removeRemote([oldLogo.storagePath]);
+      } catch (error) {
+        console.warn('Previous Homestead logo cleanup will be retried later.', error);
+      }
+    }
+    pendingHomesteadLogoFile = null;
+    removeHomesteadLogoRequested = false;
+    $('#homesteadLogoInput').value = '';
+    if (homesteadLogoPreviewUrl) URL.revokeObjectURL(homesteadLogoPreviewUrl);
+    homesteadLogoPreviewUrl = '';
+    status.textContent = context?.homesteadId ? 'Shared Homestead identity saved.' : 'Homestead identity saved on this device.';
+  } catch (error) {
+    console.warn('Homestead identity could not be fully saved.', error);
+    status.textContent = savedLocally && context?.homesteadId
+      ? `Saved on this device; shared update failed. ${error.message || ''}`.trim()
+      : error.message || 'Homestead identity could not be saved.';
+    status.classList.add('error');
+  } finally {
+    $('#saveHomesteadIdentity').disabled = Boolean(context?.homesteadId && !context.canManageHomestead);
+  }
 });
 $('#childForm').addEventListener('submit', event => {
   event.preventDefault();
@@ -2678,6 +2892,7 @@ $('#resetData').addEventListener('click', () => {
 
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(error => console.warn('Offline support could not start.', error)));
 window.addEventListener('regula-rustica:cloud-context', () => {
+  applyCloudHomesteadContext(window.REGULA_RUSTICA_CLOUD_CONTEXT);
   renderRecords();
   renderSettingsSummary();
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();

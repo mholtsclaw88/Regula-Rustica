@@ -133,6 +133,34 @@ test('normalization does not materialize recurring Tasks as a read side effect',
   assert.equal(normalized.tasks[0].id, 'recurring-task');
 });
 
+test('Homestead identity fields survive normalization, persistence, and reload', async () => {
+  const api = await dataApi();
+  const source = currentData([]);
+  source.settings = {
+    homesteadName: 'Woodthief Homestead',
+    homesteadMotto: 'Ora · Labora · Custodia',
+    homesteadLocation: 'Northeast Ohio',
+    homesteadLogoCrop: { x: 35, y: 62, zoom: 1.8 },
+    homesteadLogo: {
+      id: 'woodthief-mark',
+      storagePath: 'homesteads/home-1/identity/woodthief-mark/logo.jpg',
+      filename: 'logo.jpg',
+      mimeType: 'image/jpeg',
+      size: 1200
+    }
+  };
+  const normalized = api.normalizeData(source);
+  api.localStorage.setItem(api.storageKey, JSON.stringify(normalized));
+  const reloaded = api.loadData();
+  assert.equal(reloaded.settings.homesteadName, source.settings.homesteadName);
+  assert.equal(reloaded.settings.homesteadMotto, source.settings.homesteadMotto);
+  assert.equal(reloaded.settings.homesteadLocation, source.settings.homesteadLocation);
+  assert.equal(reloaded.settings.homesteadLogo.storagePath, source.settings.homesteadLogo.storagePath);
+  assert.equal(reloaded.settings.homesteadLogoCrop.x, 35);
+  assert.equal(reloaded.settings.homesteadLogoCrop.y, 62);
+  assert.equal(reloaded.settings.homesteadLogoCrop.zoom, 1.8);
+});
+
 test('normalization disables stale recurring work for inactive Records without erasing history', async () => {
   const api = await dataApi();
   const source = currentData([
