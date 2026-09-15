@@ -134,7 +134,7 @@ async function initializeCloud() {
     const hasMembership = Boolean(homesteadId);
     let homesteadIdentity = null;
     if (hasMembership) {
-      const result = await client.from('homesteads').select('name,motto,location,logo_storage_path').eq('id', homesteadId).single();
+      const result = await client.from('homesteads').select('name,motto,location,logo_storage_path,logo_crop').eq('id', homesteadId).single();
       if (result.error) throw result.error;
       homesteadIdentity = result.data;
     }

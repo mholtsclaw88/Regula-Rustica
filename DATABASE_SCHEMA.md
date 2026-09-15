@@ -205,6 +205,7 @@ Represents the top-level owner of all Regula Rustica data.
 | `motto` | `text` | No | Optional Homestead motto, maximum 160 characters |
 | `location` | `text` | No | Optional short freeform location, maximum 120 characters |
 | `logo_storage_path` | `text` | No | Private `record-documents` Storage path under this Homestead's `identity` folder |
+| `logo_crop` | `jsonb` | Yes | Non-destructive `{x, y, zoom}` presentation metadata; defaults to centered |
 | `created_at` | `timestamptz` | Yes | Standard |
 | `updated_at` | `timestamptz` | Yes | Standard |
 | `created_by` | `uuid` | No | Creator |

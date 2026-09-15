@@ -335,7 +335,8 @@ function normalizeData(source = {}, options = {}) {
       homesteadName: source.settings?.homesteadName || 'My Homestead',
       homesteadMotto: source.settings?.homesteadMotto || '',
       homesteadLocation: source.settings?.homesteadLocation || '',
-      homesteadLogo: normalizeHomesteadLogo(source.settings?.homesteadLogo)
+      homesteadLogo: normalizeHomesteadLogo(source.settings?.homesteadLogo),
+      homesteadLogoCrop: normalizeProfileCrop(source.settings?.homesteadLogoCrop)
     },
     records,
     tasks,
@@ -631,6 +632,7 @@ let profileCropAttachmentId = null;
 let pendingHomesteadLogoFile = null;
 let removeHomesteadLogoRequested = false;
 let homesteadLogoPreviewUrl = '';
+let homesteadLogoCropDraft = normalizeProfileCrop(data.settings.homesteadLogoCrop);
 let profileCropDraft = normalizeProfileCrop();
 let settingsSection = 'home';
 
@@ -1795,7 +1797,6 @@ function renderChoreWindows() {
 
 function renderAll() {
   $('#todayDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  $('#homesteadHeader').textContent = (data.settings.homesteadName || 'My Homestead').toUpperCase();
   $('#homesteadName').value = data.settings.homesteadName || '';
   $('#homesteadMotto').value = data.settings.homesteadMotto || '';
   $('#homesteadLocation').value = data.settings.homesteadLocation || '';
@@ -1823,7 +1824,8 @@ function cloudHomesteadIdentity(row, currentLogo = null) {
     homesteadName: row?.name || 'My Homestead',
     homesteadMotto: row?.motto || '',
     homesteadLocation: row?.location || '',
-    homesteadLogo: logo
+    homesteadLogo: logo,
+    homesteadLogoCrop: normalizeProfileCrop(row?.logo_crop)
   };
 }
 
@@ -1837,6 +1839,7 @@ function applyCloudHomesteadContext(context) {
   const next = cloudHomesteadIdentity(context.homesteadIdentity, data.settings.homesteadLogo);
   if (JSON.stringify(next) === JSON.stringify(data.settings)) return;
   data.settings = next;
+  homesteadLogoCropDraft = normalizeProfileCrop(next.homesteadLogoCrop);
   saveData(data, 'cloud-identity');
 }
 
@@ -1883,7 +1886,8 @@ function homesteadIdentity() {
     name: data.settings.homesteadName || 'My Homestead',
     motto: data.settings.homesteadMotto || '',
     location: data.settings.homesteadLocation || '',
-    logo: normalizeHomesteadLogo(data.settings.homesteadLogo)
+    logo: normalizeHomesteadLogo(data.settings.homesteadLogo),
+    logoCrop: normalizeProfileCrop(data.settings.homesteadLogoCrop)
   };
 }
 
@@ -1897,6 +1901,7 @@ async function populateHomesteadLogo(img, identity, alt = '') {
     const url = await window.RegulaRusticaDocuments.urlFor(identity.logo);
     if (!url || !img.isConnected || homesteadIdentity().logo?.storagePath !== identity.logo.storagePath) return;
     img.src = url;
+    window.RegulaRusticaJournal.applyProfileCrop(img, identity.logoCrop);
     img.hidden = false;
   } catch (error) { console.warn('Homestead logo could not be displayed.', error); }
 }
@@ -1911,14 +1916,18 @@ function renderHomesteadIdentity() {
   $('#todayHomesteadLogoWrap').classList.toggle('hidden', !identity.logo);
   populateHomesteadLogo($('#todayHomesteadLogo'), identity, `${identity.name} logo`);
 
-  $('#recordsHomesteadName').textContent = identity.name;
-  $('#recordsHomesteadLogoWrap').classList.toggle('hidden', !identity.logo);
-  populateHomesteadLogo($('#recordsHomesteadLogo'), identity);
+  const pageTitles = {
+    recordsPageTitle: 'Records', tasksPageTitle: 'Tasks', calendarPageTitle: 'Calendar',
+    yieldPageTitle: 'Yield', ledgerPageTitle: 'Ledger'
+  };
+  Object.entries(pageTitles).forEach(([id, section]) => { $(`#${id}`).textContent = `${identity.name} ${section}`; });
 
   $('#homesteadLogoPreviewEmpty').classList.toggle('hidden', Boolean(identity.logo));
   $('#homesteadLogoPreview').hidden = !identity.logo;
-  populateHomesteadLogo($('#homesteadLogoPreview'), identity, `${identity.name} logo`);
+  populateHomesteadLogo($('#homesteadLogoPreview'), { ...identity, logoCrop: homesteadLogoCropDraft }, `${identity.name} logo`);
   $('#removeHomesteadLogo').classList.toggle('hidden', !identity.logo);
+  $('#homesteadLogoFraming').classList.toggle('hidden', !identity.logo);
+  $('#homesteadLogoZoom').value = String(homesteadLogoCropDraft.zoom);
 }
 
 function followStartDate(startInput, endInput, automatic = true) {
@@ -2746,23 +2755,55 @@ $('#calendarToday').addEventListener('click', () => { calendarMonth = new Date()
 $('#homesteadLogoInput').addEventListener('change', event => {
   pendingHomesteadLogoFile = event.target.files[0] || null;
   removeHomesteadLogoRequested = false;
+  homesteadLogoCropDraft = normalizeProfileCrop();
   if (homesteadLogoPreviewUrl) URL.revokeObjectURL(homesteadLogoPreviewUrl);
   homesteadLogoPreviewUrl = pendingHomesteadLogoFile ? URL.createObjectURL(pendingHomesteadLogoFile) : '';
   if (!pendingHomesteadLogoFile) return renderHomesteadIdentity();
   $('#homesteadLogoPreview').src = homesteadLogoPreviewUrl;
+  window.RegulaRusticaJournal.applyProfileCrop($('#homesteadLogoPreview'), homesteadLogoCropDraft);
   $('#homesteadLogoPreview').alt = `${$('#homesteadName').value.trim() || 'Homestead'} logo preview`;
   $('#homesteadLogoPreview').hidden = false;
   $('#homesteadLogoPreviewEmpty').classList.add('hidden');
   $('#removeHomesteadLogo').classList.remove('hidden');
+  $('#homesteadLogoFraming').classList.remove('hidden');
+  $('#homesteadLogoZoom').value = '1';
 });
 $('#removeHomesteadLogo').addEventListener('click', () => {
   pendingHomesteadLogoFile = null;
   removeHomesteadLogoRequested = true;
+  homesteadLogoCropDraft = normalizeProfileCrop();
   $('#homesteadLogoInput').value = '';
   $('#homesteadLogoPreview').hidden = true;
   $('#homesteadLogoPreviewEmpty').classList.remove('hidden');
   $('#removeHomesteadLogo').classList.add('hidden');
+  $('#homesteadLogoFraming').classList.add('hidden');
 });
+const updateHomesteadLogoCropPreview = () => window.RegulaRusticaJournal.applyProfileCrop($('#homesteadLogoPreview'), homesteadLogoCropDraft);
+$('#homesteadLogoZoom').addEventListener('input', event => {
+  homesteadLogoCropDraft = normalizeProfileCrop({ ...homesteadLogoCropDraft, zoom: event.target.value });
+  updateHomesteadLogoCropPreview();
+});
+let homesteadLogoCropDrag = null;
+$('#homesteadLogoCropPreview').addEventListener('pointerdown', event => {
+  if ($('#homesteadLogoPreview').hidden) return;
+  homesteadLogoCropDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, crop: { ...homesteadLogoCropDraft } };
+  event.currentTarget.setPointerCapture(event.pointerId);
+});
+$('#homesteadLogoCropPreview').addEventListener('pointermove', event => {
+  if (!homesteadLogoCropDrag || homesteadLogoCropDrag.pointerId !== event.pointerId) return;
+  const bounds = event.currentTarget.getBoundingClientRect();
+  homesteadLogoCropDraft = normalizeProfileCrop({
+    ...homesteadLogoCropDraft,
+    x: homesteadLogoCropDrag.crop.x - ((event.clientX - homesteadLogoCropDrag.x) / bounds.width) * 100,
+    y: homesteadLogoCropDrag.crop.y - ((event.clientY - homesteadLogoCropDrag.y) / bounds.height) * 100
+  });
+  updateHomesteadLogoCropPreview();
+});
+const endHomesteadLogoCropDrag = event => {
+  if (homesteadLogoCropDrag?.pointerId === event.pointerId) homesteadLogoCropDrag = null;
+};
+$('#homesteadLogoCropPreview').addEventListener('pointerup', endHomesteadLogoCropDrag);
+$('#homesteadLogoCropPreview').addEventListener('pointercancel', endHomesteadLogoCropDrag);
 $('#homesteadForm').addEventListener('submit', async event => {
   event.preventDefault();
   const status = $('#homesteadIdentityStatus');
@@ -2772,7 +2813,8 @@ $('#homesteadForm').addEventListener('submit', async event => {
     homesteadName: $('#homesteadName').value.trim() || 'My Homestead',
     homesteadMotto: $('#homesteadMotto').value.trim(),
     homesteadLocation: $('#homesteadLocation').value.trim(),
-    homesteadLogo: removeHomesteadLogoRequested ? null : oldLogo
+    homesteadLogo: removeHomesteadLogoRequested ? null : oldLogo,
+    homesteadLogoCrop: normalizeProfileCrop(homesteadLogoCropDraft)
   };
   $('#saveHomesteadIdentity').disabled = true;
   status.textContent = 'Saving Homestead identity…';
@@ -2795,8 +2837,9 @@ $('#homesteadForm').addEventListener('submit', async event => {
         name: next.homesteadName,
         motto: next.homesteadMotto || null,
         location: next.homesteadLocation || null,
-        logo_storage_path: next.homesteadLogo?.storagePath || null
-      }).eq('id', context.homesteadId).select('name,motto,location,logo_storage_path').single();
+        logo_storage_path: next.homesteadLogo?.storagePath || null,
+        logo_crop: next.homesteadLogoCrop
+      }).eq('id', context.homesteadId).select('name,motto,location,logo_storage_path,logo_crop').single();
       if (result.error) throw result.error;
       context.homesteadIdentity = result.data;
     }

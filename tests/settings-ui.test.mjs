@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [html, app, css] = await Promise.all([
+const [html, app, css, styles] = await Promise.all([
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
-  readFile(new URL('../housekeeping.css', import.meta.url), 'utf8')
+  readFile(new URL('../housekeeping.css', import.meta.url), 'utf8'),
+  readFile(new URL('../styles.css', import.meta.url), 'utf8')
 ]);
 
 test('Settings home exposes one focused destination for every category', () => {
@@ -22,7 +23,7 @@ test('Settings home exposes one focused destination for every category', () => {
 test('existing Settings control contracts remain present exactly once', () => {
   [
     'homesteadForm', 'homesteadName', 'homesteadMotto', 'homesteadLocation',
-    'homesteadLogoInput', 'removeHomesteadLogo', 'saveHomesteadIdentity', 'childForm', 'childName', 'childList',
+    'homesteadLogoInput', 'homesteadLogoCropPreview', 'homesteadLogoZoom', 'removeHomesteadLogo', 'saveHomesteadIdentity', 'childForm', 'childName', 'childList',
     'addChoreWindow', 'choreWindowList', 'cloudAuthForm', 'cloudStatus',
     'syncControls', 'syncRecovery', 'syncResetFromCloud', 'exportData', 'importData', 'resetData'
   ].forEach(id => assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id));
@@ -44,12 +45,16 @@ test('Settings summary derives from real local and cloud state', () => {
   assert.match(app, /data\.settings\.homesteadName/);
 });
 
-test('Homestead identity is restrained on Today and Records and omits absent optional lines', () => {
+test('Homestead identity is restrained on Today and names every primary section consistently', () => {
   assert.match(html, /class="homestead-bookplate"/);
   assert.match(html, /id="todayHomesteadName"/);
   assert.match(html, /class="[^"]*hidden[^"]*" id="todayHomesteadMotto"/);
   assert.match(html, /class="[^"]*hidden[^"]*" id="todayHomesteadLocation"/);
-  assert.match(html, /class="records-homestead-identity"/);
+  assert.doesNotMatch(html, /id="homesteadHeader"|Farm book of|The Homestead/);
+  ['records', 'tasks', 'calendar', 'yield', 'ledger'].forEach(section => {
+    assert.match(html, new RegExp(`id="${section}PageTitle"`));
+    assert.match(app, new RegExp(`${section}PageTitle`));
+  });
   assert.match(app, /classList\.toggle\('hidden', !identity\.motto\)/);
   assert.match(app, /classList\.toggle\('hidden', !identity\.location\)/);
   assert.doesNotMatch(app, /homesteadLogo[^\n]*Regula Rustica/i);
@@ -60,11 +65,19 @@ test('shared Homestead identity uses the existing Homestead row and private imag
     readFile(new URL('../cloud-auth.js', import.meta.url), 'utf8'),
     readFile(new URL('../record-documents.js', import.meta.url), 'utf8')
   ]);
-  assert.match(auth, /from\('homesteads'\)\.select\('name,motto,location,logo_storage_path'\)/);
+  assert.match(auth, /from\('homesteads'\)\.select\('name,motto,location,logo_storage_path,logo_crop'\)/);
   assert.match(app, /from\('homesteads'\)\.update\(/);
   assert.match(documents, /homesteads\/\$\{context\.homesteadId\}\/identity\//);
   assert.match(documents, /saveHomesteadLogo/);
   assert.match(app, /removeHomesteadLogoRequested/);
+  assert.match(app, /logo_crop: next\.homesteadLogoCrop/);
+});
+
+test('Homestead logo uses the existing non-destructive crop controls in a circular frame', () => {
+  assert.match(styles, /\.homestead-bookplate-logo\{[^}]*overflow:hidden;[^}]*border-radius:50%/s);
+  assert.match(styles, /\.homestead-logo-preview\{[^}]*border-radius:50%;[^}]*touch-action:none/s);
+  assert.match(app, /applyProfileCrop\(img, identity\.logoCrop\)/);
+  assert.match(app, /homesteadLogoCropPreview[^]*pointermove/);
 });
 
 test('Settings index has responsive desktop and mobile layouts', () => {

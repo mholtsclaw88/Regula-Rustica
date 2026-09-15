@@ -140,6 +140,7 @@ test('Homestead identity fields survive normalization, persistence, and reload',
     homesteadName: 'Woodthief Homestead',
     homesteadMotto: 'Ora · Labora · Custodia',
     homesteadLocation: 'Northeast Ohio',
+    homesteadLogoCrop: { x: 35, y: 62, zoom: 1.8 },
     homesteadLogo: {
       id: 'woodthief-mark',
       storagePath: 'homesteads/home-1/identity/woodthief-mark/logo.jpg',
@@ -155,6 +156,9 @@ test('Homestead identity fields survive normalization, persistence, and reload',
   assert.equal(reloaded.settings.homesteadMotto, source.settings.homesteadMotto);
   assert.equal(reloaded.settings.homesteadLocation, source.settings.homesteadLocation);
   assert.equal(reloaded.settings.homesteadLogo.storagePath, source.settings.homesteadLogo.storagePath);
+  assert.equal(reloaded.settings.homesteadLogoCrop.x, 35);
+  assert.equal(reloaded.settings.homesteadLogoCrop.y, 62);
+  assert.equal(reloaded.settings.homesteadLogoCrop.zoom, 1.8);
 });
 
 test('normalization disables stale recurring work for inactive Records without erasing history', async () => {

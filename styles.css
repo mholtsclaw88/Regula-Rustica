@@ -95,23 +95,24 @@
 
 /* Homestead identity: a restrained bookplate, not a second product brand. */
 .homestead-bookplate{display:flex;min-height:92px;margin:0 0 17px;padding:2px 0 15px;align-items:center;gap:18px;border-bottom:3px double var(--gold)}
-.homestead-bookplate-logo{display:grid;width:76px;height:76px;flex:0 0 76px;place-items:center}
-.homestead-bookplate-logo img{display:block;width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+.homestead-bookplate-logo{display:grid;width:76px;height:76px;flex:0 0 76px;place-items:center;overflow:hidden;border:2px solid var(--gold);border-radius:50%;background:var(--raised)}
+.homestead-bookplate-logo img{display:block;width:100%;height:100%;object-fit:cover;mix-blend-mode:multiply;will-change:transform,object-position}
 .homestead-bookplate-copy{min-width:0}
 .homestead-bookplate h2{margin:.15rem 0 .1rem;color:var(--forest);font-size:clamp(1.65rem,4vw,2.25rem);line-height:1.08}
 .homestead-identity-motto,.homestead-identity-location{margin:.1rem 0;color:var(--muted)}
 .homestead-identity-motto{font-style:italic}
 .homestead-identity-location{font:700 .72rem/1.4 Arial,sans-serif;letter-spacing:.06em}
-.records-homestead-identity{display:flex;margin:0 0 8px;align-items:center;gap:8px;color:var(--muted);font-size:.8rem}
-.records-homestead-logo{width:28px;height:28px;flex:0 0 28px}
-.records-homestead-logo img{display:block;width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
-.records-homestead-identity strong{color:var(--forest);font-weight:600}
 .homestead-logo-field{display:grid;gap:6px}
 .form-label{font:700 .78rem Arial,sans-serif;color:var(--forest)}
 .homestead-logo-editor{display:flex;align-items:center;gap:14px}
-.homestead-logo-preview{display:grid;width:84px;height:84px;flex:0 0 84px;place-items:center;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:var(--raised);color:var(--muted);font:700 .66rem/1.25 Arial,sans-serif;text-align:center}
-.homestead-logo-preview img{width:100%;height:100%;object-fit:contain}
+.homestead-logo-preview{display:grid;width:112px;height:112px;flex:0 0 112px;place-items:center;overflow:hidden;border:2px solid var(--gold);border-radius:50%;background:var(--raised);color:var(--muted);font:700 .66rem/1.25 Arial,sans-serif;text-align:center;cursor:grab;touch-action:none}
+.homestead-logo-preview:active{cursor:grabbing}
+.homestead-logo-preview img{width:100%;height:100%;object-fit:cover;user-select:none;pointer-events:none;will-change:transform,object-position}
 .homestead-logo-editor .quick{margin:0}
+.homestead-logo-framing{display:grid;gap:5px}
+.homestead-logo-framing label{grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px}
+.homestead-logo-framing input[type="range"]{width:100%}
+.choice-pills input{top:0;right:0;bottom:0;left:0;width:auto;height:auto;margin:0;padding:0}
 .optional{color:var(--muted);font-weight:400}
 .form-status{min-height:1.15em;margin:0;color:var(--forest);font:700 .75rem/1.4 Arial,sans-serif}
 .form-status.error{color:var(--red)}
@@ -121,7 +122,6 @@
  .homestead-bookplate h2{font-size:1.48rem}
  .homestead-identity-motto{font-size:.83rem}
  .homestead-identity-location{font-size:.65rem}
- .records-homestead-identity{margin:0 3px 7px}
  .homestead-logo-editor{align-items:flex-start}
- .homestead-logo-preview{width:72px;height:72px;flex-basis:72px}
+ .homestead-logo-preview{width:96px;height:96px;flex-basis:96px}
 }
