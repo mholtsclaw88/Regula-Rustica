@@ -70,6 +70,8 @@ test('primary sections share compact Homestead mastheads and accessible Latin ex
   assert.match(app, /section-info\[open\]/);
   assert.match(app, /event\.key === 'Escape'/);
   assert.match(css, /\.section-info > summary:focus-visible/);
+  assert.equal((html.match(/<span aria-hidden="true">i<\/span>/g) || []).length, 6);
+  assert.match(css, /\.section-info > summary > span\s*\{[^}]*border: 1px solid currentColor;/s);
   assert.match(css, /\.section-info-popover\s*\{[^}]*background: var\(--paper\)/s);
   assert.match(css, /@media \(max-width: 520px\)[\s\S]*\.section-info > summary \{ width: 40px; height: 40px; \}/);
 });

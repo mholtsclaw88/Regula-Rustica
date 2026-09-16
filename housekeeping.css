@@ -1028,18 +1028,27 @@ summary:focus-visible {
 .section-masthead-copy { min-width: 0; }
 .section-masthead h2 { margin: 2px 0 0; color: var(--forest); font-size: clamp(1.4rem,3vw,1.9rem); line-height: 1.08; }
 .section-masthead > .btn { justify-self: end; }
-.section-kicker { display: flex; align-items: center; gap: 4px; min-height: 36px; }
-.section-info { position: relative; }
+.section-kicker { display: flex; align-items: center; gap: 0; min-height: 30px; }
+.section-info { position: relative; margin-left: -2px; }
 .section-info > summary {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   place-items: center;
   border-radius: 50%;
   color: var(--forest2);
   cursor: pointer;
   list-style: none;
-  font: 700 .86rem/1 Arial,sans-serif;
+  font-size: 0;
+}
+.section-info > summary > span {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font: 700 10px/1 Georgia,serif;
 }
 .section-info > summary::-webkit-details-marker { display: none; }
 .section-info > summary:hover { background: rgba(164,123,60,.1); }
@@ -1077,7 +1086,8 @@ summary:focus-visible {
   .section-masthead-seal { width: 46px; height: 46px; }
   .section-masthead h2 { font-size: 1.3rem; }
   .section-masthead > .btn { min-height: 42px; padding: 9px 11px; }
-  .section-kicker { min-height: 40px; }
+  .section-kicker { min-height: 36px; }
+  .section-info { margin-left: -5px; }
   .section-info > summary { width: 40px; height: 40px; }
   .section-info-popover { position: fixed; top: auto; right: 12px; bottom: calc(82px + env(safe-area-inset-bottom)); left: 12px; width: auto; }
   .today-date-block .section-info-popover { bottom: auto; top: 128px; }
