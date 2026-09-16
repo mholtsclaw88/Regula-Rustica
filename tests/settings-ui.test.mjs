@@ -60,6 +60,35 @@ test('Homestead identity is restrained on Today and names every primary section 
   assert.doesNotMatch(app, /homesteadLogo[^\n]*Regula Rustica/i);
 });
 
+test('primary sections share compact Homestead mastheads and accessible Latin explanations', () => {
+  assert.equal((html.match(/class="section-head section-masthead"/g) || []).length, 5);
+  assert.equal((html.match(/class="section-masthead-seal hidden"/g) || []).length, 5);
+  ['Custodia', 'Agenda', 'Fructus', 'Rationes', 'Tempora', 'Horarium'].forEach(label => {
+    assert.match(html, new RegExp(`aria-label="About ${label}"`));
+  });
+  assert.match(app, /section-masthead-seal/);
+  assert.match(app, /section-info\[open\]/);
+  assert.match(app, /event\.key === 'Escape'/);
+  assert.match(css, /\.section-info > summary:focus-visible/);
+  assert.match(css, /\.section-info-popover\s*\{[^}]*background: var\(--paper\)/s);
+  assert.match(css, /@media \(max-width: 520px\)[\s\S]*\.section-info > summary \{ width: 40px; height: 40px; \}/);
+});
+
+test('Today uses one Horarium and date heading before its existing daily content', () => {
+  assert.equal((html.match(/<span class="label">Horarium<\/span>/g) || []).length, 1);
+  assert.doesNotMatch(html, /<span class="label">Today<\/span>|Today's Schedule<\/h3>/);
+  assert.match(html, /About Horarium[\s\S]*id="todayDate"[\s\S]*Today at a Glance[\s\S]*id="todayTimeline"/);
+});
+
+test('App About provides the permanent product explanation and motto', () => {
+  assert.match(html, /The rural rule\./);
+  assert.match(html, /modern farm ledger for ordering the daily work of the homestead/);
+  assert.match(html, /Ora et labora · Ut in omnibus glorificetur Deus\./);
+  assert.match(html, /<dt>Version<\/dt>/);
+  assert.match(html, /<dt>Storage<\/dt>/);
+  assert.match(html, /<dt>Offline use<\/dt>/);
+});
+
 test('shared Homestead identity uses the existing Homestead row and private image storage', async () => {
   const [auth, documents] = await Promise.all([
     readFile(new URL('../cloud-auth.js', import.meta.url), 'utf8'),
@@ -78,6 +107,20 @@ test('Homestead logo uses the existing non-destructive crop controls in a circul
   assert.match(styles, /\.homestead-logo-preview\{[^}]*border-radius:50%;[^}]*touch-action:none/s);
   assert.match(app, /applyProfileCrop\(img, identity\.logoCrop\)/);
   assert.match(app, /homesteadLogoCropPreview[^]*pointermove/);
+});
+
+test('a newly selected Homestead logo survives rerenders and previews before Save', () => {
+  assert.match(app, /const previewLogo = !removeHomesteadLogoRequested && \(pendingHomesteadLogoFile \|\| identity\.logo\)/);
+  assert.match(app, /pendingHomesteadLogoFile && homesteadLogoPreviewUrl[\s\S]*homesteadLogoPreview'\)\.src = homesteadLogoPreviewUrl/);
+  assert.match(app, /img\.id === 'homesteadLogoPreview' && \(pendingHomesteadLogoFile \|\| removeHomesteadLogoRequested\)/);
+  assert.match(app, /URL\.revokeObjectURL\(homesteadLogoPreviewUrl\)/);
+});
+
+test('Record card metadata suppresses adjacent duplicate type values', () => {
+  assert.match(app, /function recordMetadataText\(record\)/);
+  assert.match(app, /value\.toLocaleLowerCase\(\) !== values\[index - 1\]\.toLocaleLowerCase\(\)/);
+  assert.match(app, /escapeHtml\(recordMetadataText\(record\)\)/);
+  assert.doesNotMatch(app, /escapeHtml\(record\.type\)\} · \$\{escapeHtml\(identityText\(record\)\)/);
 });
 
 test('Settings index has responsive desktop and mobile layouts', () => {
