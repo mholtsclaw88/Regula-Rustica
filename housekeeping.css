@@ -1004,12 +1004,98 @@ summary:focus-visible {
 .record-section-panel .empty-panel,
 .record-section-panel .photo-placeholder { padding: 5px 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); text-align: left; font-style: italic; }
 
+/* Compact Homestead section mastheads and shared Latin help disclosure. */
+.section-head.section-masthead {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 0 2px 11px;
+  border-bottom: 1px solid rgba(164,123,60,.42);
+}
+.section-masthead-seal {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  background: var(--raised);
+}
+.section-masthead-seal img { display: block; width: 100%; height: 100%; object-fit: cover; mix-blend-mode: multiply; will-change: transform,object-position; }
+.section-masthead-copy { min-width: 0; }
+.section-masthead h2 { margin: 2px 0 0; color: var(--forest); font-size: clamp(1.4rem,3vw,1.9rem); line-height: 1.08; }
+.section-masthead > .btn { justify-self: end; }
+.section-kicker { display: flex; align-items: center; gap: 0; min-height: 30px; }
+.section-info { position: relative; margin-left: -2px; }
+.section-info > summary {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--forest2);
+  cursor: pointer;
+  list-style: none;
+  font-size: 0;
+}
+.section-info > summary > span {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font: 700 10px/1 Georgia,serif;
+}
+.section-info > summary::-webkit-details-marker { display: none; }
+.section-info > summary:hover { background: rgba(164,123,60,.1); }
+.section-info > summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.section-info-popover {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  z-index: 20;
+  width: min(290px,calc(100vw - 34px));
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 0 10px 28px rgba(48,42,34,.18);
+  color: var(--ink);
+}
+.section-info-popover strong { color: var(--forest); font-size: .88rem; }
+.section-info-popover p { margin: 5px 0 0; color: var(--muted); font: .78rem/1.45 Arial,sans-serif; }
+.today-date-block .section-kicker { margin-bottom: -2px; }
+.today-schedule { margin-top: 8px; }
+.settings-about-tagline { margin: 4px 0 8px; color: #fff8e9; font-style: italic; }
+.settings-about-motto { margin: 12px 0 0; color: #e8d5aa; font-style: italic; }
+
 @media (max-width: 800px) {
   .record-head { align-items: flex-start; }
   .record-actions { width: 100%; justify-content: flex-start; }
   .record-workspace { display: block; }
   .record-section-nav { position: static; flex-direction: row; overflow-x: auto; margin-bottom: 18px; padding: 6px; scrollbar-width: thin; }
   .record-section-nav button { flex: 0 0 auto; min-width: max-content; text-align: center; white-space: nowrap; }
+}
+
+@media (max-width: 520px) {
+  .section-head.section-masthead { grid-template-columns: 46px minmax(0,1fr) auto; gap: 8px; padding-bottom: 8px; }
+  .section-masthead-seal { width: 46px; height: 46px; }
+  .section-masthead h2 { font-size: 1.3rem; }
+  .section-masthead > .btn { min-height: 42px; padding: 9px 11px; }
+  .section-kicker { min-height: 36px; }
+  .section-info { margin-left: -5px; }
+  .section-info > summary { width: 40px; height: 40px; }
+  .section-info-popover { position: fixed; top: auto; right: 12px; bottom: calc(82px + env(safe-area-inset-bottom)); left: 12px; width: auto; }
+  .today-date-block .section-info-popover { bottom: auto; top: 128px; }
+}
+
+@media (max-width: 370px) {
+  .section-head.section-masthead { grid-template-columns: 44px minmax(0,1fr); }
+  .section-masthead > .btn { grid-column: 1 / -1; margin-top: -3px; }
 }
 
 @media (max-width: 520px) {

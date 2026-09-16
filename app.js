@@ -786,6 +786,13 @@ function identityText(record) {
   return identityParts(record).map(displayValue).filter(Boolean).join(' · ') || 'No identifying details yet.';
 }
 
+function recordMetadataText(record) {
+  return [record.type, ...identityParts(record)]
+    .map(displayValue)
+    .filter((value, index, values) => value && (!index || value.toLocaleLowerCase() !== values[index - 1].toLocaleLowerCase()))
+    .join(' · ');
+}
+
 function stewardshipText(record) {
   const stewardship = record.stewardship || {};
   const labels = {
@@ -1150,7 +1157,7 @@ function renderRecords() {
       const responsible = record.stewardship?.responsiblePersonId
         ? data.people.find(person => person.id === record.stewardship.responsiblePersonId && !person.deletedAt)?.displayName
         : '';
-      card.innerHTML = `<div class="record-card-main"><div class="record-card-portrait" data-record-type="${escapeHtml(record.type)}" aria-hidden="true"><img alt="" hidden><span>${escapeHtml(record.name.slice(0, 1).toUpperCase() || record.type.slice(0, 1))}</span></div><div class="record-card-copy"><div class="record-card-title"><h3>${escapeHtml(record.name)}</h3><span class="pill">${escapeHtml(record.status)}</span></div><div class="meta">${escapeHtml(record.type)} · ${escapeHtml(identityText(record))}</div>${responsible ? `<div class="meta">Responsible: ${escapeHtml(responsible)}</div>` : ''}</div><span class="record-card-chevron" aria-hidden="true">›</span></div><div class="record-next">${nextTask ? `<strong>Next:</strong> ${escapeHtml(nextTask.title)} <span>${escapeHtml(nextTaskTiming(nextTask))}</span>` : '<span>No open task</span>'}</div>`;
+      card.innerHTML = `<div class="record-card-main"><div class="record-card-portrait" data-record-type="${escapeHtml(record.type)}" aria-hidden="true"><img alt="" hidden><span>${escapeHtml(record.name.slice(0, 1).toUpperCase() || record.type.slice(0, 1))}</span></div><div class="record-card-copy"><div class="record-card-title"><h3>${escapeHtml(record.name)}</h3><span class="pill">${escapeHtml(record.status)}</span></div><div class="meta">${escapeHtml(recordMetadataText(record))}</div>${responsible ? `<div class="meta">Responsible: ${escapeHtml(responsible)}</div>` : ''}</div><span class="record-card-chevron" aria-hidden="true">›</span></div><div class="record-next">${nextTask ? `<strong>Next:</strong> ${escapeHtml(nextTask.title)} <span>${escapeHtml(nextTaskTiming(nextTask))}</span>` : '<span>No open task</span>'}</div>`;
       populateProfileImage(card.querySelector('img'), card.querySelector('.record-card-portrait span'), record);
       card.addEventListener('click', () => openRecord(record.id));
       card.addEventListener('keydown', event => {
@@ -1900,6 +1907,7 @@ async function populateHomesteadLogo(img, identity, alt = '') {
   try {
     const url = await window.RegulaRusticaDocuments.urlFor(identity.logo);
     if (!url || !img.isConnected || homesteadIdentity().logo?.storagePath !== identity.logo.storagePath) return;
+    if (img.id === 'homesteadLogoPreview' && (pendingHomesteadLogoFile || removeHomesteadLogoRequested)) return;
     img.src = url;
     window.RegulaRusticaJournal.applyProfileCrop(img, identity.logoCrop);
     img.hidden = false;
@@ -1916,17 +1924,29 @@ function renderHomesteadIdentity() {
   $('#todayHomesteadLogoWrap').classList.toggle('hidden', !identity.logo);
   populateHomesteadLogo($('#todayHomesteadLogo'), identity, `${identity.name} logo`);
 
+  $$('.section-masthead-seal').forEach(seal => {
+    seal.classList.toggle('hidden', !identity.logo);
+    populateHomesteadLogo(seal.querySelector('img'), identity);
+  });
+
   const pageTitles = {
     recordsPageTitle: 'Records', tasksPageTitle: 'Tasks', calendarPageTitle: 'Calendar',
     yieldPageTitle: 'Yield', ledgerPageTitle: 'Ledger'
   };
   Object.entries(pageTitles).forEach(([id, section]) => { $(`#${id}`).textContent = `${identity.name} ${section}`; });
 
-  $('#homesteadLogoPreviewEmpty').classList.toggle('hidden', Boolean(identity.logo));
-  $('#homesteadLogoPreview').hidden = !identity.logo;
-  populateHomesteadLogo($('#homesteadLogoPreview'), { ...identity, logoCrop: homesteadLogoCropDraft }, `${identity.name} logo`);
-  $('#removeHomesteadLogo').classList.toggle('hidden', !identity.logo);
-  $('#homesteadLogoFraming').classList.toggle('hidden', !identity.logo);
+  const previewLogo = !removeHomesteadLogoRequested && (pendingHomesteadLogoFile || identity.logo);
+  $('#homesteadLogoPreviewEmpty').classList.toggle('hidden', Boolean(previewLogo));
+  $('#homesteadLogoPreview').hidden = !previewLogo;
+  if (pendingHomesteadLogoFile && homesteadLogoPreviewUrl) {
+    $('#homesteadLogoPreview').src = homesteadLogoPreviewUrl;
+    $('#homesteadLogoPreview').alt = `${identity.name} logo preview`;
+    window.RegulaRusticaJournal.applyProfileCrop($('#homesteadLogoPreview'), homesteadLogoCropDraft);
+  } else if (previewLogo) {
+    populateHomesteadLogo($('#homesteadLogoPreview'), { ...identity, logoCrop: homesteadLogoCropDraft }, `${identity.name} logo`);
+  }
+  $('#removeHomesteadLogo').classList.toggle('hidden', !previewLogo);
+  $('#homesteadLogoFraming').classList.toggle('hidden', !previewLogo);
   $('#homesteadLogoZoom').value = String(homesteadLogoCropDraft.zoom);
 }
 
@@ -2752,31 +2772,31 @@ $$('[name="calendarView"]').forEach(input => input.addEventListener('change', ()
 $('#calendarPrevious').addEventListener('click', () => { const amount = calendarView === 'month' ? -1 : calendarView === 'week' ? -7 : -1; calendarMonth = calendarView === 'month' ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + amount, 1) : new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), calendarMonth.getDate() + amount); renderCalendar(); });
 $('#calendarNext').addEventListener('click', () => { const amount = calendarView === 'month' ? 1 : calendarView === 'week' ? 7 : 1; calendarMonth = calendarView === 'month' ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + amount, 1) : new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), calendarMonth.getDate() + amount); renderCalendar(); });
 $('#calendarToday').addEventListener('click', () => { calendarMonth = new Date(); renderCalendar(); });
+$$('.section-info').forEach(info => info.addEventListener('toggle', () => {
+  if (info.open) $$('.section-info[open]').filter(item => item !== info).forEach(item => { item.open = false; });
+}));
+document.addEventListener('pointerdown', event => {
+  $$('.section-info[open]').filter(info => !info.contains(event.target)).forEach(info => { info.open = false; });
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') $$('.section-info[open]').forEach(info => { info.open = false; info.querySelector('summary')?.focus(); });
+});
 $('#homesteadLogoInput').addEventListener('change', event => {
   pendingHomesteadLogoFile = event.target.files[0] || null;
   removeHomesteadLogoRequested = false;
   homesteadLogoCropDraft = normalizeProfileCrop();
   if (homesteadLogoPreviewUrl) URL.revokeObjectURL(homesteadLogoPreviewUrl);
   homesteadLogoPreviewUrl = pendingHomesteadLogoFile ? URL.createObjectURL(pendingHomesteadLogoFile) : '';
-  if (!pendingHomesteadLogoFile) return renderHomesteadIdentity();
-  $('#homesteadLogoPreview').src = homesteadLogoPreviewUrl;
-  window.RegulaRusticaJournal.applyProfileCrop($('#homesteadLogoPreview'), homesteadLogoCropDraft);
-  $('#homesteadLogoPreview').alt = `${$('#homesteadName').value.trim() || 'Homestead'} logo preview`;
-  $('#homesteadLogoPreview').hidden = false;
-  $('#homesteadLogoPreviewEmpty').classList.add('hidden');
-  $('#removeHomesteadLogo').classList.remove('hidden');
-  $('#homesteadLogoFraming').classList.remove('hidden');
-  $('#homesteadLogoZoom').value = '1';
+  renderHomesteadIdentity();
 });
 $('#removeHomesteadLogo').addEventListener('click', () => {
   pendingHomesteadLogoFile = null;
   removeHomesteadLogoRequested = true;
   homesteadLogoCropDraft = normalizeProfileCrop();
+  if (homesteadLogoPreviewUrl) URL.revokeObjectURL(homesteadLogoPreviewUrl);
+  homesteadLogoPreviewUrl = '';
   $('#homesteadLogoInput').value = '';
-  $('#homesteadLogoPreview').hidden = true;
-  $('#homesteadLogoPreviewEmpty').classList.remove('hidden');
-  $('#removeHomesteadLogo').classList.add('hidden');
-  $('#homesteadLogoFraming').classList.add('hidden');
+  renderHomesteadIdentity();
 });
 const updateHomesteadLogoCropPreview = () => window.RegulaRusticaJournal.applyProfileCrop($('#homesteadLogoPreview'), homesteadLogoCropDraft);
 $('#homesteadLogoZoom').addEventListener('input', event => {
