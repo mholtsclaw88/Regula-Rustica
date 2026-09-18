@@ -311,6 +311,16 @@ function normalizeHomesteadLogo(value) {
   };
 }
 
+function normalizeOnboarding(value = {}) {
+  return {
+    version: 1,
+    step: Math.min(8, Math.max(1, Number(value.step || 1))),
+    mode: value.mode === 'shared' ? 'shared' : value.mode === 'local' ? 'local' : null,
+    completed: value.completed !== false,
+    dismissed: Boolean(value.dismissed)
+  };
+}
+
 function normalizeData(source = {}, options = {}) {
   const sourceVersion = Number(source.schemaVersion || source.version || 0);
   const events = asArray(source.events).map(normalizeEvent);
@@ -336,7 +346,8 @@ function normalizeData(source = {}, options = {}) {
       homesteadMotto: source.settings?.homesteadMotto || '',
       homesteadLocation: source.settings?.homesteadLocation || '',
       homesteadLogo: normalizeHomesteadLogo(source.settings?.homesteadLogo),
-      homesteadLogoCrop: normalizeProfileCrop(source.settings?.homesteadLogoCrop)
+      homesteadLogoCrop: normalizeProfileCrop(source.settings?.homesteadLogoCrop),
+      onboarding: normalizeOnboarding(source.settings?.onboarding)
     },
     records,
     tasks,
@@ -486,7 +497,7 @@ function loadData() {
     }
   }
 
-  return structuredClone(SEED_DATA);
+  return structuredClone(FIRST_RUN_DATA);
 }
 
 function saveData(nextData = data, source = 'user') {
@@ -594,7 +605,7 @@ async function importData(file) {
 const seedTimestamp = nowIso();
 const SEED_DATA = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
-  settings: { homesteadName: 'Wood Thief Homestead' },
+  settings: { homesteadName: 'Wood Thief Homestead', onboarding: { version: 1, step: 8, completed: true } },
   records: [
     { id: 'daisy', type: 'Animal', name: 'Daisy', status: 'Active', identity: { managedAs: 'Individual', species: 'Cattle', breed: 'Jersey', purpose: 'Dairy' }, stewardship: { location: 'Barn and east pasture', responsible: '', currentUse: 'Milk cow', stage: '' }, createdAt: seedTimestamp, updatedAt: seedTimestamp },
     { id: 'north', type: 'Land', name: 'North Paddock', status: 'Resting', identity: { landType: 'Pasture', size: '2 acres' }, stewardship: { currentUse: 'Rotational grazing', currentOccupants: '', rotationStage: 'Resting' }, createdAt: seedTimestamp, updatedAt: seedTimestamp },
@@ -611,6 +622,14 @@ const SEED_DATA = {
   ledger: [],
   calendarEvents: [],
   yieldEntries: [],
+  choreWindows: window.RegulaRusticaTasks.DEFAULT_WINDOWS.map(window.RegulaRusticaTasks.normalizeWindow)
+};
+
+const FIRST_RUN_DATA = {
+  schemaVersion: CURRENT_SCHEMA_VERSION,
+  settings: { homesteadName: 'My Homestead', onboarding: { version: 1, step: 1, mode: null, completed: false, dismissed: false } },
+  records: [], tasks: [], people: [], assignments: [], events: [], notes: [], documents: [], attachments: [],
+  ledger: [], ledgerAllocations: [], calendarEvents: [], yieldEntries: [], relationships: [],
   choreWindows: window.RegulaRusticaTasks.DEFAULT_WINDOWS.map(window.RegulaRusticaTasks.normalizeWindow)
 };
 
@@ -1800,6 +1819,7 @@ function renderAll() {
   $('#homesteadName').value = data.settings.homesteadName || '';
   $('#homesteadMotto').value = data.settings.homesteadMotto || '';
   $('#homesteadLocation').value = data.settings.homesteadLocation || '';
+  $('#onboardingResume')?.classList.toggle('hidden', data.settings.onboarding?.completed !== false);
   renderHomesteadIdentity();
   renderToday();
   renderRecords();
@@ -1835,8 +1855,15 @@ function applyCloudHomesteadContext(context) {
   ['homesteadName', 'homesteadMotto', 'homesteadLocation', 'homesteadLogoInput', 'removeHomesteadLogo', 'saveHomesteadIdentity']
     .forEach(id => { if ($(`#${id}`)) $(`#${id}`).disabled = !editable; });
   $('#homesteadIdentityPermission').classList.toggle('hidden', editable);
+  const onboardingCloudSetup = data.settings.onboarding?.completed === false
+    && data.settings.onboarding.mode === 'shared'
+    && data.settings.onboarding.step <= 4;
+  if (onboardingCloudSetup) return;
   if (!context?.homesteadIdentity) return;
-  const next = cloudHomesteadIdentity(context.homesteadIdentity, data.settings.homesteadLogo);
+  const next = {
+    ...cloudHomesteadIdentity(context.homesteadIdentity, data.settings.homesteadLogo),
+    onboarding: data.settings.onboarding
+  };
   if (JSON.stringify(next) === JSON.stringify(data.settings)) return;
   data.settings = next;
   homesteadLogoCropDraft = normalizeProfileCrop(next.homesteadLogoCrop);

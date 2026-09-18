@@ -50,7 +50,7 @@ test('Homestead identity is restrained on Today and names every primary section 
   assert.match(html, /id="todayHomesteadName"/);
   assert.match(html, /class="[^"]*hidden[^"]*" id="todayHomesteadMotto"/);
   assert.match(html, /class="[^"]*hidden[^"]*" id="todayHomesteadLocation"/);
-  assert.doesNotMatch(html, /id="homesteadHeader"|Farm book of|The Homestead/);
+  assert.doesNotMatch(html, /id="homesteadHeader"|Farm book of/);
   ['records', 'tasks', 'calendar', 'yield', 'ledger'].forEach(section => {
     assert.match(html, new RegExp(`id="${section}PageTitle"`));
     assert.match(app, new RegExp(`${section}PageTitle`));

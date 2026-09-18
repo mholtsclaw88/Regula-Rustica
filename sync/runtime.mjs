@@ -28,6 +28,7 @@ let context = null;
 let firstCase = null;
 let attachmentRun = null;
 let syncTimer = null;
+let connectPromise = Promise.resolve();
 
 const DOMAIN_LABELS = Object.freeze({
   homestead_people: 'People', records: 'Records', record_documents: 'Documents', record_attachments: 'Attachments',
@@ -45,7 +46,15 @@ const HEADER_STATUS_ICONS = Object.freeze({
 });
 
 window.RegulaRusticaSync = Object.freeze({
-  isInitialized: () => state.state.initialSyncCompleted
+  isInitialized: () => state.state.initialSyncCompleted,
+  initializeUpload: async () => {
+    await connectPromise;
+    if (!context?.homesteadId) throw new Error('The shared Homestead is not connected yet.');
+    await engine.initialize('upload', context.homesteadId);
+    firstCase = null;
+    startAttachmentSync();
+    render('ready');
+  }
 });
 
 function message(kind, error) {
@@ -227,7 +236,9 @@ async function connect(nextContext) {
   });
 }
 
-window.addEventListener('regula-rustica:cloud-context', event => connect(event.detail));
+window.addEventListener('regula-rustica:cloud-context', event => {
+  connectPromise = connect(event.detail);
+});
 window.addEventListener('regula-rustica:data-saved', event => {
   if (event.detail.source === 'sync') return;
   engine.queueLocalChanges(event.detail.before, event.detail.after);
@@ -277,4 +288,4 @@ document.querySelector('#syncInitializeEmpty').addEventListener('click', () => r
 document.querySelector('#syncCancel').addEventListener('click', () => { firstCase = null; render('ready'); });
 
 render();
-if (window.REGULA_RUSTICA_CLOUD_CONTEXT) connect(window.REGULA_RUSTICA_CLOUD_CONTEXT);
+if (window.REGULA_RUSTICA_CLOUD_CONTEXT) connectPromise = connect(window.REGULA_RUSTICA_CLOUD_CONTEXT);
