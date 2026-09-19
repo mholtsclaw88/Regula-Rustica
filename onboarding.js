@@ -41,7 +41,7 @@
   function showStep(step, persist = true) {
     currentStep = Math.min(8, Math.max(1, Number(step || 1)));
     screens.forEach(screen => screen.classList.toggle('hidden', Number(screen.dataset.onboardingStep) !== currentStep));
-    $('#onboardingProgress').textContent = roman[currentStep - 1];
+    $('#onboardingProgress').textContent = `Step ${roman[currentStep - 1]}`;
     $('#onboardingProgress').setAttribute('aria-label', `Onboarding section ${currentStep} of 8`);
     $('#onboardingBack').classList.toggle('hidden', currentStep === 1);
     $('#onboardingLater').classList.toggle('hidden', currentStep === 1 || currentStep === 8);
@@ -216,8 +216,12 @@
   function renderPeople() {
     const data = window.RegulaRusticaLocal.read();
     const shared = onboarding(data).mode === 'shared';
-    $('#onboardingInviteToggle').classList.toggle('hidden', !shared);
-    $('#onboardingInviteFields').classList.toggle('hidden', !shared || !$('#onboardingInvitePerson').checked);
+    const invites = shared && root.querySelector('[name="onboardingPersonAccess"]:checked')?.value === 'invite';
+    $('#onboardingPersonAccess').classList.toggle('hidden', !shared);
+    $('#onboardingLocalAccess').classList.toggle('hidden', shared);
+    $('#onboardingInviteFields').classList.toggle('hidden', !invites);
+    $('#onboardingInviteEmail').required = invites;
+    $('#onboardingPersonSubmit').textContent = invites ? 'Add person & create invitation' : 'Add person';
     const list = $('#onboardingPeopleList');
     list.innerHTML = '';
     const context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
@@ -239,10 +243,12 @@
       list.append(row);
     });
   }
-  $('#onboardingInvitePerson').addEventListener('change', event => {
-    $('#onboardingInviteFields').classList.toggle('hidden', !event.target.checked);
-    $('#onboardingPersonSubmit').textContent = event.target.checked ? 'Add person & create invitation' : 'Add person';
-  });
+  root.querySelectorAll('[name="onboardingPersonAccess"]').forEach(input => input.addEventListener('change', event => {
+    const invites = event.target.value === 'invite' && event.target.checked;
+    $('#onboardingInviteFields').classList.toggle('hidden', !invites);
+    $('#onboardingInviteEmail').required = invites;
+    $('#onboardingPersonSubmit').textContent = invites ? 'Add person & create invitation' : 'Add person';
+  }));
   $('#onboardingPersonForm').addEventListener('submit', async event => {
     event.preventDefault();
     const status = $('#onboardingPersonStatus');
@@ -253,7 +259,8 @@
     const data = window.RegulaRusticaLocal.read();
     data.people.push({ id: crypto.randomUUID(), personType: 'child', displayName: name, status: 'active', active: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     write(data);
-    if (onboarding(data).mode === 'shared' && $('#onboardingInvitePerson').checked) {
+    const invites = onboarding(data).mode === 'shared' && root.querySelector('[name="onboardingPersonAccess"]:checked')?.value === 'invite';
+    if (invites) {
       const email = $('#onboardingInviteEmail').value.trim();
       if (email && window.RegulaRusticaCloudAuth) {
         try {
@@ -267,6 +274,7 @@
     }
     event.target.reset();
     $('#onboardingPersonSubmit').textContent = 'Add person';
+    $('#onboardingInviteEmail').required = false;
     $('#onboardingInviteFields').classList.add('hidden');
     renderPeople();
   });
@@ -284,17 +292,14 @@
   }
   $('#onboardingRecordForm').addEventListener('submit', event => {
     event.preventDefault();
-    const name = $('#onboardingRecordName').value.trim();
-    const type = $('#onboardingRecordType').value;
-    if (!name) return;
-    const timestamp = new Date().toISOString();
-    const data = window.RegulaRusticaLocal.read();
-    const record = { id: crypto.randomUUID(), type, name, status: type === 'Work' ? 'Planned' : 'Active', identity: {}, stewardship: {}, createdAt: timestamp, updatedAt: timestamp };
-    data.records.push(record);
-    data.events.unshift({ id: crypto.randomUUID(), recordId: record.id, eventType: 'Record created', date: today(), details: `${type} record created`, createdAt: timestamp, updatedAt: timestamp });
-    write(data);
-    $('#onboardingRecordName').value = '';
-    renderRecords();
+    const type = root.querySelector('[name="onboardingRecordType"]:checked')?.value || 'Animal';
+    window.RegulaRustica.openRecordEditor(type);
+  });
+  root.querySelectorAll('[name="onboardingRecordType"]').forEach(input => input.addEventListener('change', event => {
+    $('#onboardingRecordForm button[type="submit"]').textContent = `Add ${event.target.value} Record`;
+  }));
+  window.addEventListener('regula-rustica:data-saved', () => {
+    if (currentStep === 6 && !root.classList.contains('hidden')) renderRecords();
   });
 
   function enabledSuggestionTask(data, recordId, suggestionKey) {

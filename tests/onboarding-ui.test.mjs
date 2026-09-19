@@ -29,7 +29,8 @@ test('local path skips account setup while shared path uses production cloud ser
 test('onboarding writes to real Homestead, people, Record, task, and Chore Window models', () => {
   assert.match(onboarding, /settings\.homesteadName = name/);
   assert.match(onboarding, /personType: 'child'/);
-  assert.match(onboarding, /data\.records\.push\(record\)/);
+  assert.match(onboarding, /RegulaRustica\.openRecordEditor\(type\)/);
+  assert.match(app, /openRecordEditor: type => openModal\('record', null, null, type\)/);
   assert.match(onboarding, /RegulaRusticaTasks\.suggestedTasks\(record\)/);
   assert.match(onboarding, /RegulaRusticaTasks\.reactivateSuggestedTask/);
   assert.match(onboarding, /data\.choreWindows\.find/);
@@ -44,6 +45,17 @@ test('household roles and optional invitation semantics are disclosed', () => {
   for (const role of ['Steward', 'Keeper', 'Hand', 'Guest']) assert.match(html, new RegExp(`<dt>${role}<\\/dt>`));
   assert.match(html, /Only those you invite need a Regula Rustica account/);
   assert.match(onboarding, /createInvitation/);
+  assert.match(html, /Household only/);
+  assert.match(html, /Invite to shared Homestead/);
+  assert.match(html, /App roles control what an invited account may do/);
+});
+
+test('Record setup uses type cards and the production Record editor', () => {
+  for (const type of ['Animal', 'Land', 'Equipment', 'Structure', 'Work']) assert.match(html, new RegExp(`value="${type}"`));
+  assert.doesNotMatch(html, /id="onboardingRecordName"/);
+  assert.match(html, /Add Animal Record/);
+  assert.match(html, /Example · Your Today page/);
+  assert.match(onboarding, /regula-rustica:data-saved/);
 });
 
 test('new installs start empty and incomplete while legacy installs default to completed', () => {
@@ -54,7 +66,7 @@ test('new installs start empty and incomplete while legacy installs default to c
 });
 
 test('onboarding assets are part of the offline shell', () => {
-  assert.match(worker, /regula-rustica-onboarding-v2/);
-  assert.match(worker, /onboarding\.css\?v=onboarding-v2/);
-  assert.match(worker, /onboarding\.js\?v=onboarding-v2/);
+  assert.match(worker, /regula-rustica-onboarding-v4/);
+  assert.match(worker, /onboarding\.css\?v=onboarding-v4/);
+  assert.match(worker, /onboarding\.js\?v=onboarding-v4/);
 });

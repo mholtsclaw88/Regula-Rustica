@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="styles.css?v=homestead-identity-v3">
   <link rel="stylesheet" href="housekeeping.css?v=calendar-projections-v1">
   <link rel="stylesheet" href="cloud-auth.css">
-  <link rel="stylesheet" href="onboarding.css?v=onboarding-v2">
+  <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=calendar-projections-v1" defer></script>
   <script src="task-foundation.js?v=record-lifecycle-v1" defer></script>
@@ -20,8 +20,8 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=onboarding-v1" defer></script>
-  <script src="onboarding.js?v=onboarding-v2" defer></script>
+  <script src="app.js?v=onboarding-v3" defer></script>
+  <script src="onboarding.js?v=onboarding-v4" defer></script>
   <script src="ui-refinements.js?v=monastic-icons-v3" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=homestead-identity-v2" type="module"></script>
@@ -32,7 +32,7 @@
     <header class="onboarding-top">
       <button class="onboarding-back" id="onboardingBack" type="button" aria-label="Previous section">‹</button>
       <div class="onboarding-brand"><strong>Regula Rustica</strong><span>Ora et labora · Ut in omnibus glorificetur Deus</span></div>
-      <span class="onboarding-progress" id="onboardingProgress" aria-label="Onboarding section">I</span>
+      <span class="onboarding-progress" id="onboardingProgress" aria-label="Onboarding section">Step I</span>
     </header>
     <button class="onboarding-later hidden" id="onboardingLater" type="button">Finish later</button>
     <main class="onboarding-main">
@@ -94,8 +94,9 @@
         <div class="onboarding-list" id="onboardingPeopleList"></div>
         <form class="onboarding-form" id="onboardingPersonForm">
           <label>Person’s name<input id="onboardingPersonName" maxlength="120" required></label>
-          <label class="onboarding-invite-toggle hidden" id="onboardingInviteToggle"><input id="onboardingInvitePerson" type="checkbox"> Invite to Regula Rustica</label>
-          <div class="onboarding-invite-fields hidden" id="onboardingInviteFields"><label>Email<input id="onboardingInviteEmail" type="email" maxlength="254"></label><label>Role<select id="onboardingInviteRole"><option value="keeper">Keeper</option><option value="hand">Hand</option><option value="guest">Guest</option><option value="steward">Steward</option></select></label></div>
+          <fieldset class="choice-filter onboarding-person-access hidden" id="onboardingPersonAccess"><legend>Regula Rustica access</legend><div class="choice-pills"><label><input type="radio" name="onboardingPersonAccess" value="household" checked> Household only</label><label><input type="radio" name="onboardingPersonAccess" value="invite"> Invite to shared Homestead</label></div></fieldset>
+          <p class="onboarding-local-access hidden" id="onboardingLocalAccess">This person can be assigned work on this device. To give them an account, return to the previous choice and establish a shared Homestead.</p>
+          <div class="onboarding-invite-fields hidden" id="onboardingInviteFields"><label>Email<input id="onboardingInviteEmail" type="email" maxlength="254"></label><label>App role<select id="onboardingInviteRole"><option value="keeper">Keeper</option><option value="hand">Hand</option><option value="guest">Guest</option><option value="steward">Steward</option></select></label><small>App roles control what an invited account may do. Household-only people do not need a role.</small></div>
           <p class="form-status" id="onboardingPersonStatus" role="status"></p>
           <button class="btn secondary" id="onboardingPersonSubmit" type="submit">Add person</button>
         </form>
@@ -107,7 +108,7 @@
       <section class="onboarding-screen hidden" data-onboarding-step="6">
         <p class="onboarding-eyebrow">Custodia · What Is Kept</p><h2>What has been entrusted to your care?</h2>
         <p class="onboarding-lead">Enduring things become Records: animals, land, equipment, structures, and work worth tending over time.</p>
-        <form class="onboarding-record-form" id="onboardingRecordForm"><label>Type<select id="onboardingRecordType"><option>Animal</option><option>Land</option><option>Equipment</option><option>Structure</option><option>Work</option></select></label><label>Name<input id="onboardingRecordName" maxlength="120" placeholder="Maple, North Pasture, Ford 8N…" required></label><button class="btn secondary" type="submit">Add Record</button></form>
+        <form class="onboarding-record-form" id="onboardingRecordForm"><fieldset><legend>Choose a Record type</legend><div class="onboarding-record-types"><label><input type="radio" name="onboardingRecordType" value="Animal" checked><strong>Animal</strong><span>Livestock and working animals</span></label><label><input type="radio" name="onboardingRecordType" value="Land"><strong>Land</strong><span>Fields, gardens, and pastures</span></label><label><input type="radio" name="onboardingRecordType" value="Equipment"><strong>Equipment</strong><span>Tools, vehicles, and machinery</span></label><label><input type="radio" name="onboardingRecordType" value="Structure"><strong>Structure</strong><span>Barns, coops, sheds, and buildings</span></label><label><input type="radio" name="onboardingRecordType" value="Work"><strong>Work</strong><span>Longer projects worth tending</span></label></div></fieldset><button class="btn secondary" type="submit">Add Animal Record</button></form>
         <div class="onboarding-list" id="onboardingRecordList"></div>
         <div class="onboarding-actions"><button class="btn secondary" type="button" data-onboarding-skip>Skip for now</button><button class="btn primary" type="button" data-onboarding-next>Continue</button></div>
       </section>
@@ -125,6 +126,7 @@
         <p class="onboarding-eyebrow">The Rule in Practice</p><h2>Your day now has an order.</h2>
         <p class="onboarding-lead">The Homestead has its name, the household is known, what is entrusted to your care has been recorded, and the recurring work has found its place. This is how Regula Rustica begins: not with more administration, but with a clearer rhythm for the work already before you.</p>
         <div class="onboarding-bookplate" id="onboardingFinalBookplate"></div>
+        <p class="onboarding-preview-label">Example · Your Today page</p>
         <section class="onboarding-today-preview" aria-labelledby="onboardingTodayTitle"><header><div><span>Horarium</span><h3 id="onboardingTodayTitle">Today</h3></div><time id="onboardingFinalDate"></time></header><div class="onboarding-final-stats" id="onboardingFinalStats"></div><div class="onboarding-final-schedule" id="onboardingFinalSchedule"></div></section>
         <blockquote><strong>The rule is not the work itself.</strong> It is the order that gives prayer, labor, responsibility, and rest each their proper place—so that what has been entrusted to your care may be tended faithfully, and the work of the Homestead may serve the good of the household rather than consume it.</blockquote>
         <p class="onboarding-motto">Ora et labora · Ut in omnibus glorificetur Deus.</p>
