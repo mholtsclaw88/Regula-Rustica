@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=homestead-identity-v3">
-  <link rel="stylesheet" href="housekeeping.css?v=calendar-projections-v1">
+  <link rel="stylesheet" href="styles.css?v=compact-mastheads-v2">
+  <link rel="stylesheet" href="housekeeping.css?v=compact-mastheads-v2">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
@@ -20,7 +20,7 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=onboarding-v3" defer></script>
+  <script src="app.js?v=onboarding-v5" defer></script>
   <script src="onboarding.js?v=onboarding-v4" defer></script>
   <script src="ui-refinements.js?v=monastic-icons-v3" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
@@ -171,7 +171,7 @@
         </div>
       </section>
       <header class="today-date-block">
-        <span class="label">Today</span>
+        <div class="section-kicker"><span class="label">Horarium</span><details class="section-info"><summary aria-label="About Horarium"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Daily Schedule</strong><p>The ordered rhythm of today's chores, events, and other work.</p></div></details></div>
         <h2 id="todayDate"></h2>
       </header>
       <aside class="card today-glance" aria-labelledby="todayGlanceTitle">
@@ -185,8 +185,7 @@
         <span class="label" id="todayAllDayTitle">All day</span>
         <div id="todayAllDayEvents" class="today-all-day-events"></div>
       </section>
-      <section class="today-schedule" aria-labelledby="todayScheduleTitle">
-        <div class="today-section-heading"><span class="label">Horarium</span><h3 id="todayScheduleTitle">Today's Schedule</h3></div>
+      <section class="today-schedule" aria-label="Today's schedule">
         <div id="todayTimeline" class="today-timeline"></div>
         <p id="todayScheduleEmpty" class="empty card">No Chore Windows or timed Events today.</p>
       </section>
@@ -213,8 +212,9 @@
     </section>
 
     <section id="records" class="view">
-      <div class="section-head">
-        <div><span class="label">Custodia</span><h2 id="recordsPageTitle">Homestead Records</h2><p class="muted">The animals, land, equipment, structures, and work entrusted to your keeping.</p></div>
+      <div class="section-head section-masthead">
+        <span class="section-masthead-seal hidden"><img alt="" hidden></span>
+        <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Custodia</span><details class="section-info"><summary aria-label="About Custodia"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Stewardship / Keeping</strong><p>The animals, land, equipment, structures, and work entrusted to your keeping.</p></div></details></div><h2 id="recordsPageTitle">Homestead Records</h2></div>
         <button class="btn primary" id="addRecord">+ Record</button>
       </div>
       <fieldset class="choice-filter record-type-filter">
@@ -248,8 +248,9 @@
     </section>
 
     <section id="tasks" class="view">
-      <div class="section-head">
-        <div><span class="label">Agenda</span><h2 id="tasksPageTitle">Homestead Tasks</h2><p class="muted">What needs to be done, when, and by whom.</p></div>
+      <div class="section-head section-masthead">
+        <span class="section-masthead-seal hidden"><img alt="" hidden></span>
+        <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Agenda</span><details class="section-info"><summary aria-label="About Agenda"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Things to Be Done</strong><p>What needs to be done, when, and by whom.</p></div></details></div><h2 id="tasksPageTitle">Homestead Tasks</h2></div>
         <button class="btn primary" id="tasksAddTask">+ Task</button>
       </div>
       <div class="card">
@@ -302,8 +303,9 @@
     </section>
 
     <section id="calendar" class="view">
-      <div class="section-head">
-        <div><span class="label">Tempora</span><h2 id="calendarPageTitle">Homestead Calendar</h2><p class="muted">Shared dates, events, and the rhythm of homestead life.</p></div>
+      <div class="section-head section-masthead">
+        <span class="section-masthead-seal hidden"><img alt="" hidden></span>
+        <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Tempora</span><details class="section-info"><summary aria-label="About Tempora"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Times / Seasons</strong><p>Shared dates, events, and the rhythm of homestead life.</p></div></details></div><h2 id="calendarPageTitle">Homestead Calendar</h2></div>
         <button class="btn primary" id="addCalendarEvent">+ Event</button>
       </div>
       <div class="card calendar-card">
@@ -333,8 +335,9 @@
     </section>
 
     <section id="yield" class="view reporting-page">
-      <div class="section-head">
-        <div><span class="label">Fructus</span><h2 id="yieldPageTitle">Homestead Yield</h2><p class="muted">What your homestead produces, harvests, and provides.</p></div>
+      <div class="section-head section-masthead">
+        <span class="section-masthead-seal hidden"><img alt="" hidden></span>
+        <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Fructus</span><details class="section-info"><summary aria-label="About Fructus"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Yield / Produce</strong><p>What your homestead produces, harvests, and provides.</p></div></details></div><h2 id="yieldPageTitle">Homestead Yield</h2></div>
       </div>
       <article class="report-quick-entry">
         <div>
@@ -386,8 +389,9 @@
     </section>
 
     <section id="ledger" class="view reporting-page">
-      <div class="section-head">
-        <div><span class="label">Rationes</span><h2 id="ledgerPageTitle">Homestead Ledger</h2><p class="muted">Income, expenses, and the stewardship of household resources.</p></div>
+      <div class="section-head section-masthead">
+        <span class="section-masthead-seal hidden"><img alt="" hidden></span>
+        <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Rationes</span><details class="section-info"><summary aria-label="About Rationes"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Accounts</strong><p>Income, expenses, and the stewardship of household resources.</p></div></details></div><h2 id="ledgerPageTitle">Homestead Ledger</h2></div>
         <button class="btn primary" id="addLedger">+ Entry</button>
       </div>
       <div class="stats report-stats">
@@ -633,7 +637,7 @@
         </article>
         <article class="card settings-section hidden" id="settingAbout" data-settings-panel="about">
           <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">App / About</span><h2 tabindex="-1">Regula Rustica</h2><p class="muted">A quiet, local-first farm ledger for the things entrusted to your care.</p></header>
+          <header class="settings-section-head"><span class="label">App / About</span><h2 tabindex="-1">Regula Rustica</h2><p class="settings-about-tagline">The rural rule.</p><p class="muted">Regula Rustica is a modern farm ledger for ordering the daily work of the homestead—keeping its records, tending what has been entrusted to your care, and preserving the history of the place.</p><p class="settings-about-motto">Ora et labora · Ut in omnibus glorificetur Deus.</p></header>
           <dl class="settings-about-list">
             <div><dt>Application</dt><dd>Regula Rustica</dd></div>
             <div><dt>Version</dt><dd>v5</dd></div>
