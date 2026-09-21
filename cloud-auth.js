@@ -169,25 +169,58 @@ async function initializeCloud() {
     }
   }
 
+  async function signIn(email, password) {
+    const result = await client.auth.signInWithPassword({ email, password });
+    if (result.error) throw result.error;
+    return result.data;
+  }
+
+  async function signUp(displayName, email, password) {
+    const result = await client.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: displayName }, emailRedirectTo: location.href }
+    });
+    if (result.error) throw result.error;
+    return result.data;
+  }
+
+  async function createHomestead(name) {
+    const result = await client.rpc('create_homestead', { homestead_name: name });
+    if (result.error) throw result.error;
+    const session = (await client.auth.getSession()).data.session;
+    await refreshAccount(session);
+    return window.REGULA_RUSTICA_CLOUD_CONTEXT;
+  }
+
+  async function createInvitation(email, role) {
+    const result = await client.rpc('create_invitation', {
+      invitation_email: email,
+      invitation_role: role
+    });
+    if (result.error) throw result.error;
+    const invitation = result.data?.[0];
+    if (!invitation?.raw_token) throw new Error('The private invitation could not be created.');
+    await refreshInvitations();
+    return { invitation, link: buildInvitationLink(invitation.raw_token, location.href) };
+  }
+
+  window.RegulaRusticaCloudAuth = Object.freeze({ signIn, signUp, createHomestead, createInvitation });
+  window.dispatchEvent(new CustomEvent('regula-rustica:cloud-auth-ready'));
+
   authForm.addEventListener('submit', event => {
     event.preventDefault();
-    run(() => client.auth.signInWithPassword({
-      email: document.querySelector('#cloudEmail').value.trim(),
-      password: document.querySelector('#cloudPassword').value
-    }));
+    run(() => signIn(document.querySelector('#cloudEmail').value.trim(), document.querySelector('#cloudPassword').value));
   });
 
   document.querySelector('#cloudSignUp').addEventListener('click', () => run(async () => {
-    const result = await client.auth.signUp({
-      email: document.querySelector('#cloudEmail').value.trim(),
-      password: document.querySelector('#cloudPassword').value,
-      options: {
-        data: { display_name: document.querySelector('#cloudDisplayName').value.trim() },
-        emailRedirectTo: location.href
-      }
-    });
-    if (!result.error && !result.data.session) showStatus('Check your email to confirm the account, then sign in.');
-    return result;
+    const data = await signUp(
+      document.querySelector('#cloudDisplayName').value.trim(),
+      document.querySelector('#cloudEmail').value.trim(),
+      document.querySelector('#cloudPassword').value
+    );
+    if (!data.session) showStatus('Check your email to confirm the account, then sign in.');
+    return data;
   }));
 
   document.querySelector('#cloudResetRequest').addEventListener('click', () => run(() =>
@@ -198,11 +231,7 @@ async function initializeCloud() {
   document.querySelector('#cloudSignOut').addEventListener('click', () => run(() => client.auth.signOut()));
 
   document.querySelector('#cloudCreateHomestead').addEventListener('click', () => run(async () => {
-    const result = await client.rpc('create_homestead', {
-      homestead_name: document.querySelector('#cloudHomesteadName').value.trim()
-    });
-    if (!result.error) await refreshAccount((await client.auth.getSession()).data.session);
-    return result;
+    return createHomestead(document.querySelector('#cloudHomesteadName').value.trim());
   }, 'Homestead created.'));
 
   document.querySelector('#cloudAcceptInvitation').addEventListener('click', () => run(async () => {
@@ -231,18 +260,10 @@ async function initializeCloud() {
     event.preventDefault();
     run(async () => {
       clearInvitationResult();
-      const result = await client.rpc('create_invitation', {
-        invitation_email: document.querySelector('#cloudInvitationEmail').value.trim(),
-        invitation_role: roleSelect.value
-      });
-      if (!result.error) {
-        const invitation = result.data?.[0];
-        if (!invitation?.raw_token) throw new Error('The private invitation could not be created.');
-        document.querySelector('#cloudInvitationLink').value = buildInvitationLink(invitation.raw_token, location.href);
-        invitationResult.classList.remove('hidden');
-        document.querySelector('#cloudInvitationEmail').value = '';
-        await refreshInvitations();
-      }
+      const result = await createInvitation(document.querySelector('#cloudInvitationEmail').value.trim(), roleSelect.value);
+      document.querySelector('#cloudInvitationLink').value = result.link;
+      invitationResult.classList.remove('hidden');
+      document.querySelector('#cloudInvitationEmail').value = '';
       return result;
     }, 'Private invitation created. Copy the link below.');
   });

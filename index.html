@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css?v=compact-mastheads-v2">
   <link rel="stylesheet" href="housekeeping.css?v=compact-mastheads-v2">
   <link rel="stylesheet" href="cloud-auth.css">
+  <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=calendar-projections-v1" defer></script>
   <script src="task-foundation.js?v=record-lifecycle-v1" defer></script>
@@ -19,13 +20,121 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=compact-mastheads-v1" defer></script>
+  <script src="app.js?v=onboarding-v5" defer></script>
+  <script src="onboarding.js?v=onboarding-v4" defer></script>
   <script src="ui-refinements.js?v=monastic-icons-v3" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=homestead-identity-v2" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
 </head>
 <body>
+  <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+    <header class="onboarding-top">
+      <button class="onboarding-back" id="onboardingBack" type="button" aria-label="Previous section">‹</button>
+      <div class="onboarding-brand"><strong>Regula Rustica</strong><span>Ora et labora · Ut in omnibus glorificetur Deus</span></div>
+      <span class="onboarding-progress" id="onboardingProgress" aria-label="Onboarding section">Step I</span>
+    </header>
+    <button class="onboarding-later hidden" id="onboardingLater" type="button">Finish later</button>
+    <main class="onboarding-main">
+      <section class="onboarding-screen opening" data-onboarding-step="1">
+        <p class="onboarding-eyebrow">A Rural Rule</p>
+        <h2 id="onboardingTitle">Put the Homestead in order.</h2>
+        <p class="onboarding-lead">A modern farm ledger for ordering the daily work of the homestead—keeping its records, tending what has been entrusted to your care, and giving shape to the rhythm of the day.</p>
+        <p>Inspired by the ordered rhythm of the Benedictine Rule and way of life, where prayer, work, responsibility, and rest each have their place, Regula Rustica—the rural rule—helps bring that same sense of order to your daily stewardship.</p>
+        <p class="onboarding-motto">Ora et labora · Ut in omnibus glorificetur Deus.</p>
+        <button class="btn primary onboarding-primary" type="button" data-onboarding-next>Begin</button>
+      </section>
+
+      <section class="onboarding-screen hidden" data-onboarding-step="2">
+        <p class="onboarding-eyebrow">The Homestead</p><h2>Name what has been entrusted to your care.</h2>
+        <p class="onboarding-lead">Regula Rustica is ordered around a particular place and the work of caring for it. Begin by naming the homestead you steward.</p>
+        <form class="onboarding-form" id="onboardingHomesteadForm">
+          <label>Homestead name<input id="onboardingHomesteadName" maxlength="120" required></label>
+          <label>Short location <span class="optional">Optional</span><input id="onboardingHomesteadLocation" maxlength="120" placeholder="Northeast Ohio"></label>
+          <div class="onboarding-logo-field">
+            <span class="form-label">Homestead seal or logo <span class="optional">Optional</span></span>
+            <div class="onboarding-logo-row">
+              <span class="onboarding-logo-preview" id="onboardingLogoCropPreview"><img id="onboardingLogoPreview" alt="" hidden><span id="onboardingLogoEmpty">No custom seal</span></span>
+              <div class="quick"><label class="btn secondary file-button">Choose image<input id="onboardingLogoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></label><button class="btn ghost hidden" id="onboardingLogoRemove" type="button">Remove</button></div>
+            </div>
+            <div class="onboarding-logo-framing hidden" id="onboardingLogoFraming"><small>Drag to reposition.</small><label>Zoom<input id="onboardingLogoZoom" type="range" min="1" max="3" step="0.05" value="1"></label></div>
+          </div>
+          <p class="form-status" id="onboardingHomesteadStatus" role="status"></p>
+          <button class="btn primary" type="submit">Continue</button>
+        </form>
+      </section>
+
+      <section class="onboarding-screen hidden" data-onboarding-step="3">
+        <p class="onboarding-eyebrow">Keeping the Ledger</p><h2>Choose how this ledger will be kept.</h2>
+        <div class="onboarding-choice-grid">
+          <label class="onboarding-choice"><input type="radio" name="onboardingMode" value="local"><strong>Local only</strong><span>No account required. Your ledger remains usable on this device, ordinary work needs no internet, and backup and export remain available.</span></label>
+          <label class="onboarding-choice"><input type="radio" name="onboardingMode" value="shared"><strong>Cloud / shared Homestead</strong><span>Synchronize across devices, invite household members, and give each participating person an individual account.</span></label>
+        </div>
+        <p class="onboarding-note">Nothing is permanent here. You may begin with a local ledger and enable household sharing later. Regula Rustica will never require the cloud simply to tend the Homestead.</p>
+        <button class="btn primary" id="onboardingModeContinue" type="button">Continue</button>
+      </section>
+
+      <section class="onboarding-screen hidden" data-onboarding-step="4">
+        <p class="onboarding-eyebrow">Shared Stewardship</p><h2>Establish the shared ledger.</h2>
+        <p class="onboarding-lead">Accounts belong to individuals. The Homestead you just named will become the shared ledger.</p>
+        <fieldset class="choice-filter"><legend>Account action</legend><div class="choice-pills"><label><input type="radio" name="onboardingAuthMode" value="signup" checked>Create account</label><label><input type="radio" name="onboardingAuthMode" value="signin">Sign in</label></div></fieldset>
+        <form class="onboarding-form" id="onboardingAuthForm">
+          <label id="onboardingAuthNameLabel">Your name<input id="onboardingAuthName" autocomplete="name"></label>
+          <label>Email<input id="onboardingAuthEmail" type="email" autocomplete="email" required></label>
+          <label>Password<input id="onboardingAuthPassword" type="password" autocomplete="current-password" minlength="8" required></label>
+          <p class="form-status" id="onboardingAuthStatus" role="status">Cloud access is optional and may be changed later.</p>
+          <button class="btn primary" type="submit">Continue with cloud</button>
+          <button class="btn ghost" id="onboardingReturnLocal" type="button">Return to Local only</button>
+        </form>
+      </section>
+
+      <section class="onboarding-screen hidden" data-onboarding-step="5">
+        <p class="onboarding-eyebrow">The Household</p><h2>Name those who share the work.</h2>
+        <p class="onboarding-lead">A rule is lived by people. Add the members of the household who share in the care of the Homestead. Those who use Regula Rustica themselves can be invited to the shared ledger.</p>
+        <div class="onboarding-list" id="onboardingPeopleList"></div>
+        <form class="onboarding-form" id="onboardingPersonForm">
+          <label>Person’s name<input id="onboardingPersonName" maxlength="120" required></label>
+          <fieldset class="choice-filter onboarding-person-access hidden" id="onboardingPersonAccess"><legend>Regula Rustica access</legend><div class="choice-pills"><label><input type="radio" name="onboardingPersonAccess" value="household" checked> Household only</label><label><input type="radio" name="onboardingPersonAccess" value="invite"> Invite to shared Homestead</label></div></fieldset>
+          <p class="onboarding-local-access hidden" id="onboardingLocalAccess">This person can be assigned work on this device. To give them an account, return to the previous choice and establish a shared Homestead.</p>
+          <div class="onboarding-invite-fields hidden" id="onboardingInviteFields"><label>Email<input id="onboardingInviteEmail" type="email" maxlength="254"></label><label>App role<select id="onboardingInviteRole"><option value="keeper">Keeper</option><option value="hand">Hand</option><option value="guest">Guest</option><option value="steward">Steward</option></select></label><small>App roles control what an invited account may do. Household-only people do not need a role.</small></div>
+          <p class="form-status" id="onboardingPersonStatus" role="status"></p>
+          <button class="btn secondary" id="onboardingPersonSubmit" type="submit">Add person</button>
+        </form>
+        <details class="onboarding-roles"><summary>What do these roles mean?</summary><dl><dt>Steward</dt><dd>Full Homestead administration and data authority.</dd><dt>Keeper</dt><dd>Trusted day-to-day management of records, tasks, Journal, notes, ledger, and photos.</dd><dt>Hand</dt><dd>Limited participation in ordinary work, assigned tasks, approved events, and observations.</dd><dt>Guest</dt><dd>Read-only access.</dd></dl></details>
+        <p class="onboarding-note">Everyone listed here may share in the work. Only those you invite need a Regula Rustica account. Invitations remain optional and may be sent later.</p>
+        <div class="onboarding-actions"><button class="btn secondary" type="button" data-onboarding-skip>Skip for now</button><button class="btn primary" type="button" data-onboarding-next>Continue</button></div>
+      </section>
+
+      <section class="onboarding-screen hidden" data-onboarding-step="6">
+        <p class="onboarding-eyebrow">Custodia · What Is Kept</p><h2>What has been entrusted to your care?</h2>
+        <p class="onboarding-lead">Enduring things become Records: animals, land, equipment, structures, and work worth tending over time.</p>
+        <form class="onboarding-record-form" id="onboardingRecordForm"><fieldset><legend>Choose a Record type</legend><div class="onboarding-record-types"><label><input type="radio" name="onboardingRecordType" value="Animal" checked><strong>Animal</strong><span>Livestock and working animals</span></label><label><input type="radio" name="onboardingRecordType" value="Land"><strong>Land</strong><span>Fields, gardens, and pastures</span></label><label><input type="radio" name="onboardingRecordType" value="Equipment"><strong>Equipment</strong><span>Tools, vehicles, and machinery</span></label><label><input type="radio" name="onboardingRecordType" value="Structure"><strong>Structure</strong><span>Barns, coops, sheds, and buildings</span></label><label><input type="radio" name="onboardingRecordType" value="Work"><strong>Work</strong><span>Longer projects worth tending</span></label></div></fieldset><button class="btn secondary" type="submit">Add Animal Record</button></form>
+        <div class="onboarding-list" id="onboardingRecordList"></div>
+        <div class="onboarding-actions"><button class="btn secondary" type="button" data-onboarding-skip>Skip for now</button><button class="btn primary" type="button" data-onboarding-next>Continue</button></div>
+      </section>
+
+      <section class="onboarding-screen hidden" data-onboarding-step="7">
+        <p class="onboarding-eyebrow">Horarium · The Daily Order</p><h2>Give the work its place in the day.</h2>
+        <p class="onboarding-lead">A rule becomes a rhythm when recurring work has its proper place.</p>
+        <form class="onboarding-window-form" id="onboardingWindowForm"><div data-onboarding-window="morning"><strong>Morning Chore Window</strong><label>Start<input type="time" name="morningStart" required></label><label>End<input type="time" name="morningEnd" required></label></div><div data-onboarding-window="evening"><strong>Evening Chore Window</strong><label>Start<input type="time" name="eveningStart" required></label><label>End<input type="time" name="eveningEnd" required></label></div><p class="form-status" id="onboardingWindowStatus" role="status"></p><button class="btn secondary" type="submit">Save Chore Windows</button></form>
+        <div><span class="onboarding-eyebrow">Suggested Tasks</span><div class="onboarding-suggestions" id="onboardingSuggestions"></div></div>
+        <section class="onboarding-rhythm-preview"><span class="onboarding-eyebrow">The rhythm taking shape</span><div id="onboardingRhythmPreview"></div></section>
+        <div class="onboarding-actions"><button class="btn secondary" type="button" data-onboarding-skip>Establish later</button><button class="btn primary" type="button" data-onboarding-next>Continue</button></div>
+      </section>
+
+      <section class="onboarding-screen hidden" data-onboarding-step="8">
+        <p class="onboarding-eyebrow">The Rule in Practice</p><h2>Your day now has an order.</h2>
+        <p class="onboarding-lead">The Homestead has its name, the household is known, what is entrusted to your care has been recorded, and the recurring work has found its place. This is how Regula Rustica begins: not with more administration, but with a clearer rhythm for the work already before you.</p>
+        <div class="onboarding-bookplate" id="onboardingFinalBookplate"></div>
+        <p class="onboarding-preview-label">Example · Your Today page</p>
+        <section class="onboarding-today-preview" aria-labelledby="onboardingTodayTitle"><header><div><span>Horarium</span><h3 id="onboardingTodayTitle">Today</h3></div><time id="onboardingFinalDate"></time></header><div class="onboarding-final-stats" id="onboardingFinalStats"></div><div class="onboarding-final-schedule" id="onboardingFinalSchedule"></div></section>
+        <blockquote><strong>The rule is not the work itself.</strong> It is the order that gives prayer, labor, responsibility, and rest each their proper place—so that what has been entrusted to your care may be tended faithfully, and the work of the Homestead may serve the good of the household rather than consume it.</blockquote>
+        <p class="onboarding-motto">Ora et labora · Ut in omnibus glorificetur Deus.</p>
+        <button class="btn primary onboarding-primary" id="onboardingFinish" type="button">Enter Regula Rustica</button>
+      </section>
+    </main>
+  </section>
+
   <header class="top">
     <div class="top-brand">
       <h1>Regula Rustica</h1>
@@ -52,6 +161,7 @@
 
   <main>
     <section id="today" class="view active">
+      <aside class="onboarding-resume hidden" id="onboardingResume"><div><strong>Continue establishing your Homestead</strong><span>Your work is saved. Return whenever you are ready.</span></div><button class="btn secondary" id="onboardingResumeButton" type="button">Resume</button></aside>
       <section class="homestead-bookplate" aria-labelledby="todayHomesteadName">
         <span class="homestead-bookplate-logo hidden" id="todayHomesteadLogoWrap"><img id="todayHomesteadLogo" alt="" hidden></span>
         <div class="homestead-bookplate-copy">
