@@ -728,9 +728,34 @@ summary:focus-visible {
 .action-cluster { align-items: center; }
 .action-cluster .primary { box-shadow: 0 4px 10px rgba(40,69,54,.16); }
 .section-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.cellarer-draft-button { color: var(--forest); border: 1px solid rgba(164,123,60,.38); white-space: nowrap; }
+.cellarer-access { position: fixed; right: 18px; bottom: 18px; z-index: 40; }
+.cellarer-desk-toggle { display: flex; min-height: 48px; align-items: center; gap: 9px; padding: 9px 14px; border: 1px solid var(--gold); border-radius: 8px; background: var(--forest); color: var(--paper); box-shadow: 0 5px 15px rgba(35,66,46,.2); cursor: pointer; font: 700 .85rem Georgia,serif; white-space: nowrap; }
+.cellarer-desk-toggle:hover { background: var(--forest2); }
+.cellarer-desk-toggle:focus-visible,.cellarer-desk-row:focus-visible,.cellarer-kind-choice summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.cellarer-desk-toggle svg { width: 22px; height: 22px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.cellarer-desk[hidden] { display: none; }
+.cellarer-desk { position: absolute; right: 0; bottom: calc(100% + 10px); width: min(354px,calc(100vw - 24px)); max-height: calc(100dvh - 100px); overflow-y: auto; border: 1px solid var(--line); border-top: 3px double var(--gold); border-radius: 12px; background: var(--paper); box-shadow: 0 14px 32px rgba(35,43,34,.22); }
+.cellarer-desk-header { padding: 16px 17px 12px; }
+.cellarer-desk-header h2 { margin: 4px 0 5px; color: var(--forest); font-size: 1.3rem; }
+.cellarer-desk-header p { margin: 0; color: var(--muted); font: .82rem/1.4 Arial,sans-serif; }
+.cellarer-desk-rows { border-top: 1px solid var(--line); }
+.cellarer-desk-row { display: grid; width: 100%; gap: 5px; padding: 13px 17px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; text-align: left; }
+.cellarer-desk-row:not(:disabled):hover { background: var(--raised); }
+.cellarer-desk-row strong { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: var(--forest); font: 700 1rem Georgia,serif; }
+.cellarer-desk-row span { color: var(--muted); font: .77rem/1.4 Arial,sans-serif; }
+.cellarer-desk-row:disabled { cursor: not-allowed; }
+.cellarer-desk-row:disabled strong,.cellarer-desk-row:disabled span { color: var(--muted); }
+.cellarer-desk-row small { flex: 0 0 auto; color: var(--muted); font: 700 .65rem Arial,sans-serif; white-space: nowrap; }
+.cellarer-desk-stewardship { margin: 0; padding: 12px 17px 14px; color: var(--forest); font: italic .84rem/1.35 Georgia,serif; }
+.cellarer-desk-stewardship span { display: block; margin-top: 3px; color: var(--muted); font: .7rem/1.35 Arial,sans-serif; }
+body.onboarding-open .cellarer-access { display: none; }
 .cellarer-dialog { width: min(560px,calc(100% - 22px)); }
 .cellarer-dialog textarea { min-height: 132px; }
+.cellarer-prompt-help { margin: -5px 0 0; line-height: 1.4; }
+.cellarer-kind-choice { padding: 2px 0; }
+.cellarer-kind-choice summary { width: fit-content; color: var(--forest); cursor: pointer; font: 700 .78rem Arial,sans-serif; }
+.cellarer-kind-choice summary span { color: var(--muted); font-weight: 400; }
+.cellarer-kind-choice label { margin-top: 10px; }
 .cellarer-privacy-note { margin: -2px 0 0; line-height: 1.45; }
 .cellarer-status { min-height: 1.25em; margin: 0; color: var(--forest2); font: 700 .78rem Arial,sans-serif; }
 .cellarer-status.error { color: var(--red); }
@@ -918,7 +943,6 @@ summary:focus-visible {
 @media (max-width: 520px) {
   .section-actions { gap: 5px; }
   .section-actions .btn { padding-left: 9px; padding-right: 9px; }
-  .cellarer-draft-button span { display: none; }
   .cellarer-dialog form { padding: 17px 15px; }
   .settings-page-head { margin-bottom: 13px; }
   .settings-page-head .muted { font-size: .76rem; }
@@ -1362,4 +1386,15 @@ html:has(#calendar.active) { scrollbar-gutter: stable; }
   .calendar-month-counts em { font-size: .5rem; line-height: 1; }
   .calendar-task-disclosure > summary { min-height: 54px; padding: 7px 8px 7px 0; }
   .calendar-task-row > .shared-task-check { margin-top: 15px; }
+}
+
+@media (max-width: 800px) {
+  main { padding-bottom: 110px; }
+  .cellarer-access { right: 12px; bottom: calc(77px + env(safe-area-inset-bottom,0px)); }
+  .cellarer-desk { max-height: calc(100dvh - 158px - env(safe-area-inset-bottom,0px)); }
+}
+
+@media (max-width: 370px) {
+  .cellarer-desk-toggle { padding: 8px 11px; font-size: .8rem; }
+  .cellarer-desk { width: calc(100vw - 24px); }
 }

@@ -149,18 +149,50 @@ function premiumAvailable() {
 function initializeCellarerDialog() {
   const dialog = document.querySelector('#cellarerDialog');
   const form = document.querySelector('#cellarerForm');
-  if (!dialog || !form || !window.RegulaRustica?.cellarerContext || !window.RegulaRustica?.openCellarerDraft) return;
+  const access = document.querySelector('.cellarer-access');
+  const desk = document.querySelector('#cellarerDesk');
+  const toggle = document.querySelector('#cellarerDeskToggle');
+  const prepare = document.querySelector('#cellarerPrepare');
+  if (!dialog || !form || !access || !desk || !toggle || !prepare
+    || !window.RegulaRustica?.cellarerContext || !window.RegulaRustica?.openCellarerDraft) return;
   const kind = document.querySelector('#cellarerKind');
+  const kindChoice = document.querySelector('.cellarer-kind-choice');
   const prompt = document.querySelector('#cellarerPrompt');
   const status = document.querySelector('#cellarerStatus');
   const submit = document.querySelector('#cellarerSubmit');
   const close = () => { if (dialog.open) dialog.close(); };
+  const closeDesk = (returnFocus = false) => {
+    if (desk.hidden) return;
+    desk.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    if (returnFocus) toggle.focus();
+  };
   const showStatus = (message, error = false) => {
     status.textContent = message;
     status.classList.toggle('error', error);
   };
-  document.querySelectorAll('[data-cellarer-kind]').forEach(button => button.addEventListener('click', () => {
-    kind.value = CELLARER_DRAFT_KINDS.includes(button.dataset.cellarerKind) ? button.dataset.cellarerKind : 'auto';
+  toggle.addEventListener('click', () => {
+    if (!desk.hidden) return closeDesk(true);
+    desk.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+    prepare.focus();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!desk.hidden && !access.contains(event.target)) closeDesk();
+  });
+  document.addEventListener('focusin', event => {
+    if (!desk.hidden && !access.contains(event.target)) closeDesk();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !desk.hidden) {
+      event.preventDefault();
+      closeDesk(true);
+    }
+  });
+  prepare.addEventListener('click', () => {
+    closeDesk();
+    kind.value = 'auto';
+    kindChoice.open = false;
     prompt.value = '';
     showStatus(premiumAvailable()
       ? 'Cyril will prepare a draft. You remain in control of what is recorded.'
@@ -168,7 +200,7 @@ function initializeCellarerDialog() {
     submit.disabled = !premiumAvailable();
     dialog.showModal();
     setTimeout(() => prompt.focus(), 30);
-  }));
+  });
   document.querySelector('#cellarerClose')?.addEventListener('click', close);
   document.querySelector('#cellarerCancel')?.addEventListener('click', close);
   form.addEventListener('submit', async event => {
