@@ -727,6 +727,16 @@ summary:focus-visible {
 .record-title-row h2 { margin-bottom: 0; }
 .action-cluster { align-items: center; }
 .action-cluster .primary { box-shadow: 0 4px 10px rgba(40,69,54,.16); }
+.section-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.cellarer-draft-button { color: var(--forest); border: 1px solid rgba(164,123,60,.38); white-space: nowrap; }
+.cellarer-dialog { width: min(560px,calc(100% - 22px)); }
+.cellarer-dialog textarea { min-height: 132px; }
+.cellarer-privacy-note { margin: -2px 0 0; line-height: 1.45; }
+.cellarer-status { min-height: 1.25em; margin: 0; color: var(--forest2); font: 700 .78rem Arial,sans-serif; }
+.cellarer-status.error { color: var(--red); }
+.cellarer-draft-notice { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid rgba(164,123,60,.36); border-left: 3px solid var(--gold); border-radius: 8px; background: rgba(244,239,226,.72); }
+.cellarer-draft-notice strong { color: var(--forest); }
+.cellarer-draft-notice span { color: var(--muted); font: .78rem Arial,sans-serif; }
 
 .milk-action { background: #466d59; }
 .egg-action { border-color: #c69a45; background: #f2e3bd; color: #684b20; }
@@ -906,6 +916,10 @@ summary:focus-visible {
 }
 
 @media (max-width: 520px) {
+  .section-actions { gap: 5px; }
+  .section-actions .btn { padding-left: 9px; padding-right: 9px; }
+  .cellarer-draft-button span { display: none; }
+  .cellarer-dialog form { padding: 17px 15px; }
   .settings-page-head { margin-bottom: 13px; }
   .settings-page-head .muted { font-size: .76rem; }
   .settings-summary { padding: 15px 16px; }
@@ -1221,6 +1235,9 @@ summary:focus-visible {
   .section-masthead > .btn { grid-column: 1 / -1; margin-top: -3px; }
   .section-masthead > .yield-page-add { grid-column: 1 / -1; justify-self: stretch; margin-top: -3px; }
   .section-masthead > .yield-page-add > summary { justify-content: center; }
+  .section-masthead > .section-actions { grid-column: 1 / -1; width: 100%; }
+  .section-actions > * { flex: 1 1 0; }
+  .section-actions .record-add > summary { justify-content: center; }
 }
 
 @media (max-width: 520px) {

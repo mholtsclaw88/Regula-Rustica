@@ -39,10 +39,10 @@ test('mobile uses the real sticky text tab list without a generated dropdown', (
 });
 
 test('updated Record detail assets share one offline cache version', () => {
-  assert.match(worker, /regula-rustica-ledger-page-v1/);
+  assert.match(worker, /regula-rustica-cyril-assisted-entry-v1/);
   for (const asset of ['housekeeping.css', 'app.js']) {
-    assert.match(worker, new RegExp(`${asset.replace('.', '\\.')}\\?v=ledger-page-v1`));
-    assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=ledger-page-v1`));
+    assert.match(worker, new RegExp(`${asset.replace('.', '\\.')}\\?v=cyril-assisted-entry-v1`));
+    assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=cyril-assisted-entry-v1`));
   }
   assert.match(worker, /ui-refinements\.js\?v=ledger-page-v1/);
   assert.match(html, /ui-refinements\.js\?v=ledger-page-v1/);
