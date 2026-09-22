@@ -547,7 +547,8 @@ summary:focus-visible {
 .reporting-range { margin: 4px 0 0; color: var(--muted); font: .8rem Arial, sans-serif; }
 .reporting-page > .section-head { align-items: flex-end; margin-bottom: 18px; }
 .section-head .muted { margin: 4px 0 0; }
-#yield .section-masthead:has(.section-masthead-seal.hidden) { grid-template-columns: minmax(0, 1fr) auto; }
+#yield .section-masthead:has(.section-masthead-seal.hidden),
+#ledger .section-masthead:has(.section-masthead-seal.hidden) { grid-template-columns: minmax(0, 1fr) auto; }
 .yield-page-add { justify-self: end; }
 .yield-page-add .record-add-menu button {
   grid-template-columns: 30px minmax(0, 1fr);
@@ -581,6 +582,15 @@ summary:focus-visible {
   gap: 16px;
   margin: 2px 2px 9px;
 }
+.ledger-summary-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 2px 2px 9px;
+}
+.ledger-summary-head h3 { margin: 3px 0 0; }
+.ledger-summary-head .reporting-range { max-width: 58%; text-align: right; }
 .yield-summary-head h3 { margin: 3px 0 0; }
 .yield-summary-head .reporting-range { max-width: 58%; text-align: right; }
 .yield-summary-grid {
@@ -620,6 +630,7 @@ summary:focus-visible {
 .report-quick-entry .quick { justify-content: flex-end; margin: 0; }
 .report-quick-entry .btn { min-height: 38px; padding: 8px 11px; }
 .report-stats { margin-bottom: 14px; }
+#ledger .report-stats .stat strong { font-size: clamp(1rem, 4.8vw, 1.4rem); overflow-wrap: anywhere; }
 .reporting-filter-panel { margin-bottom: 18px; border-top: 1px solid rgba(164,123,60,.36); border-bottom: 1px solid rgba(164,123,60,.36); }
 .reporting-filter-panel > summary { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
 .reporting-filter-panel > summary::-webkit-details-marker { display: none; }
@@ -633,10 +644,17 @@ summary:focus-visible {
 .ledger-entry { grid-template-columns: minmax(0,1fr) auto 44px; }
 .report-entry-amount { display: grid; gap: 3px; justify-items: end; text-align: right; white-space: nowrap; }
 .report-entry-actions { align-self: center; }
-.yield-empty-state { display: grid; justify-items: start; gap: 5px; padding: 22px; }
-.yield-empty-state > strong { color: var(--forest); font: 700 1.05rem Georgia, serif; }
-.yield-empty-state > span { color: var(--muted); font: .82rem Arial, sans-serif; }
-.yield-empty-state > .btn { margin-top: 7px; }
+.yield-empty-state,
+.report-empty-state { display: grid; justify-items: start; gap: 5px; padding: 22px; }
+.yield-empty-state > strong,
+.report-empty-state > strong { color: var(--forest); font: 700 1.05rem Georgia, serif; }
+.yield-empty-state > span,
+.report-empty-state > span { color: var(--muted); font: .82rem Arial, sans-serif; }
+.yield-empty-state > .btn,
+.report-empty-state > .btn { margin-top: 7px; }
+.report-footnote { width: fit-content; margin: 12px 2px 0; color: var(--muted); font: .72rem Arial, sans-serif; }
+.report-footnote summary { color: var(--forest); cursor: pointer; font-weight: 700; }
+.report-footnote p { max-width: 48rem; margin: 6px 0 0; line-height: 1.45; }
 .record-section-panel .steward-box { margin-top: 0; }
 .record-relationships { margin-top: 18px; }
 .record-relationships h4 { margin: 0 0 8px; color: var(--forest); }
@@ -909,6 +927,8 @@ summary:focus-visible {
   .yield-page-add > summary { min-height: 40px; padding: 8px 11px; }
   .yield-summary-head { align-items: start; gap: 10px; margin-top: 0; }
   .yield-summary-head .reporting-range { max-width: 55%; font-size: .7rem; }
+  .ledger-summary-head { align-items: start; gap: 10px; margin-top: 0; }
+  .ledger-summary-head .reporting-range { max-width: 55%; font-size: .7rem; }
   .yield-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
   .yield-summary-card { grid-template-columns: 28px minmax(0,1fr); column-gap: 7px; padding: 10px; }
   .yield-summary-icon { width: 28px; height: 28px; }

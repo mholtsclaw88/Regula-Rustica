@@ -32,7 +32,6 @@
     style.textContent = `
       .record-context, .tabs-mini { display:none !important; }
       .ledger-receipt-action.has-receipt::before { content:'✓ '; }
-      .receipt-storage-note { margin:.65rem 0 1rem; font-size:.86rem; color:var(--muted, #6b6256); }
       .receipt-dialog { width:min(92vw, 620px); }
       .receipt-dialog img { display:block; width:100%; max-height:68vh; object-fit:contain; border-radius:10px; border:1px solid var(--line, #cdbf9f); background:#fff; }
       .receipt-dialog .receipt-meta { margin:.65rem 0 0; color:var(--muted, #6b6256); font-size:.86rem; }
@@ -295,13 +294,6 @@
     if (ledgerList) {
       const rows = [...ledgerList.children].filter(node => node.classList.contains('task'));
       mainLedgerEntries(data).forEach((entry, index) => addReceiptButton(rows[index], entry, photos));
-      const section = document.querySelector('#ledger');
-      if (section && !section.querySelector('.receipt-storage-note')) {
-        const note = document.createElement('p');
-        note.className = 'receipt-storage-note';
-        note.textContent = 'Receipt photos are compressed and saved on this device and in downloaded backups. Ledger entries sync to the cloud; receipt-photo cloud sync is not yet enabled.';
-        ledgerList.before(note);
-      }
     }
 
     const record = currentRecord(data);
