@@ -8,10 +8,11 @@ import {
 } from '../cellarer-assisted-entry.mjs';
 import cellarerHandler from '../netlify/functions/cyril-assisted-entry.mts';
 
-const [html, app, styles, fn, migration, worker] = await Promise.all([
+const [html, app, styles, client, fn, migration, worker] = await Promise.all([
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
   readFile(new URL('../housekeeping.css', import.meta.url), 'utf8'),
+  readFile(new URL('../cellarer-assisted-entry.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../netlify/functions/cyril-assisted-entry.mts', import.meta.url), 'utf8'),
   readFile(new URL('../supabase/migrations/20260922182819_cellarer_assisted_entry_quota.sql', import.meta.url), 'utf8'),
   readFile(new URL('../service-worker.js', import.meta.url), 'utf8')
@@ -57,7 +58,16 @@ test('unknown local references and incomplete drafts are rejected', () => {
 
 test('Assisted Entry uses existing forms and always marks the result as a reviewable draft', () => {
   assert.match(html, /id="cellarerDialog"/);
-  assert.equal((html.match(/data-cellarer-kind=/g) || []).length, 4);
+  assert.equal((html.match(/id="cellarerDeskToggle"/g) || []).length, 1);
+  assert.doesNotMatch(html, /data-cellarer-kind=|Draft with Cyril/);
+  assert.match(html, /id="cellarerDesk"[^>]*hidden/);
+  assert.match(html, /id="cellarerPrepare"/);
+  assert.match(html, /Ask About the Homestead[\s\S]*?Coming later[\s\S]*?disabled/);
+  assert.match(html, /Consult Cyril[\s\S]*?Coming later/);
+  assert.match(html, /Cyril will determine where it belongs/);
+  assert.match(client, /kind\.value = 'auto'/);
+  assert.match(client, /toggle\.setAttribute\('aria-expanded', 'true'\)/);
+  assert.match(client, /event\.key === 'Escape'/);
   assert.match(app, /function openCellarerDraft\(draft\)/);
   assert.match(app, /openModal\('task'/);
   assert.match(app, /openModal\('yield'/);
@@ -147,6 +157,6 @@ test('daily quota is private, atomic, Homestead-scoped, and cached assets are ve
   assert.match(migration, /on conflict on constraint premium_feature_usage_pkey/);
   assert.match(migration, /public\.has_premium_feature\(normalized_feature\)/);
   assert.match(migration, /revoke all on table private\.premium_feature_usage from public, anon, authenticated/);
-  assert.match(worker, /regula-rustica-cyril-assisted-entry-v1/);
-  assert.match(worker, /cellarer-assisted-entry\.mjs\?v=cyril-assisted-entry-v1/);
+  assert.match(worker, /regula-rustica-cyril-global-desk-v1/);
+  assert.match(worker, /cellarer-assisted-entry\.mjs\?v=cyril-global-desk-v1/);
 });

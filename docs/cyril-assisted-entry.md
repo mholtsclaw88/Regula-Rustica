@@ -5,6 +5,12 @@ create, update, complete, or sync an entry. It returns a validated draft that is
 opened in the existing Regula Rustica form; the user reviews and explicitly
 saves through the ordinary local-first workflow.
 
+The single **Cyril the Cellarer** control opens the Cellarer's Desk from the
+bottom-right of the app. **Prepare an Entry** opens the existing draft form with
+the prompt first; Cyril chooses the entry type unless the user expands the
+optional selector. **Ask About the Homestead** and **Consult Cyril** are shown
+as unavailable future capabilities.
+
 ## Request path
 
 1. The browser sends a short instruction plus a bounded list of active Records,

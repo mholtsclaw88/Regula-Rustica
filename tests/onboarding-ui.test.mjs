@@ -66,7 +66,7 @@ test('new installs start empty and incomplete while legacy installs default to c
 });
 
 test('onboarding assets are part of the offline shell', () => {
-  assert.match(worker, /regula-rustica-cyril-assisted-entry-v1/);
+  assert.match(worker, /regula-rustica-cyril-global-desk-v1/);
   assert.match(worker, /onboarding\.css\?v=onboarding-v4/);
   assert.match(worker, /onboarding\.js\?v=onboarding-v4/);
 });

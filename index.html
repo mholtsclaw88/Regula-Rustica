@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=cyril-assisted-entry-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=cyril-global-desk-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
@@ -25,7 +25,7 @@
   <script src="ui-refinements.js?v=ledger-page-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=premium-foundation-v1" type="module"></script>
-  <script src="cellarer-assisted-entry.mjs?v=cyril-assisted-entry-v1" type="module"></script>
+  <script src="cellarer-assisted-entry.mjs?v=cyril-global-desk-v1" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
 </head>
 <body>
@@ -252,7 +252,7 @@
       <div class="section-head section-masthead">
         <span class="section-masthead-seal hidden"><img alt="" hidden></span>
         <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Agenda</span><details class="section-info"><summary aria-label="About Agenda"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Things to Be Done</strong><p>What needs to be done, when, and by whom.</p></div></details></div><h2 id="tasksPageTitle">Homestead Tasks</h2></div>
-        <div class="section-actions"><button class="btn secondary cellarer-draft-button" type="button" data-cellarer-kind="task"><span>Draft with </span>Cyril</button><button class="btn primary" id="tasksAddTask">+ Task</button></div>
+        <div class="section-actions"><button class="btn primary" id="tasksAddTask">+ Task</button></div>
       </div>
       <div class="card">
         <fieldset class="choice-filter task-choice-filter">
@@ -307,7 +307,7 @@
       <div class="section-head section-masthead">
         <span class="section-masthead-seal hidden"><img alt="" hidden></span>
         <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Tempora</span><details class="section-info"><summary aria-label="About Tempora"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Times / Seasons</strong><p>Shared dates, events, and the rhythm of homestead life.</p></div></details></div><h2 id="calendarPageTitle">Homestead Calendar</h2></div>
-        <div class="section-actions"><button class="btn secondary cellarer-draft-button" type="button" data-cellarer-kind="calendar_event"><span>Draft with </span>Cyril</button><button class="btn primary" id="addCalendarEvent">+ Event</button></div>
+        <div class="section-actions"><button class="btn primary" id="addCalendarEvent">+ Event</button></div>
       </div>
       <div class="card calendar-card">
         <div class="calendar-toolbar">
@@ -339,7 +339,7 @@
       <div class="section-head section-masthead">
         <span class="section-masthead-seal hidden"><img alt="" hidden></span>
         <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Fructus</span><details class="section-info"><summary aria-label="About Fructus"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Yield / Produce</strong><p>What your homestead produces, harvests, and provides.</p></div></details></div><h2 id="yieldPageTitle">Homestead Yield</h2></div>
-        <div class="section-actions"><button class="btn secondary cellarer-draft-button" type="button" data-cellarer-kind="yield"><span>Draft with </span>Cyril</button><details class="record-add yield-page-add" id="yieldAdd">
+        <div class="section-actions"><details class="record-add yield-page-add" id="yieldAdd">
           <summary class="btn primary">+ Yield</summary>
           <div class="record-add-menu" aria-label="Choose Yield type">
             <button id="addMilkYield" type="button"><strong>Milk</strong></button>
@@ -387,7 +387,7 @@
       <div class="section-head section-masthead">
         <span class="section-masthead-seal hidden"><img alt="" hidden></span>
         <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Rationes</span><details class="section-info"><summary aria-label="About Rationes"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Accounts</strong><p>Income, expenses, and the stewardship of household resources.</p></div></details></div><h2 id="ledgerPageTitle">Homestead Ledger</h2></div>
-        <div class="section-actions"><button class="btn secondary cellarer-draft-button" type="button" data-cellarer-kind="ledger"><span>Draft with </span>Cyril</button><button class="btn primary" id="addLedger">+ Entry</button></div>
+        <div class="section-actions"><button class="btn primary" id="addLedger">+ Entry</button></div>
       </div>
       <div class="ledger-summary-head"><div><span class="label">Selected period</span><h3>At a Glance</h3></div><span class="reporting-range" id="ledgerSummaryRange"></span></div>
       <div class="stats report-stats" aria-label="Ledger totals for selected period">
@@ -740,6 +740,19 @@
 
   <footer class="footer">Regula Rustica v5 · The app remembers so you do not have to.</footer>
 
+  <div class="cellarer-access">
+    <section id="cellarerDesk" class="cellarer-desk" aria-labelledby="cellarerDeskTitle" hidden>
+      <header class="cellarer-desk-header"><span class="label">The Cellarer's Desk</span><h2 id="cellarerDeskTitle">Cyril the Cellarer</h2><p>How may I help with the Homestead?</p></header>
+      <div class="cellarer-desk-rows">
+        <button id="cellarerPrepare" class="cellarer-desk-row" type="button"><strong>Prepare an Entry</strong><span>Tell Cyril what happened or what needs recording. He’ll prepare a draft for your review.</span></button>
+        <button class="cellarer-desk-row" type="button" disabled><strong>Ask About the Homestead <small>Coming later</small></strong><span>Ask a question using what has been kept in Regula Rustica.</span></button>
+        <button class="cellarer-desk-row" type="button" disabled><strong>Consult Cyril <small>Coming later</small></strong><span>Work through a question, decision, or plan with the Cellarer.</span></button>
+      </div>
+      <p class="cellarer-desk-stewardship">Cyril assists; you remain the steward.<span>Nothing is recorded without your review.</span></p>
+    </section>
+    <button id="cellarerDeskToggle" class="cellarer-desk-toggle" type="button" aria-controls="cellarerDesk" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7" cy="12" r="3.3"/><path d="M10.3 12H21m-3 0v3m-3-3v2"/></svg><span>Cyril the Cellarer</span></button>
+  </div>
+
   <dialog id="modal">
     <form id="modalForm">
       <div class="form-modal-header row"><div><h2 id="modalTitle">Add</h2><p class="muted form-modal-subtitle" id="modalSubtitle"></p></div><button type="button" class="btn ghost" id="modalClose" aria-label="Close">✕</button></div>
@@ -758,8 +771,9 @@
       <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2>Prepare an entry</h2><p class="muted form-modal-subtitle">Describe what happened or what needs recording. Cyril will prepare a draft for your review.</p></div><button type="button" class="btn ghost" id="cellarerClose" aria-label="Close">✕</button></div>
       <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
       <div class="form-grid">
-        <label>Entry type<select id="cellarerKind" name="kind"><option value="auto">Let Cyril decide</option><option value="task">Task</option><option value="yield">Yield</option><option value="ledger">Ledger entry</option><option value="journal_note">Journal note</option><option value="record_event">Record event</option><option value="calendar_event">Calendar event</option></select></label>
         <label>What should Cyril prepare?<textarea id="cellarerPrompt" name="prompt" maxlength="1200" required placeholder="Example: Paid Miller Feed $84.50 today for layer feed, linked to the laying hens."></textarea></label>
+        <p class="cellarer-prompt-help muted">Cyril will determine where it belongs. You can choose an entry type if needed.</p>
+        <details class="cellarer-kind-choice"><summary>Choose an entry type <span>(optional)</span></summary><label>Entry type<select id="cellarerKind" name="kind"><option value="auto">Let Cyril decide</option><option value="task">Task</option><option value="yield">Yield</option><option value="ledger">Ledger entry</option><option value="journal_note">Journal note</option><option value="record_event">Record event</option><option value="calendar_event">Calendar event</option></select></label></details>
         <p class="cellarer-privacy-note muted">Only this request and a compact list of active Records, people, and Chore Windows are sent for drafting.</p>
         <p id="cellarerStatus" class="cellarer-status" role="status"></p>
       </div>
