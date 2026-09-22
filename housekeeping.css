@@ -962,8 +962,22 @@ summary:focus-visible {
 .record-overview { display: grid; gap: 18px; }
 .record-overview > section { padding-bottom: 16px; border-bottom: 1px solid rgba(164,123,60,.28); }
 .record-overview > section:last-child { border-bottom: 0; }
+.record-overview-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.record-overview-link { min-height: 36px; padding: 5px 0; border: 0; background: transparent; color: var(--forest2); cursor: pointer; font: 700 .72rem Arial, sans-serif; }
+.record-overview-link:hover,
+.record-overview-link:focus-visible { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; outline: 0; }
 .record-overview-value { margin: 6px 0 0; color: var(--ink); font-size: .95rem; line-height: 1.45; }
 .record-overview-value.muted { color: var(--muted); }
+.record-recent-activity { margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(164,123,60,.28); }
+.record-overview-activity { display: grid; margin-top: 5px; }
+.record-activity-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 12px; min-height: 56px; padding: 10px 0; border: 0; border-bottom: 1px solid rgba(164,123,60,.2); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.record-activity-row:last-child { border-bottom: 0; }
+.record-activity-row .journal-type { grid-column: 1 / -1; }
+.record-activity-row strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record-activity-row .meta { text-align: right; }
+.record-activity-row:hover,
+.record-activity-row:focus-visible { color: var(--forest); outline: 0; }
+.record-activity-row:focus-visible { box-shadow: inset 3px 0 var(--gold); }
 .record-relationships { margin-top: 10px; }
 .record-relationships h4 { margin: 0 0 5px; color: var(--forest2); font: 700 .7rem Arial, sans-serif; text-transform: uppercase; letter-spacing: .1em; }
 .record-relationships .steward-box { border: 0; background: transparent; padding: 0; margin: 0; }
@@ -1074,11 +1088,18 @@ summary:focus-visible {
 .settings-about-motto { margin: 12px 0 0; color: #e8d5aa; font-style: italic; }
 
 @media (max-width: 800px) {
-  .record-head { align-items: flex-start; }
-  .record-actions { width: 100%; justify-content: flex-start; }
+  .record-head { flex-direction: row; align-items: center; }
+  .record-actions { width: auto; flex: 0 0 auto; justify-content: flex-end; }
   .record-workspace { display: block; }
-  .record-section-nav { position: static; flex-direction: row; overflow-x: auto; margin-bottom: 18px; padding: 6px; scrollbar-width: thin; }
-  .record-section-nav button { flex: 0 0 auto; min-width: max-content; text-align: center; white-space: nowrap; }
+  .record-section-nav { position: sticky; top: 57px; z-index: 18; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 0; margin: 0 -14px 18px; padding: 0 8px; overflow: visible; border-width: 1px 0; border-radius: 0; background: rgba(251,242,223,.97); box-shadow: 0 5px 12px rgba(57,47,35,.08); }
+  .record-section-nav button { position: relative; display: grid; min-width: 0; min-height: 46px; padding: 8px 2px; place-items: center; border-radius: 0; background: transparent; color: var(--muted); text-align: center; white-space: nowrap; font-size: clamp(.66rem,2.8vw,.76rem); }
+  .record-section-nav button:hover,
+  .record-section-nav button:focus-visible { background: rgba(164,123,60,.08); color: var(--forest); }
+  .record-section-nav button.active { background: transparent; color: var(--forest); }
+  .record-section-nav button.active::after { content: ''; position: absolute; right: 6px; bottom: -1px; left: 6px; height: 3px; background: var(--gold); }
+  .record-panel-head { align-items: center; }
+  .record-panel-head .btn,
+  .record-panel-head .record-add > summary { min-height: 44px; white-space: nowrap; }
 }
 
 @media (max-width: 520px) {
@@ -1110,6 +1131,8 @@ summary:focus-visible {
   .record-add-menu { position: fixed; top: auto; right: 14px; left: 14px; min-width: 0; }
   .record-yield-entry { grid-template-columns: minmax(0,1fr) auto; }
   .record-yield-entry .actions { grid-column: 1 / -1; }
+  .record-activity-row { grid-template-columns: 1fr; gap: 3px; }
+  .record-activity-row .meta { text-align: left; }
 }
 
 /* Final cascade for the compact Records sprint. */

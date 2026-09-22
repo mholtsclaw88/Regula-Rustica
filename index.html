@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=compact-mastheads-v2">
-  <link rel="stylesheet" href="housekeeping.css?v=compact-mastheads-v2">
+  <link rel="stylesheet" href="housekeeping.css?v=record-detail-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
@@ -20,9 +20,9 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=onboarding-v5" defer></script>
+  <script src="app.js?v=record-detail-v1" defer></script>
   <script src="onboarding.js?v=onboarding-v4" defer></script>
-  <script src="ui-refinements.js?v=monastic-icons-v3" defer></script>
+  <script src="ui-refinements.js?v=record-detail-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=homestead-identity-v2" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
@@ -662,17 +662,6 @@
             </div>
           </div>
           <div class="record-actions action-cluster">
-            <details class="record-add" id="recordAdd">
-              <summary class="btn primary">+ Add</summary>
-              <div class="record-add-menu">
-                <button id="recordEvent" type="button"><strong>Event</strong><small>Something that happened</small></button>
-                <button id="recordAddTask" type="button"><strong>Task</strong><small>Something that needs doing</small></button>
-                <button id="recordAddYield" type="button" aria-expanded="false" aria-controls="recordAddYieldMenu"><strong>Yield</strong><small>Record something produced or harvested</small></button>
-                <div class="record-yield-submenu hidden" id="recordAddYieldMenu" aria-label="Eligible Yield types"></div>
-                <button id="recordAddJournal" type="button"><strong>Journal Entry</strong><small>Add a note, photo, or document</small></button>
-                <button id="recordAddLedger" type="button"><strong>Ledger Entry</strong><small>Record an expense or income</small></button>
-              </div>
-            </details>
             <button class="btn secondary" id="recordEdit" type="button">Edit</button>
           </div>
         </div>
@@ -686,22 +675,23 @@
           </nav>
           <div class="record-section-content">
             <section class="record-section-panel active" role="tabpanel" data-record-section-panel="overview">
-              <h3 class="record-section-heading">Overview</h3>
+              <div class="record-panel-head"><div><h3 class="record-section-heading">At a Glance</h3><p class="muted">The present state of this Record’s care.</p></div></div>
               <div class="record-overview">
                 <section><span class="label">Stewardship</span><p id="recordStewardship" class="record-overview-value"></p></section>
-                <section><span class="label">Next Task</span><div id="recordOverviewTask" class="record-overview-value"></div></section>
-                <section id="recordOverviewYieldWrap"><span class="label">Recent Yield</span><div id="recordOverviewYield" class="record-overview-value"></div></section>
-                <section><span class="label">Recent Event</span><div id="recordOverviewEvent" class="record-overview-value"></div></section>
+                <section><div class="record-overview-label"><span class="label">Next Task</span><button type="button" class="record-overview-link" data-record-jump="tasks">View Tasks</button></div><div id="recordOverviewTask" class="record-overview-value"></div></section>
+                <section id="recordOverviewYieldWrap"><div class="record-overview-label"><span class="label">Recent Yield</span><button type="button" class="record-overview-link" data-record-jump="yield">View Yield</button></div><div id="recordOverviewYield" class="record-overview-value"></div></section>
               </div>
+              <section class="record-recent-activity"><div class="record-overview-label"><span class="label">Recent Activity</span><button type="button" class="record-overview-link" data-record-jump="journal">Full Journal</button></div><div id="recordOverviewActivity" class="record-overview-activity"></div></section>
             </section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><h3 class="record-section-heading">Tasks</h3><div id="panelTasks"></div><div id="suggestedTasks" class="stack suggested-tasks"></div></section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="yield"><div class="record-panel-head"><div><h3 class="record-section-heading">Yield</h3><p class="muted">Last 30 Days</p></div><button class="btn primary hidden" id="recordSectionAddYield" type="button">+ Yield</button></div><div id="recordYieldSummary" class="record-yield-summary"></div><div id="recordYieldList" class="record-yield-list"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="tasks"><div class="record-panel-head"><div><h3 class="record-section-heading">Tasks</h3><p class="muted">Work connected to this Record.</p></div><button class="btn primary" id="recordSectionAddTask" type="button">+ Task</button></div><div id="panelTasks"></div><div id="suggestedTasks" class="stack suggested-tasks"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="yield"><div class="record-panel-head"><div><h3 class="record-section-heading">Yield</h3><p class="muted">Last 30 Days</p></div><details class="record-add hidden" id="recordSectionYieldAdd"><summary class="btn primary">+ Yield</summary><div class="record-add-menu" id="recordAddYieldMenu" aria-label="Eligible Yield types"></div></details></div><div id="recordYieldSummary" class="record-yield-summary"></div><div id="recordYieldList" class="record-yield-list"></div></section>
             <section class="record-section-panel" role="tabpanel" data-record-section-panel="journal">
               <div class="record-panel-head">
                 <div><h3 class="record-section-heading">Journal</h3><p class="muted">What has happened, and what you have intentionally recorded.</p></div>
                 <details class="record-add" id="journalAdd">
-                  <summary class="btn primary">+ Journal Entry</summary>
+                  <summary class="btn primary">+ Entry</summary>
                   <div class="record-add-menu">
+                    <button id="journalAddEvent" type="button"><strong>Record Event</strong><small>Log something that happened</small></button>
                     <button id="journalAddNote" type="button"><strong>Note</strong><small>Write an observation or note</small></button>
                     <button id="journalTakePhoto" type="button"><strong>Take Photo</strong><small>Use this device's camera</small></button>
                     <button id="journalChoosePhoto" type="button"><strong>Add Photo</strong><small>Choose an existing photo</small></button>
@@ -710,14 +700,14 @@
                 </details>
               </div>
               <div class="journal-filters" role="group" aria-label="Filter Journal">
-                <button class="active" type="button" data-journal-filter="all">All</button><button type="button" data-journal-filter="tasks">Tasks</button><button type="button" data-journal-filter="yield">Yield</button><button type="button" data-journal-filter="notes">Notes</button><button type="button" data-journal-filter="photos">Photos</button><button type="button" data-journal-filter="documents">Documents</button>
+                <button class="active" type="button" data-journal-filter="all">All</button><button type="button" data-journal-filter="events">Events</button><button type="button" data-journal-filter="tasks">Tasks</button><button type="button" data-journal-filter="yield">Yield</button><button type="button" data-journal-filter="notes">Notes</button><button type="button" data-journal-filter="photos">Photos</button><button type="button" data-journal-filter="documents">Documents</button>
               </div>
               <div id="panelJournal" class="record-journal"></div>
               <input class="hidden" id="journalCameraInput" type="file" accept="image/*" capture="environment">
               <input class="hidden" id="journalPhotoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
               <input class="hidden" id="journalFileInput" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif">
             </section>
-            <section class="record-section-panel" role="tabpanel" data-record-section-panel="ledger"><h3 class="record-section-heading">Ledger</h3><div id="panelLedger"></div></section>
+            <section class="record-section-panel" role="tabpanel" data-record-section-panel="ledger"><div class="record-panel-head"><div><h3 class="record-section-heading">Ledger</h3><p class="muted">Income and expenses connected to this Record.</p></div><button class="btn primary" id="recordSectionAddLedger" type="button">+ Entry</button></div><div id="panelLedger"></div></section>
           </div>
         </div>
       </article>

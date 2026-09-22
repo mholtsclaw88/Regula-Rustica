@@ -776,14 +776,19 @@ function openRecord(id) {
   $$('.view,.record-shell').forEach(element => element.classList.remove('active'));
   $$('.nav button').forEach(button => button.classList.remove('active'));
   $('#recordView').classList.add('active');
+  activateRecordSection('overview');
+  renderRecord();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function activateRecordSection(section, options = {}) {
   $$('.record-section-nav button').forEach(button => {
-    const active = button.dataset.recordSection === 'overview';
+    const active = button.dataset.recordSection === section;
     button.classList.toggle('active', active);
     button.setAttribute('aria-selected', String(active));
   });
-  $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === 'overview'));
-  renderRecord();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === section));
+  if (options.scroll) $('.record-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function displayValue(value) {
@@ -1318,6 +1323,28 @@ function journalItemLabel(item) {
   return 'Document';
 }
 
+function journalItemTitle(item) {
+  if (item.kind === 'task') return item.task.title;
+  if (item.kind === 'yield') return item.task?.title || window.RegulaRusticaTasks.YIELD_TYPES[item.entry.type]?.label || 'Yield recorded';
+  if (item.kind === 'event') return item.event.eventType;
+  if (item.kind === 'legacy-note') return item.note.title || item.note.text || 'Note';
+  return item.documentEntry.title || journalItemLabel(item);
+}
+
+function journalItemOverviewMeta(item) {
+  const date = new Date(item.timestamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  if (item.kind === 'yield') return `${journalItemLabel(item)} · ${item.entry.quantity} ${item.entry.unit} · ${date}`;
+  if (item.kind === 'document' && item.attachments.length) return `${journalItemLabel(item)} · ${item.attachments.length} attachment${item.attachments.length === 1 ? '' : 's'} · ${date}`;
+  return `${journalItemLabel(item)} · ${date}`;
+}
+
+function renderRecordOverviewActivity(record) {
+  const root = $('#recordOverviewActivity');
+  const items = window.RegulaRusticaJournal.buildJournalItems(data, record.id).slice(0, 3);
+  root.innerHTML = items.map(item => `<button class="record-activity-row" type="button" data-record-jump="journal"><span class="journal-type">${escapeHtml(journalItemLabel(item))}</span><strong>${escapeHtml(journalItemTitle(item))}</strong><span class="meta">${escapeHtml(journalItemOverviewMeta(item))}</span></button>`).join('');
+  if (!items.length) root.innerHTML = '<p class="muted record-empty">Nothing has been recorded here yet.</p>';
+}
+
 function renderJournal(record) {
   const root = $('#panelJournal');
   root.innerHTML = '';
@@ -1372,19 +1399,17 @@ function renderRecord() {
   $('#recordStewardship').textContent = stewardshipText(record);
   const eligibleYieldTypes = window.RegulaRusticaTasks.eligibleYieldTypes(record);
   const yieldEligible = eligibleYieldTypes.length > 0;
-  $('#recordSectionAddYield').classList.toggle('hidden', !yieldEligible);
-  const recordAddYield = $('#recordAddYield');
+  const recordAddYield = $('#recordSectionYieldAdd');
   const recordAddYieldMenu = $('#recordAddYieldMenu');
   recordAddYield.classList.toggle('hidden', !yieldEligible);
-  recordAddYield.setAttribute('aria-expanded', 'false');
-  recordAddYieldMenu.classList.add('hidden');
+  recordAddYield.open = false;
   recordAddYieldMenu.innerHTML = '';
   eligibleYieldTypes.forEach(type => {
     const button = document.createElement('button');
     button.type = 'button';
     button.innerHTML = `<strong>${escapeHtml(window.RegulaRusticaTasks.YIELD_TYPES[type].label)}</strong>`;
     button.addEventListener('click', () => {
-      closeRecordAdd();
+      recordAddYield.open = false;
       openModal('yield', null, record.id, type);
     });
     recordAddYieldMenu.append(button);
@@ -1430,13 +1455,7 @@ function renderRecord() {
   });
   if (!recentYields.length) yieldList.innerHTML = `<p class="muted record-empty">${yieldEligible ? 'No Yield recorded in the last 30 days.' : 'This Record does not produce tracked Yield.'}</p>`;
 
-  const recentEvent = data.events
-    .filter(event => !event.deletedAt && event.recordId === record.id && !data.yieldEntries.some(entry => !entry.deletedAt && entry.legacyEventId === event.id))
-    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))[0];
-  $('#recordOverviewEvent').innerHTML = recentEvent
-    ? `<strong>${escapeHtml(recentEvent.eventType)}</strong><div class="meta">${formatDate(recentEvent.date)}</div>`
-    : '<span class="muted">No events recorded yet.</span>';
-
+  renderRecordOverviewActivity(record);
   renderJournal(record);
 
   const ledgerPanel = $('#panelLedger');
@@ -2640,29 +2659,10 @@ $('#addMeatYield')?.addEventListener('click', () => openModal('yield',null,null,
 $('#addHarvestYield')?.addEventListener('click', () => openModal('yield',null,null,'harvest'));
 $('#addForageYield')?.addEventListener('click', () => openModal('yield',null,null,'forage'));
 $('#addChoreWindow').addEventListener('click', () => openModal('chore-window'));
-const closeRecordAdd = () => {
-  $('#recordAdd').open = false;
-  $('#recordAddYield').setAttribute('aria-expanded', 'false');
-  $('#recordAddYieldMenu').classList.add('hidden');
-};
-$('#recordEvent').addEventListener('click', () => { closeRecordAdd(); openModal('event', null, currentRecordId); });
-const openCurrentRecordYield = () => { const type=window.RegulaRusticaTasks.eligibleYieldTypes(recordById(currentRecordId))[0]; if(type)openModal('yield',null,currentRecordId,type); };
-$('#recordSectionAddYield').addEventListener('click', openCurrentRecordYield);
-$('#recordAddTask').addEventListener('click', () => { closeRecordAdd(); openModal('task', null, currentRecordId); });
-$('#recordAddYield').addEventListener('click', () => {
-  const menu = $('#recordAddYieldMenu');
-  const expanded = !menu.classList.toggle('hidden');
-  $('#recordAddYield').setAttribute('aria-expanded', String(expanded));
-});
-$('#recordAddLedger').addEventListener('click', () => { closeRecordAdd(); openModal('ledger', null, currentRecordId); });
+$('#recordSectionAddTask').addEventListener('click', () => openModal('task', null, currentRecordId));
+$('#recordSectionAddLedger').addEventListener('click', () => openModal('ledger', null, currentRecordId));
 $('#recordEdit').addEventListener('click', () => openModal('record', currentRecordId));
 const closeJournalAdd = () => { $('#journalAdd').open = false; };
-$('#recordAddJournal').addEventListener('click', () => {
-  closeRecordAdd();
-  $('.record-section-nav button[data-record-section="journal"]').click();
-  $('#journalAdd').open = true;
-  $('#journalAdd').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-});
 const openDocumentFromFiles = files => {
   const selected = [...files];
   if (!selected.length) return;
@@ -2670,6 +2670,7 @@ const openDocumentFromFiles = files => {
   closeJournalAdd();
   openModal('document', null, currentRecordId);
 };
+$('#journalAddEvent').addEventListener('click', () => { closeJournalAdd(); openModal('event', null, currentRecordId); });
 $('#journalAddNote').addEventListener('click', () => { pendingDocumentFiles = []; closeJournalAdd(); openModal('document', null, currentRecordId); });
 $('#journalTakePhoto').addEventListener('click', () => { $('#journalCameraInput').value = ''; $('#journalCameraInput').click(); });
 $('#journalChoosePhoto').addEventListener('click', () => { $('#journalPhotoInput').value = ''; $('#journalPhotoInput').click(); });
@@ -2729,12 +2730,12 @@ $('#profileCropForm').addEventListener('submit', event => {
 $('.record-section-nav').addEventListener('click', event => {
   const button = event.target.closest('button[data-record-section]');
   if (!button) return;
-  $$('.record-section-nav button').forEach(item => {
-    const active = item === button;
-    item.classList.toggle('active', active);
-    item.setAttribute('aria-selected', String(active));
-  });
-  $$('.record-section-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.recordSectionPanel === button.dataset.recordSection));
+  activateRecordSection(button.dataset.recordSection);
+});
+$('#recordView').addEventListener('click', event => {
+  const jump = event.target.closest('[data-record-jump]');
+  if (!jump) return;
+  activateRecordSection(jump.dataset.recordJump, { scroll: true });
 });
 $('#backToList').addEventListener('click', () => showView(priorView));
 const cancelModal = () => { pendingDocumentFiles = []; $('#modal').close(); };
