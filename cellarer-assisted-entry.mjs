@@ -155,6 +155,8 @@ function initializeCellarerDialog() {
   const prepare = document.querySelector('#cellarerPrepare');
   if (!dialog || !form || !access || !desk || !toggle || !prepare
     || !window.RegulaRustica?.cellarerContext || !window.RegulaRustica?.openCellarerDraft) return;
+  if (toggle.dataset.cellarerInitialized === 'true') return;
+  toggle.dataset.cellarerInitialized = 'true';
   const kind = document.querySelector('#cellarerKind');
   const kindChoice = document.querySelector('.cellarer-kind-choice');
   const prompt = document.querySelector('#cellarerPrompt');
@@ -201,6 +203,10 @@ function initializeCellarerDialog() {
     dialog.showModal();
     setTimeout(() => prompt.focus(), 30);
   });
+  document.querySelector('#cellarerReceipt')?.addEventListener('click', () => {
+    closeDesk();
+    window.dispatchEvent(new Event('regula-rustica:cellarer-receipt-request'));
+  });
   document.querySelector('#cellarerClose')?.addEventListener('click', close);
   document.querySelector('#cellarerCancel')?.addEventListener('click', close);
   form.addEventListener('submit', async event => {
@@ -233,4 +239,5 @@ function initializeCellarerDialog() {
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeCellarerDialog, { once: true });
   else initializeCellarerDialog();
+  window.addEventListener('load', initializeCellarerDialog, { once: true });
 }

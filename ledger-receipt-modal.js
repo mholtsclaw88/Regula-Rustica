@@ -109,10 +109,12 @@
   function captureLedgerSubmit() {
     if (!ledgerContext || !stagedReceipt) return;
     const root = document.querySelector('#modalFields');
+    const description = root?.querySelector('[name=description]')?.value?.trim() || '';
+    if (!description) return;
     pendingSave = {
       id: ledgerContext.id || null,
       receipt: stagedReceipt,
-      description: root?.querySelector('[name=description]')?.value?.trim() || '',
+      description,
       date: root?.querySelector('[name=date]')?.value || '',
       amount: Number(root?.querySelector('[name=amount]')?.value || 0)
     };
@@ -135,6 +137,22 @@
     receiptMap(data)[entry.id] = pending.receipt;
     writeData(data);
   }
+
+  window.RegulaRusticaReceipts = {
+    prepareFile: compressReceipt,
+    stageForOpenLedger(receipt) {
+      if (!ledgerContext || document.querySelector('#modalForm')?.dataset.formMode !== 'ledger'
+        || !receipt?.dataUrl?.startsWith('data:image/jpeg;base64,')) {
+        throw new Error('Open a Ledger draft before attaching its receipt.');
+      }
+      stagedReceipt = receipt;
+      queueMicrotask(() => {
+        augmentLedgerForm(null);
+        const status = document.querySelector('.ledger-receipt-field .receipt-form-status');
+        if (status) status.textContent = 'Receipt photo ready to save with this entry. It stays on this device.';
+      });
+    }
+  };
 
   function install() {
     ensureStyles();

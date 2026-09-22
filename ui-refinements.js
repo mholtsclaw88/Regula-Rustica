@@ -1,7 +1,7 @@
 'use strict';
 (function(){
  function load(src,onload,marker){if(marker&&document.querySelector(`script[${marker}]`))return;const script=document.createElement('script');script.src=src;if(marker)script.setAttribute(marker,'true');if(onload)script.addEventListener('load',onload,{once:true});document.head.appendChild(script);}
- function loadLedgerTools(){load('ledger-receipt-modal.js?v=data-entry-forms-v2',null,'data-ledger-receipt-modal');load('ledger-allocations.js?v=data-entry-forms-v2',null,'data-ledger-allocations');}
+ function loadLedgerTools(){load('ledger-receipt-modal.js?v=cyril-receipt-reader-v1',null,'data-ledger-receipt-modal');load('ledger-allocations.js?v=data-entry-forms-v2',null,'data-ledger-allocations');}
  function addRecordUxStyles(){if(document.querySelector('#record-ux-styles'))return;const style=document.createElement('style');style.id='record-ux-styles';style.textContent=`
   .task-yield-chronicle .combined-yield-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem}
   .task-yield-chronicle .combined-yield-kind{color:var(--forest2);font:700 .72rem Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em}
