@@ -125,3 +125,18 @@
  .homestead-logo-editor{align-items:flex-start}
  .homestead-logo-preview{width:96px;height:96px;flex-basis:96px}
 }
+
+/* Premium is cloud-backed, but remains visually subordinate to core Settings. */
+.premium-status-card{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:0 0 16px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--raised)}
+.premium-status-card .cloud-status{max-width:34rem;margin:0;text-align:right}
+.premium-feature-list{display:grid;gap:0;margin:0 0 18px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.premium-feature-list > div{display:grid;grid-template-columns:minmax(150px,.42fr) minmax(0,1fr);gap:16px;padding:14px;background:var(--paper)}
+.premium-feature-list > div + div{border-top:1px solid var(--line)}
+.premium-feature-list strong{color:var(--forest)}
+.premium-feature-list span{color:var(--muted);font:normal .8rem/1.45 Arial,sans-serif}
+.premium-note{margin:18px 0 8px;padding:12px 14px;border-left:3px solid var(--gold);background:var(--raised);color:var(--forest);font-size:.9rem;line-height:1.5}
+@media(max-width:520px){
+ .premium-status-card{display:grid;gap:8px}
+ .premium-status-card .cloud-status{text-align:left}
+ .premium-feature-list > div{grid-template-columns:1fr;gap:4px;padding:12px}
+}
