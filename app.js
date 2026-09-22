@@ -2337,6 +2337,10 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
       field('Date', 'date', 'date', entry.date || today()),
       field('Type', 'type', 'select', entry.type || 'expense', ['expense', 'income'])
     ));
+    root.append(formRow(
+      field('Vendor or source (optional)', 'vendorOrSource', 'text', entry.vendorOrSource),
+      field('Category (optional)', 'category', 'text', entry.category)
+    ));
     root.append(formSection('Allocation'));
     addRecordSelect(root, 'Linked record (optional)', 'recordId', recordId || entry.recordId);
     const allocationSlot = document.createElement('div');
@@ -2481,6 +2485,97 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
 
   $('#modal').showModal();
   setTimeout(() => root.querySelector('input,textarea,select')?.focus(), 30);
+}
+
+function cellarerContext(preferredKind = null) {
+  return {
+    today: today(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    preferredKind,
+    records: data.records
+      .filter(record => !record.deletedAt && !INACTIVE_RECORD_STATUSES.has(record.status))
+      .map(record => ({
+        id: record.id,
+        name: record.name,
+        type: record.type,
+        eligibleYieldTypes: window.RegulaRusticaTasks.eligibleYieldTypes(record)
+      })),
+    people: activePeople().map(person => ({ id: person.id, name: personDisplayName(person) })),
+    choreWindows: data.choreWindows
+      .filter(window => !window.deletedAt && window.enabled)
+      .map(window => ({ id: window.id, name: window.name, startTime: window.startTime || '', endTime: window.endTime || '' }))
+  };
+}
+
+function setModalDraftValue(name, value) {
+  if (value === null || value === undefined || value === '') return;
+  const input = $(`#modalFields [name="${name}"]`);
+  if (!input) return;
+  if (input.type === 'checkbox') input.checked = Boolean(value);
+  else if (input.tagName === 'SELECT' && ![...input.options].some(option => option.value === String(value))) return;
+  else input.value = String(value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function markCellarerDraft() {
+  const note = document.createElement('aside');
+  note.className = 'cellarer-draft-notice';
+  note.innerHTML = '<strong>Cyril’s draft</strong><span>Review and adjust this entry before recording it.</span>';
+  $('#modalFields').prepend(note);
+}
+
+function openCellarerDraft(draft) {
+  if (!draft) return;
+  if (draft.kind === 'task') {
+    openModal('task', null, draft.recordId);
+    [
+      ['title', draft.title], ['description', draft.description], ['recordId', draft.recordId],
+      ['personId', draft.personId], ['availableFrom', draft.startDate], ['dueDate', draft.dueDate],
+      ['priority', draft.priority], ['recurrenceFrequency', draft.recurrenceFrequency],
+      ['recurrenceInterval', draft.recurrenceInterval], ['recurrenceMode', draft.recurrenceMode],
+      ['choreWindowId', draft.choreWindowId], ['yieldType', draft.yieldType]
+    ].forEach(([name, value]) => setModalDraftValue(name, value));
+  }
+  if (draft.kind === 'yield') {
+    openModal('yield', null, draft.recordId, draft.yieldType);
+    [
+      ['recordId', draft.recordId], ['quantity', draft.quantity], ['unit', draft.unit],
+      ['unusableQuantity', draft.unusableQuantity], ['session', draft.session],
+      ['occurredAt', draft.occurredAt], ['details', draft.description], ['product', draft.title]
+    ].forEach(([name, value]) => setModalDraftValue(name, value));
+  }
+  if (draft.kind === 'ledger') {
+    openModal('ledger', null, draft.recordId);
+    [
+      ['description', draft.title], ['amount', draft.amount], ['date', draft.date],
+      ['type', draft.ledgerType], ['recordId', draft.recordId], ['vendorOrSource', draft.vendorOrSource],
+      ['category', draft.category]
+    ].forEach(([name, value]) => setModalDraftValue(name, value));
+  }
+  if (draft.kind === 'journal_note') {
+    pendingDocumentFiles = [];
+    openModal('document', null, draft.recordId);
+    setModalDraftValue('title', draft.title);
+    setModalDraftValue('body', draft.body || draft.description);
+  }
+  if (draft.kind === 'record_event') {
+    openModal('event', null, draft.recordId);
+    const eventSelect = $('#modalFields [name="eventType"]');
+    const requested = draft.recordEventType || draft.title;
+    setModalDraftValue('eventType', [...eventSelect.options].some(option => option.value === requested) ? requested : 'Other');
+    setModalDraftValue('date', draft.date);
+    setModalDraftValue('details', draft.description || draft.body || requested);
+  }
+  if (draft.kind === 'calendar_event') {
+    openModal('calendar', null, draft.recordId, '', draft.startDate);
+    [
+      ['title', draft.title], ['startDate', draft.startDate], ['endDate', draft.endDate || draft.startDate],
+      ['allDay', draft.allDay], ['startTime', draft.startTime], ['endTime', draft.endTime],
+      ['location', draft.location], ['notes', draft.description || draft.body], ['recordId', draft.recordId]
+    ].forEach(([name, value]) => setModalDraftValue(name, value));
+  }
+  markCellarerDraft();
 }
 
 function recordIdentityFromForm(type, form) {
@@ -2666,7 +2761,7 @@ $('#modalForm').addEventListener('submit', async event => {
   if (modalMode === 'ledger') {
     if (!form.description.trim()) return;
     const existing = data.ledger.find(entry => entry.id === editId);
-    const values = { type: form.type, date: form.date, amount: Number(form.amount || 0), description: form.description.trim(), recordId: form.recordId || null };
+    const values = { type: form.type, date: form.date, amount: Number(form.amount || 0), description: form.description.trim(), recordId: form.recordId || null, vendorOrSource: form.vendorOrSource?.trim() || '', category: form.category?.trim() || '' };
     if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
     else data.ledger.unshift({ id: uid(), ...values, createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null });
   }
@@ -3010,7 +3105,7 @@ window.addEventListener('regula-rustica:cloud-context', () => {
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 });
 
-window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type) };
+window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, openCellarerDraft };
 renderAll();
 window.addEventListener('load', () => materializeRecurringTasks());
 if (startupMigrationBefore) setTimeout(() => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {
