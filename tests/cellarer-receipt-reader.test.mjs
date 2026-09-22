@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { validateReceiptLedgerDraft } from '../cellarer-receipt-reader.mjs';
+import { receiptRecordFromNote, validateReceiptLedgerDraft } from '../cellarer-receipt-reader.mjs';
 import receiptHandler from '../netlify/functions/cyril-receipt-reader.mts';
 
 const context = {
@@ -24,6 +24,14 @@ test('receipt draft requires a legible positive total and real date', () => {
   assert.equal(draft.kind, 'ledger');
   assert.equal(draft.ledgerType, 'expense');
   assert.equal(draft.recordId, 'hens');
+});
+
+test('an explicit Record name in the steward note resolves only when unambiguous', () => {
+  const records = [{ id: 'hens', name: 'Laying Hens' }, { id: 'garden', name: 'Kitchen Garden' }];
+  assert.equal(receiptRecordFromNote('Allocate this to Laying Hens, please.', records), 'hens');
+  assert.equal(receiptRecordFromNote('For the kitchen garden.', records), 'garden');
+  assert.equal(receiptRecordFromNote('For Laying Hens and Kitchen Garden.', records), null);
+  assert.equal(receiptRecordFromNote('General homestead supplies.', records), null);
 });
 
 test('receipt request rejects unauthenticated and invalid images before any paid call', async () => {
@@ -92,6 +100,35 @@ test('receipt image yields only a reviewed Ledger draft, never a direct write', 
   }
 });
 
+test('a chosen or explicitly named Record overrides an uncertain AI match without writing an allocation', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalNetlify = globalThis.Netlify;
+  globalThis.Netlify = { env: { get: name => ({
+    SUPABASE_URL: 'https://example.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'publishable',
+    OPENAI_BASE_URL: 'https://gateway.example/v1', OPENAI_API_KEY: 'gateway-key'
+  }[name]) } };
+  globalThis.fetch = async url => {
+    if (String(url).endsWith('/auth/v1/user')) return Response.json({ id: 'user' });
+    if (String(url).includes('consume_premium_feature')) return Response.json([{ allowed: true }]);
+    return Response.json({ output_text: JSON.stringify({
+      title: 'Feed', amount: 24.5, date: '2026-09-22', vendorOrSource: 'Mill', category: 'Feed', recordId: null
+    }) });
+  };
+  try {
+    const response = await receiptHandler(request({ image, context, preferredRecordId: 'hens' }));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).draft.recordId, 'hens');
+    const fromNote = await receiptHandler(request({ image, context, note: 'Please allocate to Laying Hens.' }));
+    assert.equal(fromNote.status, 200);
+    assert.equal((await fromNote.json()).draft.recordId, 'hens');
+    const invalid = await receiptHandler(request({ image, context, preferredRecordId: 'unknown' }));
+    assert.equal(invalid.status, 400);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.Netlify = originalNetlify;
+  }
+});
+
 test('unreadable receipt fields fail closed without creating a Ledger entry', async () => {
   const originalFetch = globalThis.fetch;
   const originalNetlify = globalThis.Netlify;
@@ -123,12 +160,15 @@ test('receipt UI reuses the existing Ledger form and local-only attachment path'
   ]);
   assert.match(html, /id="cellarerReceipt"/);
   assert.match(html, /id="cellarerReceiptDialog"/);
+  assert.match(html, /id="cellarerReceiptRecord"/);
   assert.match(html, /receipt photos do not cloud-sync/);
   assert.match(client, /openCellarerDraft\(draft\)/);
   assert.match(client, /stageForOpenLedger\(receipt\)/);
   assert.match(receiptStorage, /stageForOpenLedger\(receipt\)/);
+  assert.match(receiptStorage, /Receipt photo attached to this draft/);
+  assert.match(receiptStorage, /receipt-draft-preview/);
   assert.match(receiptStorage, /receiptMap\(data\)\[entry\.id\] = pending\.receipt/);
   assert.match(app, /if \(draft\.kind === 'ledger'\)/);
-  assert.match(worker, /regula-rustica-cyril-receipt-reader-v1/);
-  assert.match(worker, /cellarer-receipt-reader\.mjs\?v=cyril-receipt-reader-v1/);
+  assert.match(worker, /regula-rustica-cyril-receipt-reader-v2/);
+  assert.match(worker, /cellarer-receipt-reader\.mjs\?v=cyril-receipt-reader-v2/);
 });

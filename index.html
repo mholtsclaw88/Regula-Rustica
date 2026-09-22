@@ -22,11 +22,11 @@
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
   <script src="app.js?v=cyril-assisted-entry-v1" defer></script>
   <script src="onboarding.js?v=onboarding-v4" defer></script>
-  <script src="ui-refinements.js?v=cyril-receipt-reader-v1" defer></script>
+  <script src="ui-refinements.js?v=cyril-receipt-reader-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=premium-foundation-v1" type="module"></script>
   <script src="cellarer-assisted-entry.mjs?v=cyril-receipt-reader-v1" type="module"></script>
-  <script src="cellarer-receipt-reader.mjs?v=cyril-receipt-reader-v1" type="module"></script>
+  <script src="cellarer-receipt-reader.mjs?v=cyril-receipt-reader-v2" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
 </head>
 <body>
@@ -791,6 +791,7 @@
         <input id="cellarerReceiptCamera" class="cellarer-receipt-file" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Take receipt photo">
         <input id="cellarerReceiptFile" class="cellarer-receipt-file" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose receipt photo">
         <img id="cellarerReceiptPreview" class="cellarer-receipt-preview hidden" alt="Selected receipt preview">
+        <label>Record for this expense (optional)<select id="cellarerReceiptRecord"><option value="">Let Cyril suggest one</option></select></label>
         <label>Anything Cyril should know? (optional)<input id="cellarerReceiptNote" type="text" maxlength="300" placeholder="For example: feed for the laying hens"></label>
         <p class="muted cellarer-privacy-note">The selected image is sent for AI reading only when you choose Prepare draft. If you save the Ledger entry, its receipt photo stays on this device and in downloaded backups; receipt photos do not cloud-sync.</p>
         <p id="cellarerReceiptStatus" class="cellarer-status" role="status"></p>

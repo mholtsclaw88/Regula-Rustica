@@ -2,6 +2,13 @@ import { validateCellarerDraft } from './cellarer-assisted-entry.mjs';
 
 export const CELLARER_RECEIPT_FEATURE_KEY = 'cellarer_receipt_reader';
 
+export function receiptRecordFromNote(note, records = []) {
+  const words = value => ` ${String(value || '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ')} `;
+  const noteWords = words(note);
+  const matches = records.filter(record => record?.name && noteWords.includes(words(record.name)));
+  return matches.length === 1 ? matches[0].id : null;
+}
+
 export function validateReceiptLedgerDraft(input, context) {
   if (!input || typeof input.amount !== 'number' || !Number.isFinite(input.amount) || input.amount <= 0) {
     throw new Error('Cyril could not read a positive receipt total. Enter this receipt manually.');
@@ -34,6 +41,7 @@ function initializeReceiptReader() {
   const picker = document.querySelector('#cellarerReceiptFile');
   const preview = document.querySelector('#cellarerReceiptPreview');
   const note = document.querySelector('#cellarerReceiptNote');
+  const recordSelect = document.querySelector('#cellarerReceiptRecord');
   const status = document.querySelector('#cellarerReceiptStatus');
   const submit = document.querySelector('#cellarerReceiptSubmit');
   let selected = null;
@@ -57,6 +65,9 @@ function initializeReceiptReader() {
     camera.value = '';
     picker.value = '';
     note.value = '';
+    const records = window.RegulaRustica?.cellarerContext?.('ledger')?.records || [];
+    recordSelect.replaceChildren(new Option('Let Cyril suggest one', ''));
+    records.forEach(record => recordSelect.add(new Option(`${record.name} (${record.type})`, record.id)));
     preview.removeAttribute('src');
     preview.classList.add('hidden');
     submit.disabled = true;
@@ -112,7 +123,7 @@ function initializeReceiptReader() {
       const response = await fetch('/api/cyril/receipt-reader', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cloud.session.access_token}` },
-        body: JSON.stringify({ image: selected.dataUrl, note: note.value.trim(), context }),
+        body: JSON.stringify({ image: selected.dataUrl, note: note.value.trim(), preferredRecordId: recordSelect.value || null, context }),
         signal: controller.signal
       });
       const result = await response.json().catch(() => ({}));
