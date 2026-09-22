@@ -35,6 +35,14 @@ test('Yield history distinguishes true empty data from filtered results', () => 
   assert.match(app, /data-yield-empty-action="clear"/);
 });
 
+test('Record Yield keeps a recent summary while listing complete linked history', () => {
+  assert.match(html, /Production and harvest history for this Record\./);
+  assert.match(app, /recordYields\.forEach\(entry =>/);
+  assert.doesNotMatch(app, /recentYields\.forEach\(entry =>/);
+  assert.match(app, /if \(!recordYields\.length\)/);
+  assert.match(html, /id="recordSectionYieldAdd"/);
+});
+
 test('Yield page assets use the current offline cache version', () => {
   assert.match(worker, /regula-rustica-yield-page-v2/);
   for (const asset of ['housekeeping.css', 'app.js']) {

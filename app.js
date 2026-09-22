@@ -1450,10 +1450,10 @@ function renderRecord() {
   }).join(' · ');
   $('#recordOverviewYieldWrap').classList.toggle('hidden', !yieldEligible && !recordYields.length);
   $('#recordOverviewYield').innerHTML = yieldSummary || '<span class="muted">No Yield recorded in the last 30 days.</span>';
-  $('#recordYieldSummary').textContent = yieldSummary;
+  $('#recordYieldSummary').innerHTML = `<span class="label">Last 30 Days</span><div>${yieldSummary ? escapeHtml(yieldSummary) : '<span class="muted">No recent Yield.</span>'}</div>`;
   const yieldList = $('#recordYieldList');
   yieldList.innerHTML = '';
-  recentYields.forEach(entry => {
+  recordYields.forEach(entry => {
     const row = document.createElement('div');
     row.className = 'record-yield-entry';
     const label = window.RegulaRusticaTasks.YIELD_TYPES[entry.type]?.label || 'Yield';
@@ -1461,7 +1461,7 @@ function renderRecord() {
     row.querySelector('.edit').addEventListener('click', () => openModal('yield', entry.id, entry.recordId, entry.type));
     yieldList.appendChild(row);
   });
-  if (!recentYields.length) yieldList.innerHTML = `<p class="muted record-empty">${yieldEligible ? 'No Yield recorded in the last 30 days.' : 'This Record does not produce tracked Yield.'}</p>`;
+  if (!recordYields.length) yieldList.innerHTML = `<p class="muted record-empty">${yieldEligible ? 'No Yield has been recorded for this Record.' : 'This Record does not produce tracked Yield.'}</p>`;
 
   renderRecordOverviewActivity(record);
   renderJournal(record);

@@ -1066,7 +1066,7 @@ summary:focus-visible {
 
 .record-panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .record-panel-head .muted { margin: -9px 0 14px; }
-.record-yield-summary { margin-bottom: 14px; color: var(--forest); font-weight: 700; }
+.record-yield-summary { display: grid; gap: 4px; margin-bottom: 14px; color: var(--forest); font-weight: 700; }
 .record-yield-list { display: grid; gap: 0; }
 .record-yield-entry { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(164,123,60,.24); }
 .record-yield-entry:last-child { border-bottom: 0; }
