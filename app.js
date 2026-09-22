@@ -1833,7 +1833,8 @@ function ledgerRow(entry, options = {}) {
   const allocationText = !recordContext && allocationSummary.items.length
     ? `Allocated ${formatMoney(allocationSummary.allocated)} · ${allocationSummary.items.map(item => item.record?.name).filter(Boolean).join(', ')}${allocationSummary.unallocated > .004 ? ` · ${formatMoney(allocationSummary.unallocated)} unallocated` : ''}`
     : '';
-  const meta = [formatDate(entry.date), recordContext && options.allocated ? 'Allocated share' : '', !recordContext && entry.recordId ? recordName(entry.recordId) : ''].filter(Boolean).join(' · ');
+  const hasReceipt = Boolean(data.legacy?.receiptPhotos?.[entry.id]);
+  const meta = [formatDate(entry.date), recordContext && options.allocated ? 'Allocated share' : '', !recordContext && entry.recordId ? recordName(entry.recordId) : '', hasReceipt ? 'Receipt attached' : ''].filter(Boolean).join(' · ');
   row.innerHTML = `<div class="task-body"><strong>${escapeHtml(entry.description)}</strong><div class="meta">${escapeHtml(meta)}</div>${allocationText ? `<div class="meta allocation-ledger-summary">${escapeHtml(allocationText)}</div>` : ''}</div><strong class="report-entry-amount ${entry.type === 'income' ? 'money-in' : 'money-out'}">${entry.type === 'income' ? '+' : '−'}${formatMoney(amount)}</strong>`;
   addReportEntryActions(row, entry.description, () => openModal('ledger', entry.id, entry.recordId), () => {
     if (confirm('Delete this ledger entry?')) {
@@ -1848,12 +1849,29 @@ function ledgerRow(entry, options = {}) {
 function renderLedger() {
   const root = $('#ledgerList');
   root.innerHTML = '';
+  const active = data.ledger.filter(entry => !entry.deletedAt);
   const filter = document.querySelector('[name="ledgerTypeFilter"]:checked')?.value || 'all';
   const range = selectedReportingRange('ledgerDateFilter');
-  const ranged = data.ledger.filter(entry => !entry.deletedAt && window.RegulaRusticaHousekeeping.matchesReportingDate(entry.date, range));
-  $('#ledgerDateRange').textContent = reportingRangeText(range);
-  ranged.filter(entry => filter === 'all' || entry.type === filter).sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => root.appendChild(ledgerRow(entry)));
-  if (!root.children.length) root.innerHTML = '<div class="empty-panel">No ledger entries match this filter.</div>';
+  const ranged = active.filter(entry => window.RegulaRusticaHousekeeping.matchesReportingDate(entry.date, range));
+  const visible = ranged.filter(entry => filter === 'all' || entry.type === filter);
+  const rangeText = reportingRangeText(range);
+  const typeLabel = filter === 'all' ? 'All entries' : filter === 'expense' ? 'Expenses' : 'Income';
+  $('#ledgerSummaryRange').textContent = rangeText;
+  $('#ledgerDateRange').textContent = `${rangeText} · ${typeLabel}`;
+  visible.sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => root.appendChild(ledgerRow(entry)));
+  if (!root.children.length) {
+    if (!active.length) {
+      root.innerHTML = '<div class="empty-panel report-empty-state"><strong>Nothing has been recorded yet.</strong><span>Record an expense or income for your homestead.</span><button class="btn primary" type="button" data-ledger-empty-action="record">Record Entry</button></div>';
+    } else {
+      root.innerHTML = '<div class="empty-panel report-empty-state"><strong>No ledger entries match these filters.</strong><span>Choose another date range or entry type.</span><button class="btn secondary" type="button" data-ledger-empty-action="clear">Clear filters</button></div>';
+    }
+    root.querySelector('[data-ledger-empty-action="record"]')?.addEventListener('click', () => openModal('ledger'));
+    root.querySelector('[data-ledger-empty-action="clear"]')?.addEventListener('click', () => {
+      document.querySelector('[name="ledgerDateFilter"][value="30"]').checked = true;
+      document.querySelector('[name="ledgerTypeFilter"][value="all"]').checked = true;
+      renderLedger();
+    });
+  }
   const expenses = ranged.filter(entry => entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0);
   const income = ranged.filter(entry => entry.type === 'income').reduce((sum, entry) => sum + entry.amount, 0);
   $('#expenseTotal').textContent = formatMoney(expenses);

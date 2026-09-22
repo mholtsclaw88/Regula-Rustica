@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=compact-mastheads-v2">
-  <link rel="stylesheet" href="housekeeping.css?v=yield-page-v2">
+  <link rel="stylesheet" href="housekeeping.css?v=ledger-page-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
@@ -20,9 +20,9 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=yield-page-v2" defer></script>
+  <script src="app.js?v=ledger-page-v1" defer></script>
   <script src="onboarding.js?v=onboarding-v4" defer></script>
-  <script src="ui-refinements.js?v=record-detail-v1" defer></script>
+  <script src="ui-refinements.js?v=ledger-page-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=homestead-identity-v2" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
@@ -388,7 +388,8 @@
         <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Rationes</span><details class="section-info"><summary aria-label="About Rationes"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Accounts</strong><p>Income, expenses, and the stewardship of household resources.</p></div></details></div><h2 id="ledgerPageTitle">Homestead Ledger</h2></div>
         <button class="btn primary" id="addLedger">+ Entry</button>
       </div>
-      <div class="stats report-stats">
+      <div class="ledger-summary-head"><div><span class="label">Selected period</span><h3>At a Glance</h3></div><span class="reporting-range" id="ledgerSummaryRange"></span></div>
+      <div class="stats report-stats" aria-label="Ledger totals for selected period">
         <div class="stat stat-expense"><strong id="expenseTotal">$0</strong><span>Expenses</span></div>
         <div class="stat stat-income"><strong id="incomeTotal">$0</strong><span>Income</span></div>
         <div class="stat stat-net"><strong id="ledgerNet">$0</strong><span>Net</span></div>
@@ -417,8 +418,9 @@
         </fieldset>
         </div>
       </details>
-      <div class="report-list-head"><span class="label">Financial record</span><h3>Recent entries</h3></div>
+      <div class="report-list-head"><span class="label">Financial record</span><h3>Ledger History</h3></div>
       <div id="ledgerList" class="stack"></div>
+      <details class="report-footnote"><summary>About receipt photos</summary><p>Receipt images remain on this device and in downloaded backups. Ledger entries sync to the cloud.</p></details>
     </section>
 
     <section id="settings" class="view">
