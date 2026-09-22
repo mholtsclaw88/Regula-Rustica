@@ -15,6 +15,9 @@ const memberManagement = document.querySelector('#cloudMemberManagement');
 const invitationForm = document.querySelector('#cloudInvitationForm');
 const invitationList = document.querySelector('#cloudInvitationList');
 const invitationResult = document.querySelector('#cloudInvitationResult');
+const premiumStatus = document.querySelector('#premiumStatus');
+const premiumRedeemForm = document.querySelector('#premiumRedeemForm');
+const premiumRedeemResult = document.querySelector('#premiumRedeemResult');
 let invitationToken = invitationTokenFromUrl(location.href);
 
 document.querySelector('#cloudInvitationToken').value = invitationToken;
@@ -38,7 +41,7 @@ async function initializeCloud() {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   });
 
-  const setBusy = busy => document.querySelectorAll('.cloud-card button, .cloud-card input, .cloud-card select')
+  const setBusy = busy => document.querySelectorAll('.cloud-card button, .cloud-card input, .cloud-card select, .premium-card button, .premium-card input')
     .forEach(element => { element.disabled = busy; });
 
   const formatDate = value => new Intl.DateTimeFormat(undefined, {
@@ -49,6 +52,35 @@ async function initializeCloud() {
     invitationResult.classList.add('hidden');
     document.querySelector('#cloudInvitationLink').value = '';
   };
+
+  function renderPremium(entitlement, hasMembership, canManageHomestead, error = null) {
+    premiumRedeemForm?.classList.toggle('hidden', !hasMembership || !canManageHomestead);
+    if (!premiumStatus) return;
+    premiumStatus.classList.toggle('error', Boolean(error));
+    if (error) {
+      premiumStatus.textContent = 'Premium status is temporarily unavailable. Cloud Sync remains unaffected.';
+      return;
+    }
+    if (!hasMembership) {
+      premiumStatus.textContent = 'Sign in and join a cloud Homestead to check Premium.';
+      return;
+    }
+    if (entitlement?.status === 'active') {
+      premiumStatus.textContent = entitlement.ends_at
+        ? `Premium is active through ${formatDate(entitlement.ends_at)} for this Homestead.`
+        : 'Premium is active for this Homestead.';
+      return;
+    }
+    premiumStatus.textContent = canManageHomestead
+      ? 'This Homestead is on the free plan. A Steward may redeem a Premium gift below.'
+      : 'This Homestead is on the free plan. A Steward can manage Premium access.';
+  }
+
+  async function loadPremiumEntitlement(hasMembership) {
+    if (!hasMembership) return { entitlement: null, error: null };
+    const result = await client.rpc('current_premium_entitlement');
+    return { entitlement: result.data?.[0] || null, error: result.error || null };
+  }
 
   function renderInvitations(invitations = []) {
     invitationList.replaceChildren();
@@ -109,10 +141,11 @@ async function initializeCloud() {
       membership.classList.add('hidden');
       onboarding.classList.add('hidden');
       memberManagement.classList.add('hidden');
+      renderPremium(null, false, false);
       showStatus(invitationToken
         ? 'Private invitation detected. Sign in or create an account to review and accept it.'
         : 'Cloud access is ready. Sign in or create an account.');
-      window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session: null, homesteadId: null, role: null, canManageHomestead: false, homesteadIdentity: null };
+      window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session: null, homesteadId: null, role: null, canManageHomestead: false, homesteadIdentity: null, premium: null };
       window.dispatchEvent(new CustomEvent('regula-rustica:cloud-context', { detail: window.REGULA_RUSTICA_CLOUD_CONTEXT }));
       return;
     }
@@ -138,19 +171,29 @@ async function initializeCloud() {
       if (result.error) throw result.error;
       homesteadIdentity = result.data;
     }
+    const premiumResult = await loadPremiumEntitlement(hasMembership);
     const mayManageMembers = hasMembership && Boolean(canManageMembers);
     membership.classList.toggle('hidden', !hasMembership);
     onboarding.classList.toggle('hidden', hasMembership);
     memberManagement.classList.toggle('hidden', !mayManageMembers);
     if (!mayManageMembers) clearInvitationResult();
     document.querySelector('#cloudRole').textContent = role || '';
+    renderPremium(premiumResult.entitlement, hasMembership, Boolean(canManageHomestead), premiumResult.error);
     showStatus(hasMembership
       ? 'Account connected. Local-first synchronization is available below.'
       : invitationToken
         ? 'Invitation ready. Review it below and accept when you are ready.'
         : 'Account ready. Choose how this account joins a Homestead.');
     if (mayManageMembers) await refreshInvitations();
-    window.REGULA_RUSTICA_CLOUD_CONTEXT = { client, session, homesteadId, role, canManageHomestead: Boolean(canManageHomestead), homesteadIdentity };
+    window.REGULA_RUSTICA_CLOUD_CONTEXT = {
+      client,
+      session,
+      homesteadId,
+      role,
+      canManageHomestead: Boolean(canManageHomestead),
+      homesteadIdentity,
+      premium: premiumResult.entitlement
+    };
     window.dispatchEvent(new CustomEvent('regula-rustica:cloud-context', { detail: window.REGULA_RUSTICA_CLOUD_CONTEXT }));
   }
 
@@ -266,6 +309,27 @@ async function initializeCloud() {
       document.querySelector('#cloudInvitationEmail').value = '';
       return result;
     }, 'Private invitation created. Copy the link below.');
+  });
+
+  premiumRedeemForm?.addEventListener('submit', event => {
+    event.preventDefault();
+    setBusy(true);
+    premiumRedeemResult.textContent = '';
+    (async () => {
+      try {
+        const giftCode = document.querySelector('#premiumGiftCode').value.trim();
+        const result = await client.rpc('redeem_premium_gift', { gift_code: giftCode });
+        if (result.error) throw result.error;
+        document.querySelector('#premiumGiftCode').value = '';
+        premiumRedeemResult.textContent = 'Premium gift redeemed for this Homestead.';
+        const session = (await client.auth.getSession()).data.session;
+        await refreshAccount(session);
+      } catch (error) {
+        premiumRedeemResult.textContent = error.message || 'The Premium gift could not be redeemed.';
+      } finally {
+        setBusy(false);
+      }
+    })();
   });
 
   document.querySelector('#cloudCopyInvitation').addEventListener('click', () => run(async () => {

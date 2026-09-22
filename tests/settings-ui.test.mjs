@@ -12,7 +12,7 @@ const [html, app, css, styles] = await Promise.all([
 test('Settings home exposes one focused destination for every category', () => {
   const categories = [...html.matchAll(/data-settings-category="([^"]+)"/g)].map(match => match[1]);
   const panels = [...html.matchAll(/data-settings-panel="([^"]+)"/g)].map(match => match[1]);
-  assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'cloud', 'backup', 'about']);
+  assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'cloud', 'premium', 'backup', 'about']);
   assert.deepEqual(panels.sort(), [...categories].sort());
   assert.match(app, /showSettingsSection\(button\.dataset\.settingsCategory\)/);
   assert.match(html, /data-settings-view="calendar"/);
@@ -25,6 +25,7 @@ test('existing Settings control contracts remain present exactly once', () => {
     'homesteadForm', 'homesteadName', 'homesteadMotto', 'homesteadLocation',
     'homesteadLogoInput', 'homesteadLogoCropPreview', 'homesteadLogoZoom', 'removeHomesteadLogo', 'saveHomesteadIdentity', 'childForm', 'childName', 'childList',
     'addChoreWindow', 'choreWindowList', 'cloudAuthForm', 'cloudStatus',
+    'premiumStatus', 'premiumRedeemForm', 'premiumGiftCode', 'premiumRedeemResult',
     'syncControls', 'syncRecovery', 'syncResetFromCloud', 'exportData', 'importData', 'resetData'
   ].forEach(id => assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id));
 });

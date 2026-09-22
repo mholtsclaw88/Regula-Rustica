@@ -6,6 +6,7 @@
     "test:cloud-auth": "node --test tests/cloud-invitations.test.mjs",
     "test:documents": "node --test tests/record-documents.test.mjs tests/journal-foundation.test.mjs",
     "test:settings": "node --test tests/settings-ui.test.mjs",
+    "test:premium": "node --test tests/premium-entitlements.test.mjs",
     "test:onboarding": "node --test tests/onboarding-ui.test.mjs",
     "test:record-detail": "node --test tests/record-detail-navigation.test.mjs",
     "test:yield-ui": "node --test tests/yield-page-ui.test.mjs",
