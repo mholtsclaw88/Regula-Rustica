@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=compact-mastheads-v2">
-  <link rel="stylesheet" href="housekeeping.css?v=record-detail-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=yield-page-v2">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
@@ -20,7 +20,7 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=record-detail-v1" defer></script>
+  <script src="app.js?v=yield-page-v2" defer></script>
   <script src="onboarding.js?v=onboarding-v4" defer></script>
   <script src="ui-refinements.js?v=record-detail-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
@@ -338,25 +338,19 @@
       <div class="section-head section-masthead">
         <span class="section-masthead-seal hidden"><img alt="" hidden></span>
         <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Fructus</span><details class="section-info"><summary aria-label="About Fructus"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Yield / Produce</strong><p>What your homestead produces, harvests, and provides.</p></div></details></div><h2 id="yieldPageTitle">Homestead Yield</h2></div>
+        <details class="record-add yield-page-add" id="yieldAdd">
+          <summary class="btn primary">+ Yield</summary>
+          <div class="record-add-menu" aria-label="Choose Yield type">
+            <button id="addMilkYield" type="button"><strong>Milk</strong></button>
+            <button id="addEggYield" type="button"><strong>Eggs</strong></button>
+            <button id="addMeatYield" type="button"><strong>Meat Harvest</strong></button>
+            <button id="addHarvestYield" type="button"><strong>Crop Harvest</strong></button>
+            <button id="addForageYield" type="button"><strong>Hay / Forage</strong></button>
+          </div>
+        </details>
       </div>
-      <article class="report-quick-entry">
-        <div>
-          <span class="label">Quick entry</span>
-          <p class="muted">Record today’s production or harvest.</p>
-        </div>
-        <div class="quick">
-          <button class="btn primary milk-action" id="addMilkYield">Milk</button>
-          <button class="btn secondary egg-action" id="addEggYield">Eggs</button>
-          <button class="btn secondary" id="addMeatYield">Meat harvest</button>
-          <button class="btn secondary" id="addHarvestYield">Crop harvest</button>
-          <button class="btn secondary" id="addForageYield">Hay / forage</button>
-        </div>
-      </article>
-      <div class="stats report-stats">
-        <div class="stat stat-milk"><strong id="todayMilkYield">0</strong><span>Milk</span></div>
-        <div class="stat stat-eggs"><strong id="todayEggYield">0</strong><span>Eggs</span></div>
-        <div class="stat stat-net"><strong id="todayOtherYield">0</strong><span>Other yield</span></div>
-      </div>
+      <div class="yield-summary-head"><div><span class="label">Selected period</span><h3>At a Glance</h3></div><span class="reporting-range" id="yieldSummaryRange"></span></div>
+      <div id="yieldSummary" class="yield-summary-grid" aria-label="Yield totals for selected period"></div>
       <details class="reporting-filter-panel">
         <summary><span class="reporting-range" id="yieldDateRange"></span><span>Filters</span></summary>
         <div class="reporting-controls">
@@ -384,7 +378,7 @@
         </fieldset>
         </div>
       </details>
-      <div class="report-list-head"><span class="label">Recorded provision</span><h3>Recent yield</h3></div>
+      <div class="report-list-head"><span class="label">Recorded provision</span><h3>Yield History</h3></div>
       <div id="yieldList" class="stack"></div>
     </section>
 

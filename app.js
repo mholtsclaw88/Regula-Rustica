@@ -902,17 +902,25 @@ function chooseMatchingYieldTask(yieldEntry) {
   return Number.isInteger(index) && matches[index] ? matches[index] : null;
 }
 
-function taskYieldIndicator(task) {
-  const indicators = {
-    milk: { label: 'Milk', path: '<path d="M5 3h6v2l1 1v7H4V6l1-1V3Z"/><path d="M6 3V2h4v1M6 8h4"/>' },
-    eggs: { label: 'Eggs', path: '<path d="M8 2c2 0 4 4.1 4 7a4 4 0 0 1-8 0c0-2.9 2-7 4-7Z"/>' },
-    harvest: { label: 'Harvest', path: '<path d="M13 3C8 3 4 5.2 4 9c0 2 1.4 3 3 3 3.7 0 5.8-4 6-9Z"/><path d="M3 13c2-3 4.4-4.8 7-6"/>' },
-    forage: { label: 'Hay / Forage', path: '<path d="M8 14V4M8 6 5 4M8 8 4 6M8 10 5 9M8 6l3-2M8 8l4-2M8 10l3-1"/>' },
-    meat: { label: 'Meat Harvest', path: '<path d="M3 7h10l-1 6H4L3 7Z"/><path d="M5 7c.4-2 1.5-3 3-3s2.6 1 3 3"/>' }
-  };
-  const indicator = indicators[task.yieldType];
+const YIELD_INDICATORS = {
+  milk: { label: 'Milk', path: '<path d="M5 3h6v2l1 1v7H4V6l1-1V3Z"/><path d="M6 3V2h4v1M6 8h4"/>' },
+  eggs: { label: 'Eggs', path: '<path d="M8 2c2 0 4 4.1 4 7a4 4 0 0 1-8 0c0-2.9 2-7 4-7Z"/>' },
+  harvest: { label: 'Harvest', path: '<path d="M13 3C8 3 4 5.2 4 9c0 2 1.4 3 3 3 3.7 0 5.8-4 6-9Z"/><path d="M3 13c2-3 4.4-4.8 7-6"/>' },
+  forage: { label: 'Hay / Forage', path: '<path d="M8 14V4M8 6 5 4M8 8 4 6M8 10 5 9M8 6l3-2M8 8l4-2M8 10l3-1"/>' },
+  meat: { label: 'Meat Harvest', path: '<path d="M3 7h10l-1 6H4L3 7Z"/><path d="M5 7c.4-2 1.5-3 3-3s2.6 1 3 3"/>' }
+};
+
+function yieldIconSvg(type, className = '') {
+  const indicator = YIELD_INDICATORS[type];
   if (!indicator) return '';
-  return `<span class="task-yield-meta"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">${indicator.path}</svg><span>${indicator.label}</span></span>`;
+  const classAttribute = className ? ` class="${className}"` : '';
+  return `<svg${classAttribute} viewBox="0 0 16 16" aria-hidden="true" focusable="false">${indicator.path}</svg>`;
+}
+
+function taskYieldIndicator(task) {
+  const indicator = YIELD_INDICATORS[task.yieldType];
+  if (!indicator) return '';
+  return `<span class="task-yield-meta">${yieldIconSvg(task.yieldType)}<span>${indicator.label}</span></span>`;
 }
 
 function wireTaskCheckbox(checkbox, task) {
@@ -1760,7 +1768,7 @@ function yieldRow(entry) {
   row.className = 'task report-entry yield-row';
   const yieldLabel = window.RegulaRusticaTasks.YIELD_TYPES[entry.type]?.label || 'Yield';
   const title = recordName(entry.recordId) || 'Unlinked record';
-  row.innerHTML = `<div class="yield-mark" aria-hidden="true">${escapeHtml(yieldLabel.charAt(0))}</div><div class="task-body"><strong>${escapeHtml(title)}</strong><div class="meta">${escapeHtml(yieldLabel)} · ${new Date(entry.occurredAt).toLocaleString()} · ${escapeHtml(entry.session)}</div>${entry.details ? `<div class="task-description">${escapeHtml(entry.details)}</div>` : ''}</div><div class="report-entry-amount"><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong>${entry.unusableQuantity ? `<span class="meta">${escapeHtml(entry.unusableQuantity)} unusable</span>` : ''}</div>`;
+  row.innerHTML = `<div class="yield-mark" aria-hidden="true">${yieldIconSvg(entry.type)}</div><div class="task-body"><strong>${escapeHtml(title)}</strong><div class="meta">${escapeHtml(yieldLabel)} · ${new Date(entry.occurredAt).toLocaleString()} · ${escapeHtml(entry.session)}</div>${entry.details ? `<div class="task-description">${escapeHtml(entry.details)}</div>` : ''}</div><div class="report-entry-amount"><strong>${escapeHtml(entry.quantity)} ${escapeHtml(entry.unit)}</strong>${entry.unusableQuantity ? `<span class="meta">${escapeHtml(entry.unusableQuantity)} unusable</span>` : ''}</div>`;
   addReportEntryActions(row, title, () => openModal('yield', entry.id, entry.recordId, entry.type), () => {
     if (confirm('Delete this yield entry?')) {
       entry.deletedAt = nowIso();
@@ -1776,15 +1784,44 @@ function renderYield() {
   const range = selectedReportingRange('yieldDateFilter');
   const ranged = active.filter(entry => window.RegulaRusticaHousekeeping.matchesReportingDate(localDateTime(entry.occurredAt).slice(0, 10), range));
   const rangeText = reportingRangeText(range);
-  $('#yieldDateRange').textContent = rangeText;
-  $('#todayMilkYield').textContent = summarizeYield(ranged.filter(entry => entry.type === 'milk'));
-  $('#todayEggYield').textContent = summarizeYield(ranged.filter(entry => entry.type === 'eggs'));
-  $('#todayOtherYield').textContent = summarizeYield(ranged.filter(entry => !['milk', 'eggs'].includes(entry.type)));
+  const filter = document.querySelector('[name="yieldTypeFilter"]:checked')?.value || 'all';
+  const visible = ranged.filter(entry => filter === 'all' || entry.type === filter);
+  const typeLabel = filter === 'all' ? 'All Yield' : (YIELD_INDICATORS[filter]?.label || 'Yield');
+  $('#yieldSummaryRange').textContent = rangeText;
+  $('#yieldDateRange').textContent = `${rangeText} · ${typeLabel}`;
+
+  const summary = $('#yieldSummary');
+  summary.innerHTML = '';
+  ['milk', 'eggs', 'meat', 'harvest', 'forage'].forEach(type => {
+    const entries = visible.filter(entry => entry.type === type);
+    if (!entries.length) return;
+    const label = YIELD_INDICATORS[type].label;
+    const card = document.createElement('article');
+    card.className = `yield-summary-card yield-summary-${type}`;
+    card.innerHTML = `<span class="yield-summary-icon" aria-hidden="true">${yieldIconSvg(type)}</span><strong>${escapeHtml(summarizeYield(entries))}</strong><span>${escapeHtml(label)}</span>`;
+    summary.append(card);
+  });
+  if (!summary.children.length) summary.innerHTML = '<p class="muted yield-summary-empty">No Yield recorded in this period.</p>';
+
   const root = $('#yieldList');
   root.innerHTML = '';
-  const filter = document.querySelector('[name="yieldTypeFilter"]:checked')?.value || 'all';
-  ranged.filter(entry => filter === 'all' || entry.type === filter).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).forEach(entry => root.appendChild(yieldRow(entry)));
-  if (!root.children.length) root.innerHTML = '<div class="empty-panel">No yield matches this filter.</div>';
+  visible.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).forEach(entry => root.appendChild(yieldRow(entry)));
+  if (!root.children.length) {
+    if (!active.length) {
+      root.innerHTML = '<div class="empty-panel yield-empty-state"><strong>Nothing has been recorded yet.</strong><span>Record what your homestead produces or harvests.</span><button class="btn primary" type="button" data-yield-empty-action="record">Record Yield</button></div>';
+    } else {
+      root.innerHTML = '<div class="empty-panel yield-empty-state"><strong>No Yield matches these filters.</strong><span>Choose another date range or Yield type.</span><button class="btn secondary" type="button" data-yield-empty-action="clear">Clear filters</button></div>';
+    }
+    root.querySelector('[data-yield-empty-action="record"]')?.addEventListener('click', () => {
+      $('#yieldAdd').open = true;
+      $('#yieldAdd').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    root.querySelector('[data-yield-empty-action="clear"]')?.addEventListener('click', () => {
+      document.querySelector('[name="yieldDateFilter"][value="30"]').checked = true;
+      document.querySelector('[name="yieldTypeFilter"][value="all"]').checked = true;
+      renderYield();
+    });
+  }
 }
 
 function ledgerRow(entry, options = {}) {
@@ -2653,11 +2690,20 @@ $('#tasksAddTask').addEventListener('click', () => openModal('task'));
 $('#addRecord').addEventListener('click', () => openModal('record'));
 $('#addLedger').addEventListener('click', () => openModal('ledger'));
 $('#addCalendarEvent').addEventListener('click', () => openModal('calendar', null, null, '', calendarDateKey(calendarMonth)));
-$('#addMilkYield').addEventListener('click', () => openModal('yield', null, null, 'milk'));
-$('#addEggYield').addEventListener('click', () => openModal('yield', null, null, 'eggs'));
-$('#addMeatYield')?.addEventListener('click', () => openModal('yield',null,null,'meat'));
-$('#addHarvestYield')?.addEventListener('click', () => openModal('yield',null,null,'harvest'));
-$('#addForageYield')?.addEventListener('click', () => openModal('yield',null,null,'forage'));
+[
+  ['addMilkYield', 'milk'],
+  ['addEggYield', 'eggs'],
+  ['addMeatYield', 'meat'],
+  ['addHarvestYield', 'harvest'],
+  ['addForageYield', 'forage']
+].forEach(([id, type]) => {
+  const button = $(`#${id}`);
+  button?.insertAdjacentHTML('afterbegin', `<span class="yield-menu-mark" aria-hidden="true">${yieldIconSvg(type)}</span>`);
+  button?.addEventListener('click', () => {
+    $('#yieldAdd').open = false;
+    openModal('yield', null, null, type);
+  });
+});
 $('#addChoreWindow').addEventListener('click', () => openModal('chore-window'));
 $('#recordSectionAddTask').addEventListener('click', () => openModal('task', null, currentRecordId));
 $('#recordSectionAddLedger').addEventListener('click', () => openModal('ledger', null, currentRecordId));
