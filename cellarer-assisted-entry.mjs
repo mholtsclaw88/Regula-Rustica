@@ -56,11 +56,41 @@ const text = (value, max = 500) => typeof value === 'string' ? value.trim().slic
 const number = value => Number.isFinite(Number(value)) ? Number(value) : null;
 const idSet = list => new Set((Array.isArray(list) ? list : []).map(item => item?.id).filter(Boolean));
 
+const animalWords = {
+  cat: ['cat', 'cats', 'kitten', 'kittens', 'feline'],
+  pig: ['pig', 'pigs', 'hog', 'hogs', 'swine'],
+  chicken: ['chicken', 'chickens', 'hen', 'hens', 'poultry'],
+  cattle: ['cow', 'cows', 'cattle', 'bovine'],
+  goat: ['goat', 'goats'], sheep: ['sheep', 'lamb', 'lambs'],
+  dog: ['dog', 'dogs', 'puppy', 'puppies', 'canine']
+};
+
+export function resolveCellarerRecord(value, records = []) {
+  const words = input => ` ${String(input || '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ')} `;
+  const haystack = words(value);
+  const named = records.filter(record => record?.name && haystack.includes(words(record.name)));
+  if (named.length) return named.length === 1 ? named[0].id : null;
+  const matchingSpecies = Object.entries(animalWords)
+    .filter(([, aliases]) => aliases.some(alias => haystack.includes(` ${alias} `)))
+    .map(([species]) => species);
+  if (matchingSpecies.length !== 1) return null;
+  const matches = records.filter(record => {
+    if (record.type !== 'Animal') return false;
+    const species = words(record.species);
+    return animalWords[matchingSpecies[0]].some(alias => species.includes(` ${alias} `));
+  });
+  return matches.length === 1 ? matches[0].id : null;
+}
+
 export function sanitizeCellarerContext(input = {}) {
   const records = (Array.isArray(input.records) ? input.records : []).slice(0, 150).map(record => ({
     id: text(record.id, 80),
     name: text(record.name, 120),
     type: text(record.type, 40),
+    species: text(record.species, 80),
+    breed: text(record.breed, 80),
+    purpose: text(record.purpose, 80),
+    currentUse: text(record.currentUse, 120),
     eligibleYieldTypes: (Array.isArray(record.eligibleYieldTypes) ? record.eligibleYieldTypes : [])
       .filter(type => ['milk', 'eggs', 'meat', 'harvest', 'forage'].includes(type))
   })).filter(record => record.id && record.name);
@@ -76,7 +106,17 @@ export function sanitizeCellarerContext(input = {}) {
     preferredKind: CELLARER_DRAFT_KINDS.includes(input.preferredKind) ? input.preferredKind : null,
     records,
     people,
-    choreWindows
+    choreWindows,
+    knownVendors: [...new Set((Array.isArray(input.knownVendors) ? input.knownVendors : [])
+      .map(vendor => text(vendor, 100)).filter(Boolean))].slice(0, 100),
+    ledgerHistory: (Array.isArray(input.ledgerHistory) ? input.ledgerHistory : []).slice(0, 30).map(entry => ({
+      description: text(entry.description, 120),
+      vendorOrSource: text(entry.vendorOrSource, 100),
+      category: text(entry.category, 80),
+      recordId: text(entry.recordId, 80),
+      allocatedRecordIds: (Array.isArray(entry.allocatedRecordIds) ? entry.allocatedRecordIds : [])
+        .map(id => text(id, 80)).filter(Boolean).slice(0, 8)
+    })).filter(entry => entry.description || entry.vendorOrSource)
   };
 }
 

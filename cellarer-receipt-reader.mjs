@@ -1,12 +1,35 @@
-import { validateCellarerDraft } from './cellarer-assisted-entry.mjs';
+import { resolveCellarerRecord, sanitizeCellarerContext, validateCellarerDraft } from './cellarer-assisted-entry.mjs';
 
 export const CELLARER_RECEIPT_FEATURE_KEY = 'cellarer_receipt_reader';
 
 export function receiptRecordFromNote(note, records = []) {
-  const words = value => ` ${String(value || '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ')} `;
-  const noteWords = words(note);
-  const matches = records.filter(record => record?.name && noteWords.includes(words(record.name)));
-  return matches.length === 1 ? matches[0].id : null;
+  return resolveCellarerRecord(note, records);
+}
+
+function validatedAllocations(input, context, total) {
+  const records = new Set(context.records.map(record => record.id));
+  const amounts = new Map();
+  const lines = Array.isArray(input.lineItems) ? input.lineItems.slice(0, 30) : [];
+  for (const item of lines) {
+    const amount = Number(item?.amount);
+    if (!Number.isFinite(amount) || amount <= 0 || Math.abs(Math.round(amount * 100) - amount * 100) > .001) continue;
+    const recordId = resolveCellarerRecord(item.description, context.records);
+    if (!recordId) continue;
+    if (!records.has(recordId)) continue;
+    amounts.set(recordId, (amounts.get(recordId) || 0) + Math.round(amount * 100));
+  }
+  if (!lines.length && Array.isArray(input.allocations)) {
+    for (const item of input.allocations.slice(0, 30)) {
+      const cents = Math.round(Number(item?.amount) * 100);
+      if (!records.has(item?.recordId) || !Number.isFinite(cents) || cents <= 0) {
+        throw new Error('Cyril returned an invalid Record allocation.');
+      }
+      amounts.set(item.recordId, (amounts.get(item.recordId) || 0) + cents);
+    }
+  }
+  const allocatedCents = [...amounts.values()].reduce((sum, cents) => sum + cents, 0);
+  if (allocatedCents > Math.round(total * 100)) throw new Error('Cyril allocated more than the receipt total.');
+  return [...amounts].map(([recordId, cents]) => ({ recordId, amount: cents / 100 }));
 }
 
 export function validateReceiptLedgerDraft(input, context) {
@@ -21,10 +44,25 @@ export function validateReceiptLedgerDraft(input, context) {
   const title = typeof input.title === 'string' && input.title.trim()
     ? input.title.trim() : typeof input.vendorOrSource === 'string' ? input.vendorOrSource.trim() : '';
   if (!title) throw new Error('Cyril could not read a receipt description. Enter this receipt manually.');
-  return validateCellarerDraft({
+  const cleanContext = sanitizeCellarerContext(context);
+  const allocations = validatedAllocations(input, cleanContext, input.amount);
+  const recordId = allocations.length > 1 ? null : input.recordId || (allocations.length === 1 ? allocations[0].recordId : null);
+  const draft = validateCellarerDraft({
     kind: 'ledger', ledgerType: 'expense', title, amount: input.amount, date,
-    vendorOrSource: input.vendorOrSource, category: input.category, recordId: input.recordId
-  }, context);
+    vendorOrSource: input.vendorOrSource, category: input.category, recordId
+  }, cleanContext);
+  const vendor = String(draft.vendorOrSource || '').toLocaleLowerCase();
+  const supportedByHistory = vendor && (cleanContext.knownVendors.some(name => name.toLocaleLowerCase() === vendor)
+    || cleanContext.ledgerHistory.some(entry =>
+    String(entry.vendorOrSource || '').toLocaleLowerCase() === vendor
+    || (vendor.length >= 4 && String(entry.description || '').toLocaleLowerCase().includes(vendor))));
+  return {
+    ...draft,
+    allocations,
+    vendorSource: input.vendorSource === 'history'
+      ? supportedByHistory ? 'history' : 'unknown'
+      : input.vendorSource === 'unknown' ? 'unknown' : 'receipt'
+  };
 }
 
 function premiumAvailable() {
@@ -130,6 +168,9 @@ function initializeReceiptReader() {
       if (current !== selection || !dialog.open) return;
       if (!response.ok) throw new Error(result.error || 'Cyril could not read this receipt.');
       const draft = validateReceiptLedgerDraft(result.draft, context);
+      if (draft.allocations.length && !window.RegulaRusticaLedgerAllocations?.applyDraft) {
+        throw new Error('Ledger allocations are still loading. Wait a moment and try again.');
+      }
       const receipt = selected;
       close();
       window.RegulaRustica.openCellarerDraft(draft);

@@ -34,6 +34,61 @@ test('an explicit Record name in the steward note resolves only when unambiguous
   assert.equal(receiptRecordFromNote('General homestead supplies.', records), null);
 });
 
+test('clear pig and cat receipt lines propose exact split allocations without inventing a remainder', () => {
+  const splitContext = {
+    ...context,
+    records: [
+      { id: 'cat', name: 'Milo', type: 'Animal', species: 'Cat' },
+      { id: 'pig', name: 'Porkers', type: 'Animal', species: 'Pig' }
+    ]
+  };
+  const draft = validateReceiptLedgerDraft({
+    title: 'Animal feed', amount: 20, date: '2026-09-22',
+    lineItems: [
+      { description: 'Cat food', amount: 10, recordId: null },
+      { description: 'Pig feed', amount: 10, recordId: null }
+    ]
+  }, splitContext);
+  assert.equal(draft.recordId, null);
+  assert.deepEqual(draft.allocations, [{ recordId: 'cat', amount: 10 }, { recordId: 'pig', amount: 10 }]);
+  const withTax = validateReceiptLedgerDraft({
+    title: 'Animal feed', amount: 22, date: '2026-09-22',
+    lineItems: [
+      { description: 'Cat food', amount: 10, recordId: null },
+      { description: 'Pig feed', amount: 10, recordId: null }
+    ]
+  }, splitContext);
+  assert.equal(withTax.allocations.reduce((sum, row) => sum + row.amount, 0), 20);
+  assert.throws(() => validateReceiptLedgerDraft({
+    title: 'Feed', amount: 19, date: '2026-09-22', lineItems: [
+      { description: 'Cat food', amount: 10 }, { description: 'Pig feed', amount: 10 }
+    ]
+  }, splitContext), /more than the receipt total/);
+});
+
+test('a sole cat is linked, but two cats or a vague line stay unallocated', () => {
+  const one = { ...context, records: [{ id: 'milo', name: 'Milo', type: 'Animal', species: 'Cat' }] };
+  const draft = input => validateReceiptLedgerDraft({
+    title: 'Supplies', amount: 10, date: '2026-09-22', lineItems: [input]
+  }, one);
+  assert.deepEqual(draft({ description: 'Cat food', amount: 10, recordId: null }).allocations,
+    [{ recordId: 'milo', amount: 10 }]);
+  const two = { ...one, records: [...one.records, { id: 'luna', name: 'Luna', type: 'Animal', species: 'Cat' }] };
+  assert.deepEqual(validateReceiptLedgerDraft({
+    title: 'Supplies', amount: 10, date: '2026-09-22',
+    lineItems: [{ description: 'Cat food', amount: 10, recordId: 'milo' }]
+  }, two).allocations, []);
+  assert.deepEqual(draft({ description: 'Supplies', amount: 10, recordId: 'milo' }).allocations, []);
+});
+
+test('historical merchant suggestion is labeled only when supported by prior Ledger context', () => {
+  const input = { title: 'Feed', amount: 10, date: '2026-09-22', vendorOrSource: 'Farm Supply', vendorSource: 'history' };
+  const withHistory = { ...context, ledgerHistory: [{ description: 'Feed', vendorOrSource: 'Farm Supply' }] };
+  assert.equal(validateReceiptLedgerDraft(input, withHistory).vendorSource, 'history');
+  assert.equal(validateReceiptLedgerDraft(input, { ...context, knownVendors: ['Farm Supply'] }).vendorSource, 'history');
+  assert.equal(validateReceiptLedgerDraft(input, context).vendorSource, 'unknown');
+});
+
 test('receipt request rejects unauthenticated and invalid images before any paid call', async () => {
   const unauthenticated = await receiptHandler(new Request('https://example.test/api/cyril/receipt-reader', { method: 'POST', body: '{}' }));
   assert.equal(unauthenticated.status, 401);
@@ -129,6 +184,41 @@ test('a chosen or explicitly named Record overrides an uncertain AI match withou
   }
 });
 
+test('receipt endpoint returns reviewable multi-Record allocations from clear line prices', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalNetlify = globalThis.Netlify;
+  const splitContext = { ...context, records: [
+    { id: 'cat', name: 'Milo', type: 'Animal', species: 'Cat' },
+    { id: 'pig', name: 'Porkers', type: 'Animal', species: 'Pig' }
+  ] };
+  globalThis.Netlify = { env: { get: name => ({
+    SUPABASE_URL: 'https://example.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'publishable',
+    OPENAI_BASE_URL: 'https://gateway.example/v1', OPENAI_API_KEY: 'gateway-key'
+  }[name]) } };
+  globalThis.fetch = async url => {
+    if (String(url).endsWith('/auth/v1/user')) return Response.json({ id: 'user' });
+    if (String(url).includes('consume_premium_feature')) return Response.json([{ allowed: true }]);
+    return Response.json({ output_text: JSON.stringify({
+      title: 'Animal feed', amount: 20, date: '2026-09-22', vendorOrSource: 'Feed Mill',
+      vendorSource: 'receipt', category: 'Feed', recordId: null,
+      lineItems: [
+        { description: 'Cat food', amount: 10, recordId: null },
+        { description: 'Pig feed', amount: 10, recordId: null }
+      ]
+    }) });
+  };
+  try {
+    const response = await receiptHandler(request({ image, context: splitContext }));
+    assert.equal(response.status, 200);
+    const { draft } = await response.json();
+    assert.equal(draft.recordId, null);
+    assert.deepEqual(draft.allocations, [{ recordId: 'cat', amount: 10 }, { recordId: 'pig', amount: 10 }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.Netlify = originalNetlify;
+  }
+});
+
 test('unreadable receipt fields fail closed without creating a Ledger entry', async () => {
   const originalFetch = globalThis.fetch;
   const originalNetlify = globalThis.Netlify;
@@ -155,8 +245,9 @@ test('unreadable receipt fields fail closed without creating a Ledger entry', as
 
 test('receipt UI reuses the existing Ledger form and local-only attachment path', async () => {
   const read = file => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
-  const [html, client, receiptStorage, app, worker] = await Promise.all([
-    read('index.html'), read('cellarer-receipt-reader.mjs'), read('ledger-receipt-modal.js'), read('app.js'), read('service-worker.js')
+  const [html, client, receiptStorage, app, allocations, worker] = await Promise.all([
+    read('index.html'), read('cellarer-receipt-reader.mjs'), read('ledger-receipt-modal.js'),
+    read('app.js'), read('ledger-allocations.js'), read('service-worker.js')
   ]);
   assert.match(html, /id="cellarerReceipt"/);
   assert.match(html, /id="cellarerReceiptDialog"/);
@@ -169,6 +260,9 @@ test('receipt UI reuses the existing Ledger form and local-only attachment path'
   assert.match(receiptStorage, /receipt-draft-preview/);
   assert.match(receiptStorage, /receiptMap\(data\)\[entry\.id\] = pending\.receipt/);
   assert.match(app, /if \(draft\.kind === 'ledger'\)/);
-  assert.match(worker, /regula-rustica-cyril-receipt-reader-v2/);
-  assert.match(worker, /cellarer-receipt-reader\.mjs\?v=cyril-receipt-reader-v2/);
+  assert.match(app, /RegulaRusticaLedgerAllocations\?\.applyDraft\(draft\.allocations\)/);
+  assert.match(allocations, /function applyDraft\(allocations\)/);
+  assert.match(html, /ledger-allocations\.js\?v=cyril-record-matching-v1/);
+  assert.match(worker, /regula-rustica-cyril-record-matching-v1/);
+  assert.match(worker, /cellarer-receipt-reader\.mjs\?v=cyril-record-matching-v1/);
 });
