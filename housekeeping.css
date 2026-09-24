@@ -759,6 +759,11 @@ body.onboarding-open .cellarer-access { display: none; }
 .cellarer-privacy-note { margin: -2px 0 0; line-height: 1.45; }
 .cellarer-status { min-height: 1.25em; margin: 0; color: var(--forest2); font: 700 .78rem Arial,sans-serif; }
 .cellarer-status.error { color: var(--red); }
+.cellarer-receipt-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.cellarer-receipt-choices .btn { min-height: 44px; }
+.cellarer-receipt-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cellarer-receipt-preview { display: block; max-width: 100%; max-height: 240px; margin: 0 auto; border: 1px solid var(--line); border-radius: 7px; object-fit: contain; }
+.cellarer-receipt-preview.hidden { display: none; }
 .cellarer-draft-notice { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid rgba(164,123,60,.36); border-left: 3px solid var(--gold); border-radius: 8px; background: rgba(244,239,226,.72); }
 .cellarer-draft-notice strong { color: var(--forest); }
 .cellarer-draft-notice span { color: var(--muted); font: .78rem Arial,sans-serif; }

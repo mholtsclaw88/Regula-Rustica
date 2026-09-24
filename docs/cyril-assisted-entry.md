@@ -11,6 +11,22 @@ the prompt first; Cyril chooses the entry type unless the user expands the
 optional selector. **Ask About the Homestead** and **Consult Cyril** are shown
 as unavailable future capabilities.
 
+## Receipt Reader
+
+**Read a Receipt** in the Cellarer's Desk accepts a camera photo or an existing
+image. The browser uses the existing Ledger receipt compressor, then sends the
+compressed JPEG and an optional short note to the Premium server endpoint.
+The endpoint verifies the Cloud user, consumes the separate
+`cellarer_receipt_reader` allowance, and requests a structured Ledger draft with
+image storage disabled. Missing or unreadable totals and dates are rejected;
+the user can enter those receipts manually. Cyril never writes a Ledger row.
+
+The returned draft opens the ordinary Ledger form for correction and explicit
+Save. Only then is the compressed photo attached through the existing local
+receipt path. Ledger entries cloud-sync; receipt photos still remain on this
+device and in downloaded backups. Cancelling the draft saves neither entry nor
+photo.
+
 ## Request path
 
 1. The browser sends a short instruction plus a bounded list of active Records,
@@ -38,7 +54,7 @@ The database quota is shared by the Homestead across devices.
 - Record event
 - Calendar event
 
-Attachments, receipt reading, Ask the Farm Book, autonomous actions, and direct
+General attachment reading, Ask the Farm Book, autonomous actions, and direct
 database writes are outside this version.
 
 ## Runtime configuration

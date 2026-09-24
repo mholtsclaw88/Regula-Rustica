@@ -63,6 +63,8 @@
       .ledger-receipt-field strong { display:block; margin-bottom:.35rem; }
       .ledger-receipt-field .receipt-form-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.55rem; }
       .ledger-receipt-field .receipt-form-status { color:var(--muted, #6b6256); font-size:.86rem; }
+      .ledger-receipt-field .receipt-draft-preview { display:block; max-width:120px; max-height:150px; margin-top:.6rem; border:1px solid var(--line, #cdbf9f); border-radius:6px; object-fit:contain; }
+      .ledger-receipt-field .receipt-draft-preview.hidden { display:none; }
       .ledger-receipt-field input[type=file] { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
     `;
     document.head.appendChild(style);
@@ -82,6 +84,7 @@
         <button type="button" class="btn secondary receipt-choose">${existing ? 'Replace image' : 'Choose image'}</button>
         <span class="receipt-form-status">${existing ? 'Receipt image attached.' : 'On a phone, this can open the camera. On desktop, choose an image file.'}</span>
       </div>
+      <img class="receipt-draft-preview hidden" alt="Receipt photo attached to this draft">
       <input class="receipt-file" type="file" accept="image/*" capture="environment">`;
     const slot = root.querySelector('.ledger-receipt-slot');
     if (slot) slot.appendChild(wrap);
@@ -99,6 +102,9 @@
         stagedReceipt = await compressReceipt(file);
         button.textContent = 'Replace image';
         status.textContent = `Ready to save: ${file.name || 'receipt image'}`;
+        const image = wrap.querySelector('.receipt-draft-preview');
+        image.src = stagedReceipt.dataUrl;
+        image.classList.remove('hidden');
       } catch (error) {
         stagedReceipt = null;
         status.textContent = error?.message || 'Receipt image could not be prepared.';
@@ -109,10 +115,12 @@
   function captureLedgerSubmit() {
     if (!ledgerContext || !stagedReceipt) return;
     const root = document.querySelector('#modalFields');
+    const description = root?.querySelector('[name=description]')?.value?.trim() || '';
+    if (!description) return;
     pendingSave = {
       id: ledgerContext.id || null,
       receipt: stagedReceipt,
-      description: root?.querySelector('[name=description]')?.value?.trim() || '',
+      description,
       date: root?.querySelector('[name=date]')?.value || '',
       amount: Number(root?.querySelector('[name=amount]')?.value || 0)
     };
@@ -135,6 +143,27 @@
     receiptMap(data)[entry.id] = pending.receipt;
     writeData(data);
   }
+
+  window.RegulaRusticaReceipts = {
+    prepareFile: compressReceipt,
+    stageForOpenLedger(receipt) {
+      if (document.querySelector('#modalForm')?.dataset.formMode !== 'ledger'
+        || !receipt?.dataUrl?.startsWith('data:image/jpeg;base64,')) {
+        throw new Error('Open a Ledger draft before attaching its receipt.');
+      }
+      ledgerContext ||= { id: null };
+      stagedReceipt = receipt;
+      queueMicrotask(() => {
+        augmentLedgerForm(null);
+        const status = document.querySelector('.ledger-receipt-field .receipt-form-status');
+        if (status) status.textContent = 'Receipt photo attached to this draft. It will be saved with the entry on this device.';
+        const button = document.querySelector('.ledger-receipt-field .receipt-choose');
+        if (button) button.textContent = 'Replace image';
+        const image = document.querySelector('.ledger-receipt-field .receipt-draft-preview');
+        if (image) { image.src = receipt.dataUrl; image.classList.remove('hidden'); }
+      });
+    }
+  };
 
   function install() {
     ensureStyles();

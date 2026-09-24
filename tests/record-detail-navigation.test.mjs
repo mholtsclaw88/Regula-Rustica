@@ -39,11 +39,11 @@ test('mobile uses the real sticky text tab list without a generated dropdown', (
 });
 
 test('updated Record detail assets share one offline cache version', () => {
-  assert.match(worker, /regula-rustica-cyril-global-desk-v1/);
-  assert.match(worker, /housekeeping\.css\?v=cyril-global-desk-v1/);
-  assert.match(html, /housekeeping\.css\?v=cyril-global-desk-v1/);
-  assert.match(worker, /app\.js\?v=cyril-assisted-entry-v1/);
-  assert.match(html, /app\.js\?v=cyril-assisted-entry-v1/);
-  assert.match(worker, /ui-refinements\.js\?v=ledger-page-v1/);
-  assert.match(html, /ui-refinements\.js\?v=ledger-page-v1/);
+  assert.match(worker, /regula-rustica-cyril-record-matching-v1/);
+  assert.match(worker, /housekeeping\.css\?v=cyril-receipt-reader-v1/);
+  assert.match(html, /housekeeping\.css\?v=cyril-receipt-reader-v1/);
+  assert.match(worker, /app\.js\?v=cyril-record-matching-v1/);
+  assert.match(html, /app\.js\?v=cyril-record-matching-v1/);
+  assert.match(worker, /ui-refinements\.js\?v=cyril-record-matching-v1/);
+  assert.match(html, /ui-refinements\.js\?v=cyril-record-matching-v1/);
 });

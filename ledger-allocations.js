@@ -254,6 +254,23 @@
     write(data);
   }
 
+  function applyDraft(allocations) {
+    if (!Array.isArray(allocations) || !allocations.length) return;
+    queueMicrotask(() => {
+      context ||= { id: null };
+      const fields = document.querySelector('#modalFields');
+      if (!fields) return;
+      if (!fields.querySelector('.ledger-allocation-field')) augment(null);
+      const box = fields.querySelector('.ledger-allocation-field');
+      if (!box) return;
+      const linkedSelect = fields.querySelector('[name=recordId]');
+      box.querySelector('.allocation-rows').replaceChildren();
+      allocations.forEach(item => addRow(box, item));
+      setSplitMode(box, linkedSelect, true);
+      updateSummary(box);
+    });
+  }
+
   function styles() {
     if (document.querySelector('#ledger-allocation-styles')) return;
     const style = document.createElement('style');
@@ -277,6 +294,7 @@
 
   function install() {
     styles();
+    window.RegulaRusticaLedgerAllocations = { applyDraft };
     const original = window.openModal;
     if (typeof original === 'function' && !original.__allocWrapped) {
       const wrapped = function (mode, id) {

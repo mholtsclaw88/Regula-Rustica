@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=cyril-global-desk-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=cyril-receipt-reader-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
@@ -20,12 +20,14 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=multi-record-ledger-v1" defer></script>
-  <script src="app.js?v=cyril-assisted-entry-v1" defer></script>
+  <script src="app.js?v=cyril-record-matching-v1" defer></script>
+  <script src="ledger-allocations.js?v=cyril-record-matching-v1" data-ledger-allocations="true" defer></script>
   <script src="onboarding.js?v=onboarding-v4" defer></script>
-  <script src="ui-refinements.js?v=ledger-page-v1" defer></script>
+  <script src="ui-refinements.js?v=cyril-record-matching-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=premium-foundation-v1" type="module"></script>
-  <script src="cellarer-assisted-entry.mjs?v=cyril-global-desk-v1" type="module"></script>
+  <script src="cellarer-assisted-entry.mjs?v=cyril-record-matching-v1" type="module"></script>
+  <script src="cellarer-receipt-reader.mjs?v=cyril-record-matching-v1" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
 </head>
 <body>
@@ -745,6 +747,7 @@
       <header class="cellarer-desk-header"><span class="label">The Cellarer's Desk</span><h2 id="cellarerDeskTitle">Cyril the Cellarer</h2><p>How may I help with the Homestead?</p></header>
       <div class="cellarer-desk-rows">
         <button id="cellarerPrepare" class="cellarer-desk-row" type="button"><strong>Prepare an Entry</strong><span>Tell Cyril what happened or what needs recording. He’ll prepare a draft for your review.</span></button>
+        <button id="cellarerReceipt" class="cellarer-desk-row" type="button"><strong>Read a Receipt</strong><span>Use a receipt photo to prepare a Ledger draft for your review.</span></button>
         <button class="cellarer-desk-row" type="button" disabled><strong>Ask About the Homestead <small>Coming later</small></strong><span>Ask a question using what has been kept in Regula Rustica.</span></button>
         <button class="cellarer-desk-row" type="button" disabled><strong>Consult Cyril <small>Coming later</small></strong><span>Work through a question, decision, or plan with the Cellarer.</span></button>
       </div>
@@ -778,6 +781,23 @@
         <p id="cellarerStatus" class="cellarer-status" role="status"></p>
       </div>
       <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerCancel">Cancel</button><button type="submit" class="btn primary" id="cellarerSubmit">Prepare draft</button></div>
+    </form>
+  </dialog>
+  <dialog id="cellarerReceiptDialog" class="cellarer-dialog" aria-labelledby="cellarerReceiptTitle">
+    <form id="cellarerReceiptForm">
+      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2 id="cellarerReceiptTitle">Read a receipt</h2><p class="muted form-modal-subtitle">Cyril will prepare a Ledger draft. You review and save it yourself.</p></div><button type="button" class="btn ghost" id="cellarerReceiptClose" aria-label="Close">✕</button></div>
+      <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
+      <div class="form-grid">
+        <div class="cellarer-receipt-choices"><button type="button" class="btn secondary" id="cellarerReceiptTake">Take photo</button><button type="button" class="btn secondary" id="cellarerReceiptChoose">Choose photo</button></div>
+        <input id="cellarerReceiptCamera" class="cellarer-receipt-file" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Take receipt photo">
+        <input id="cellarerReceiptFile" class="cellarer-receipt-file" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose receipt photo">
+        <img id="cellarerReceiptPreview" class="cellarer-receipt-preview hidden" alt="Selected receipt preview">
+        <label>Record for this expense (optional)<select id="cellarerReceiptRecord"><option value="">Let Cyril suggest one</option></select></label>
+        <label>Anything Cyril should know? (optional)<input id="cellarerReceiptNote" type="text" maxlength="300" placeholder="For example: feed for the laying hens"></label>
+        <p class="muted cellarer-privacy-note">The selected image is sent for AI reading only when you choose Prepare draft. If you save the Ledger entry, its receipt photo stays on this device and in downloaded backups; receipt photos do not cloud-sync.</p>
+        <p id="cellarerReceiptStatus" class="cellarer-status" role="status"></p>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerReceiptCancel">Cancel</button><button type="submit" class="btn primary" id="cellarerReceiptSubmit" disabled>Prepare Ledger draft</button></div>
     </form>
   </dialog>
   <dialog id="profileCropDialog" class="profile-crop-dialog">

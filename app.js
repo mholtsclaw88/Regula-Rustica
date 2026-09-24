@@ -2498,12 +2498,33 @@ function cellarerContext(preferredKind = null) {
         id: record.id,
         name: record.name,
         type: record.type,
+        species: record.identity?.species || '',
+        breed: record.identity?.breed || '',
+        purpose: record.identity?.purpose || '',
+        currentUse: record.stewardship?.currentUse || '',
         eligibleYieldTypes: window.RegulaRusticaTasks.eligibleYieldTypes(record)
       })),
     people: activePeople().map(person => ({ id: person.id, name: personDisplayName(person) })),
     choreWindows: data.choreWindows
       .filter(window => !window.deletedAt && window.enabled)
-      .map(window => ({ id: window.id, name: window.name, startTime: window.startTime || '', endTime: window.endTime || '' }))
+      .map(window => ({ id: window.id, name: window.name, startTime: window.startTime || '', endTime: window.endTime || '' })),
+    knownVendors: [...new Set(data.ledger
+      .filter(entry => !entry.deletedAt && entry.vendorOrSource)
+      .map(entry => entry.vendorOrSource.trim())
+      .filter(Boolean))].slice(0, 100),
+    ledgerHistory: data.ledger
+      .filter(entry => !entry.deletedAt)
+      .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
+      .slice(0, 30)
+      .map(entry => ({
+        description: entry.description,
+        vendorOrSource: entry.vendorOrSource,
+        category: entry.category,
+        recordId: entry.recordId,
+        allocatedRecordIds: (data.ledgerAllocations || [])
+          .filter(item => !item.deletedAt && item.ledgerEntryId === entry.id)
+          .map(item => item.recordId)
+      }))
   };
 }
 
@@ -2518,10 +2539,20 @@ function setModalDraftValue(name, value) {
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function markCellarerDraft() {
+function markCellarerDraft(draft) {
   const note = document.createElement('aside');
   note.className = 'cellarer-draft-notice';
   note.innerHTML = '<strong>Cyril’s draft</strong><span>Review and adjust this entry before recording it.</span>';
+  if (draft?.vendorSource === 'history') {
+    const hint = document.createElement('span');
+    hint.textContent = 'Vendor suggested from prior Ledger entries; verify it against the receipt.';
+    note.append(hint);
+  }
+  if (draft?.vendorSource === 'unknown') {
+    const hint = document.createElement('span');
+    hint.textContent = 'Vendor could not be confirmed; check it before saving.';
+    note.append(hint);
+  }
   $('#modalFields').prepend(note);
 }
 
@@ -2552,6 +2583,7 @@ function openCellarerDraft(draft) {
       ['type', draft.ledgerType], ['recordId', draft.recordId], ['vendorOrSource', draft.vendorOrSource],
       ['category', draft.category]
     ].forEach(([name, value]) => setModalDraftValue(name, value));
+    if (draft.allocations?.length) window.RegulaRusticaLedgerAllocations?.applyDraft(draft.allocations);
   }
   if (draft.kind === 'journal_note') {
     pendingDocumentFiles = [];
@@ -2575,7 +2607,7 @@ function openCellarerDraft(draft) {
       ['location', draft.location], ['notes', draft.description || draft.body], ['recordId', draft.recordId]
     ].forEach(([name, value]) => setModalDraftValue(name, value));
   }
-  markCellarerDraft();
+  markCellarerDraft(draft);
 }
 
 function recordIdentityFromForm(type, form) {

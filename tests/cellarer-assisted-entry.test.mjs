@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   CELLARER_DRAFT_SCHEMA,
+  resolveCellarerRecord,
   sanitizeCellarerContext,
   validateCellarerDraft
 } from '../cellarer-assisted-entry.mjs';
@@ -43,6 +44,29 @@ test('draft validation accepts supported local references and normalizes a task'
   assert.equal(draft.recordId, 'daisy');
   assert.equal(draft.personId, 'keeper');
   assert.equal(draft.recurrenceMode, 'fixed_schedule');
+});
+
+test('Record matching uses unique animal species, but never guesses among peers', () => {
+  const records = [
+    { id: 'milo', name: 'Milo', type: 'Animal', species: 'Cat' },
+    { id: 'porkers', name: 'Porkers', type: 'Animal', species: 'Pig' }
+  ];
+  assert.equal(resolveCellarerRecord('Buy cat food', records), 'milo');
+  assert.equal(resolveCellarerRecord('Pig feed', records), 'porkers');
+  assert.equal(resolveCellarerRecord('Pig feed and cat food', records), null);
+  assert.equal(resolveCellarerRecord('Buy cat food', [...records, { id: 'luna', name: 'Luna', type: 'Animal', species: 'Cat' }]), null);
+  assert.equal(resolveCellarerRecord('Feed Milo', records), 'milo');
+});
+
+test('AI context keeps bounded Record facts and prior Ledger summaries, not receipt bytes', () => {
+  const clean = sanitizeCellarerContext({
+    records: [{ id: 'milo', name: 'Milo', type: 'Animal', species: 'Cat', privateNotes: 'Do not send' }],
+    ledgerHistory: [{ description: 'Feed Store cat food', vendorOrSource: 'Feed Store', receiptPhoto: 'private bytes' }]
+  });
+  assert.equal(clean.records[0].species, 'Cat');
+  assert.equal(clean.ledgerHistory[0].vendorOrSource, 'Feed Store');
+  assert.equal('privateNotes' in clean.records[0], false);
+  assert.equal('receiptPhoto' in clean.ledgerHistory[0], false);
 });
 
 test('Yield drafts must use an eligible type for the selected Record', () => {
@@ -157,6 +181,6 @@ test('daily quota is private, atomic, Homestead-scoped, and cached assets are ve
   assert.match(migration, /on conflict on constraint premium_feature_usage_pkey/);
   assert.match(migration, /public\.has_premium_feature\(normalized_feature\)/);
   assert.match(migration, /revoke all on table private\.premium_feature_usage from public, anon, authenticated/);
-  assert.match(worker, /regula-rustica-cyril-global-desk-v1/);
-  assert.match(worker, /cellarer-assisted-entry\.mjs\?v=cyril-global-desk-v1/);
+  assert.match(worker, /regula-rustica-cyril-record-matching-v1/);
+  assert.match(worker, /cellarer-assisted-entry\.mjs\?v=cyril-record-matching-v1/);
 });
