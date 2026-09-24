@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 import { COLLECTIONS, DOMAIN_ORDER, toCloud, fromCloud } from '../sync/entities.mjs';
 import ledgerAllocationDisplay from '../ledger-allocation-display.js';
 const state={entity:(table,id)=>({cloudId:`cloud-${id}`}),localIdForCloud:(table,id)=>id?.replace(/^cloud-/,'')};
@@ -98,4 +99,22 @@ test('receipt allocation installer preserves the Ledger display API', async () =
   const source = await readFile(new URL('../ledger-allocations.js', import.meta.url), 'utf8');
   assert.match(source, /RegulaRusticaLedgerAllocations = \{ \.\.\.\(window\.RegulaRusticaLedgerAllocations \|\| \{\}\), applyDraft \}/);
   assert.doesNotMatch(source, /RegulaRusticaLedgerAllocations = \{ applyDraft \}/);
+});
+
+test('Ledger display installer preserves an already installed draft action', async () => {
+  const source = await readFile(new URL('../ledger-allocation-display.js', import.meta.url), 'utf8');
+  const applyDraft = () => {};
+  const window = { RegulaRusticaLedgerAllocations: { applyDraft } };
+  runInNewContext(source, { globalThis: window });
+  assert.equal(window.RegulaRusticaLedgerAllocations.applyDraft, applyDraft);
+  assert.equal(typeof window.RegulaRusticaLedgerAllocations.entryAllocationSummary, 'function');
+});
+
+test('Ledger API assets have matching fresh URLs in page and offline cache', async () => {
+  const [html, worker] = await Promise.all(['index.html', 'service-worker.js'].map(file => readFile(new URL(`../${file}`, import.meta.url), 'utf8')));
+  for (const asset of ['ledger-allocation-display.js', 'ledger-allocations.js']) {
+    const url = `${asset}?v=ledger-api-v2`;
+    assert.ok(html.includes(url), `page must load ${url}`);
+    assert.ok(worker.includes(url), `offline cache must store ${url}`);
+  }
 });
