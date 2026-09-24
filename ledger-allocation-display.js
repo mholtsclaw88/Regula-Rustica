@@ -3,7 +3,7 @@
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.RegulaRusticaLedgerAllocations = api;
+  else root.RegulaRusticaLedgerAllocations = { ...(root.RegulaRusticaLedgerAllocations || {}), ...api };
 }(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   function activeForEntry(data, entryId) {
     return (data?.ledgerAllocations || []).filter(allocation => !allocation.deletedAt && allocation.ledgerEntryId === entryId);
