@@ -294,7 +294,7 @@
 
   function install() {
     styles();
-    window.RegulaRusticaLedgerAllocations = { applyDraft };
+    window.RegulaRusticaLedgerAllocations = { ...(window.RegulaRusticaLedgerAllocations || {}), applyDraft };
     const original = window.openModal;
     if (typeof original === 'function' && !original.__allocWrapped) {
       const wrapped = function (mode, id) {
