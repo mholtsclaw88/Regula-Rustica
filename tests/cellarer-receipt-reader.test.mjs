@@ -263,6 +263,9 @@ test('receipt UI reuses the existing Ledger form and local-only attachment path'
   assert.match(app, /RegulaRusticaLedgerAllocations\?\.applyDraft\(draft\.allocations\)/);
   assert.match(allocations, /function applyDraft\(allocations\)/);
   assert.match(html, /ledger-allocations\.js\?v=cyril-record-matching-v1/);
-  assert.match(worker, /regula-rustica-cyril-record-matching-v1/);
+  assert.match(worker, /regula-rustica-cyril-record-matching-v2/);
   assert.match(worker, /cellarer-receipt-reader\.mjs\?v=cyril-record-matching-v1/);
+  assert.match(client, /cellarer-assisted-entry\.mjs\?v=cyril-record-matching-v1/);
+  assert.match(worker, /event\.request\.mode==='navigate'/);
+  assert.match(worker, /fetch\(event\.request\)\.catch/);
 });
