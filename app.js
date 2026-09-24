@@ -2502,6 +2502,10 @@ function cellarerContext(preferredKind = null) {
         breed: record.identity?.breed || '',
         purpose: record.identity?.purpose || '',
         currentUse: record.stewardship?.currentUse || '',
+        landType: record.identity?.landType || '',
+        equipmentType: record.identity?.equipmentType || '',
+        structureType: record.identity?.structureType || '',
+        workType: record.identity?.workType || '',
         eligibleYieldTypes: window.RegulaRusticaTasks.eligibleYieldTypes(record)
       })),
     people: activePeople().map(person => ({ id: person.id, name: personDisplayName(person) })),
@@ -2597,6 +2601,8 @@ function openCellarerDraft(draft) {
     const requested = draft.recordEventType || draft.title;
     setModalDraftValue('eventType', [...eventSelect.options].some(option => option.value === requested) ? requested : 'Other');
     setModalDraftValue('date', draft.date);
+    setModalDraftValue('value', draft.eventValue);
+    setModalDraftValue('unit', draft.eventUnit);
     setModalDraftValue('details', draft.description || draft.body || requested);
   }
   if (draft.kind === 'calendar_event') {
@@ -2604,7 +2610,9 @@ function openCellarerDraft(draft) {
     [
       ['title', draft.title], ['startDate', draft.startDate], ['endDate', draft.endDate || draft.startDate],
       ['allDay', draft.allDay], ['startTime', draft.startTime], ['endTime', draft.endTime],
-      ['location', draft.location], ['notes', draft.description || draft.body], ['recordId', draft.recordId]
+      ['recurrenceFrequency', draft.recurrenceFrequency], ['recurrenceInterval', draft.recurrenceInterval],
+      ['recurrenceUntil', draft.recurrenceUntil], ['location', draft.location],
+      ['notes', draft.description || draft.body], ['recordId', draft.recordId]
     ].forEach(([name, value]) => setModalDraftValue(name, value));
   }
   markCellarerDraft(draft);
