@@ -92,3 +92,10 @@ test('ledger allocation form stays opt-in and begins with one Primary Record row
   assert.doesNotMatch(source, /openSecondRow: true/);
   assert.match(source, /Unallocated/);
 });
+
+
+test('receipt allocation installer preserves the Ledger display API', async () => {
+  const source = await readFile(new URL('../ledger-allocations.js', import.meta.url), 'utf8');
+  assert.match(source, /RegulaRusticaLedgerAllocations = \{ \.\.\.\(window\.RegulaRusticaLedgerAllocations \|\| \{\}\), applyDraft \}/);
+  assert.doesNotMatch(source, /RegulaRusticaLedgerAllocations = \{ applyDraft \}/);
+});
