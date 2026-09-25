@@ -4,9 +4,9 @@ import test from 'node:test';
 import { premiumCloudEntitled, premiumSyncAvailable } from '../sync/premium-access.mjs';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
-const [runtime, migration, html, onboarding, auth] = await Promise.all([
+const [runtime, migration, html, onboarding, auth, app] = await Promise.all([
   read('sync/runtime.mjs'), read('supabase/migrations/20260925020421_premium_cloud_sync_gate.sql'),
-  read('index.html'), read('onboarding.js'), read('cloud-auth.js')
+  read('index.html'), read('onboarding.js'), read('cloud-auth.js'), read('app.js')
 ]);
 const connected = { session: { access_token: 'session' }, homesteadId: 'home', premium: { plan_key: 'premium', status: 'active', feature_keys: ['cloud_sync'], ends_at: null } };
 
@@ -30,6 +30,17 @@ test('active Premium grants created before cloud_sync exists remain valid in dep
   assert.equal(premiumCloudEntitled({ plan_key: 'premium', status: 'active', feature_keys: ['cellarer_assisted_entry'], ends_at: null }), true);
   assert.match(auth, /premiumCloudEntitled\(premiumResult\.entitlement\)/);
   assert.match(auth, /premiumCloudEntitled\(entitlement\)/);
+});
+
+test('Premium awaiting first sync is shown as setup needed, not Local only or connected', () => {
+  assert.match(runtime, /if \(!context\?\.homesteadId\) return \{ state: 'local', label: 'Local only'/);
+  assert.match(runtime, /if \(!state\.state\.enabled \|\| !state\.state\.initialSyncCompleted\) return \{ state: 'issue', label: 'Sync setup'/);
+  assert.match(runtime, /premiumCloudAccess\.textContent = premiumSyncAvailable\(context\) && !state\.state\.initialSyncCompleted/);
+  assert.match(runtime, /#settingCloud \.settings-back/);
+  assert.doesNotMatch(runtime, /syncCancel'\)\.addEventListener\('click', \(\) => \{ firstCase = null/);
+  assert.match(app, /isInitialized\(\) === false \? 'Cloud setup needed on this device' : 'Cloud connected'/);
+  assert.match(app, /addEventListener\('regula-rustica:sync-status', renderSettingsSummary\)/);
+  assert.match(html, /sync\/runtime\.mjs\?v=premium-sync-setup-v1/);
 });
 
 test('Premium Cloud Sync is checked at the database boundary, not only in the browser', () => {

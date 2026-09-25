@@ -742,9 +742,9 @@ function settingsOperatingMode() {
   if (context?.homesteadId) {
     const premium = context.premium;
     const premiumEndsAt = premium?.ends_at ? Date.parse(premium.ends_at) : Infinity;
-    return premium?.status === 'active' && premium.plan_key === 'premium' && premiumEndsAt > Date.now()
-      ? 'Cloud connected'
-      : 'Cloud Sync paused · Premium needed';
+    if (premium?.status !== 'active' || premium.plan_key !== 'premium' || premiumEndsAt <= Date.now())
+      return 'Cloud Sync paused · Premium needed';
+    return window.RegulaRusticaSync?.isInitialized() === false ? 'Cloud setup needed on this device' : 'Cloud connected';
   }
   if (context?.session) return 'Signed in · local until joined';
   return 'Local only';
@@ -3189,6 +3189,7 @@ window.addEventListener('regula-rustica:cloud-context', () => {
   renderSettingsSummary();
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 });
+window.addEventListener('regula-rustica:sync-status', renderSettingsSummary);
 
 window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, cellarerConsultContext, openCellarerDraft };
 renderAll();
