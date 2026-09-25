@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=cyril-receipt-reader-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=cyril-consult-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
   <title>Regula Rustica</title>
@@ -20,14 +20,15 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
-  <script src="app.js?v=cyril-draft-review-v1" defer></script>
+  <script src="app.js?v=cyril-consult-v1" defer></script>
   <script src="ledger-allocations.js?v=ledger-api-v2" data-ledger-allocations="true" defer></script>
   <script src="onboarding.js?v=onboarding-v4" defer></script>
   <script src="ui-refinements.js?v=cyril-record-matching-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=premium-foundation-v1" type="module"></script>
-  <script src="cellarer-assisted-entry.mjs?v=cyril-draft-review-v1" type="module"></script>
+  <script src="cellarer-assisted-entry.mjs?v=cyril-consult-v1" type="module"></script>
   <script src="cellarer-receipt-reader.mjs?v=cyril-draft-review-v1" type="module"></script>
+  <script src="cellarer-consult.mjs?v=cyril-consult-v1" type="module"></script>
   <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
 </head>
 <body>
@@ -748,8 +749,7 @@
       <div class="cellarer-desk-rows">
         <button id="cellarerPrepare" class="cellarer-desk-row" type="button"><strong>Prepare an Entry</strong><span>Tell Cyril what happened or what needs recording. He’ll prepare a draft for your review.</span></button>
         <button id="cellarerReceipt" class="cellarer-desk-row" type="button"><strong>Read a Receipt</strong><span>Use a receipt photo to prepare a Ledger draft for your review.</span></button>
-        <button class="cellarer-desk-row" type="button" disabled><strong>Ask About the Homestead <small>Coming later</small></strong><span>Ask a question using what has been kept in Regula Rustica.</span></button>
-        <button class="cellarer-desk-row" type="button" disabled><strong>Consult Cyril <small>Coming later</small></strong><span>Work through a question, decision, or plan with the Cellarer.</span></button>
+        <button id="cellarerConsult" class="cellarer-desk-row" type="button"><strong>Consult Cyril</strong><span>Ask one question about the Homestead, then edit and ask again if needed.</span></button>
       </div>
       <p class="cellarer-desk-stewardship">Cyril assists; you remain the steward.<span>Nothing is recorded without your review.</span></p>
     </section>
@@ -798,6 +798,19 @@
         <p id="cellarerReceiptStatus" class="cellarer-status" role="status"></p>
       </div>
       <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerReceiptCancel">Cancel</button><button type="submit" class="btn primary" id="cellarerReceiptSubmit" disabled>Prepare Ledger draft</button></div>
+    </form>
+  </dialog>
+  <dialog id="cellarerConsultDialog" class="cellarer-dialog" aria-labelledby="cellarerConsultTitle">
+    <form id="cellarerConsultForm">
+      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2 id="cellarerConsultTitle">Consult Cyril</h2><p class="muted form-modal-subtitle">Ask a question and receive one answer—not a chat.</p></div><button type="button" class="btn ghost" id="cellarerConsultClose" aria-label="Close">✕</button></div>
+      <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
+      <div class="form-grid">
+        <label>Your question<textarea id="cellarerConsultQuestion" maxlength="1200" required placeholder="Example: How much milk did Daisy produce this month?"></textarea></label>
+        <p class="muted cellarer-privacy-note">When you ask, a limited snapshot of your Homestead Records, Tasks, Yield, Ledger, Calendar, and notes is sent to Cyril. Photos and attachments are not sent. Nothing is changed.</p>
+        <p id="cellarerConsultStatus" class="cellarer-status" role="status"></p>
+        <section id="cellarerConsultAnswer" class="cellarer-consult-answer" aria-label="Cyril’s answer" hidden><strong>Cyril’s answer</strong><p id="cellarerConsultAnswerText"></p><p id="cellarerConsultCaveat" class="muted"></p></section>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerConsultCancel">Close</button><button type="submit" class="btn primary" id="cellarerConsultSubmit">Ask Cyril</button></div>
     </form>
   </dialog>
   <dialog id="profileCropDialog" class="profile-crop-dialog">

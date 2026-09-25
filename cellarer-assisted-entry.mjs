@@ -275,6 +275,10 @@ function initializeCellarerDialog() {
     closeDesk();
     window.dispatchEvent(new Event('regula-rustica:cellarer-receipt-request'));
   });
+  document.querySelector('#cellarerConsult')?.addEventListener('click', () => {
+    closeDesk();
+    window.dispatchEvent(new Event('regula-rustica:cellarer-consult-request'));
+  });
   document.querySelector('#cellarerClose')?.addEventListener('click', close);
   document.querySelector('#cellarerCancel')?.addEventListener('click', close);
   form.addEventListener('submit', async event => {

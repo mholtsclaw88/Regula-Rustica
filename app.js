@@ -2532,6 +2532,41 @@ function cellarerContext(preferredKind = null) {
   };
 }
 
+function cellarerConsultContext() {
+  const active = values => values.filter(item => !item.deletedAt);
+  const recent = (values, dateKey, limit) => active(values)
+    .sort((a, b) => String(b[dateKey] || b.createdAt || '').localeCompare(String(a[dateKey] || a.createdAt || '')))
+    .slice(0, limit);
+  const all = {
+    records: active(data.records).map(item => ({ id: item.id, name: item.name, type: item.type, status: item.status,
+      species: item.identity?.species || '', purpose: item.identity?.purpose || '' })),
+    tasks: recent(data.tasks, 'dueDate', 100).map(item => ({ title: item.title, status: item.status, recordId: item.recordId,
+      availableFrom: item.availableFrom, dueDate: item.dueDate, completedAt: item.completedAt,
+      choreWindowId: item.choreWindowId, recurrence: item.recurrenceRule?.frequency || '' })),
+    yield: recent(data.yieldEntries, 'occurredAt', 60).map(item => ({ type: item.type, recordId: item.recordId,
+      occurredAt: item.occurredAt, quantity: item.quantity, unit: item.unit, product: item.product })),
+    ledger: recent(data.ledger, 'date', 60).map(item => ({ type: item.type, date: item.date, amount: item.amount,
+      description: item.description, category: item.category, vendorOrSource: item.vendorOrSource,
+      recordId: item.recordId, allocatedRecordIds: active(data.ledgerAllocations).filter(row => row.ledgerEntryId === item.id).map(row => row.recordId) })),
+    calendar: recent(data.calendarEvents, 'startDate', 60).map(item => ({ title: item.title, startDate: item.startDate,
+      endDate: item.endDate, location: item.location, recordId: item.recordId, recurrence: item.recurrenceRule?.frequency || '' })),
+    recordEvents: recent(data.events, 'date', 60).map(item => ({ eventType: item.eventType, date: item.date,
+      recordId: item.recordId, details: item.details })),
+    journal: recent(data.notes, 'createdAt', 60).map(item => ({ kind: 'note', date: item.createdAt,
+      recordId: item.recordId, text: item.text })),
+    choreWindows: active(data.choreWindows).map(item => ({ id: item.id, name: item.name, startTime: item.startTime,
+      endTime: item.endTime, enabled: item.enabled }))
+  };
+  const coverage = {
+    records: active(data.records).length, tasks: active(data.tasks).length, yield: active(data.yieldEntries).length,
+    ledger: active(data.ledger).length, calendar: active(data.calendarEvents).length,
+    recordEvents: active(data.events).length, journal: active(data.notes).length,
+    choreWindows: active(data.choreWindows).length
+  };
+  return { today: today(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    homesteadName: data.settings.homesteadName, sections: all, coverage };
+}
+
 function setModalDraftValue(name, value) {
   if (value === null || value === undefined || value === '') return;
   const input = $(`#modalFields [name="${name}"]`);
@@ -3145,7 +3180,7 @@ window.addEventListener('regula-rustica:cloud-context', () => {
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 });
 
-window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, openCellarerDraft };
+window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, cellarerConsultContext, openCellarerDraft };
 renderAll();
 window.addEventListener('load', () => materializeRecurringTasks());
 if (startupMigrationBefore) setTimeout(() => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {

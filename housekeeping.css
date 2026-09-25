@@ -759,6 +759,10 @@ body.onboarding-open .cellarer-access { display: none; }
 .cellarer-privacy-note { margin: -2px 0 0; line-height: 1.45; }
 .cellarer-status { min-height: 1.25em; margin: 0; color: var(--forest2); font: 700 .78rem Arial,sans-serif; }
 .cellarer-status.error { color: var(--red); }
+.cellarer-consult-answer[hidden] { display: none; }
+.cellarer-consult-answer { padding: 13px 15px; border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 8px; background: var(--raised); overflow-wrap: anywhere; }
+.cellarer-consult-answer strong { color: var(--forest); }
+.cellarer-consult-answer p { margin: 8px 0 0; white-space: pre-wrap; line-height: 1.5; }
 .cellarer-receipt-choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .cellarer-receipt-choices .btn { min-height: 44px; }
 .cellarer-receipt-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
