@@ -97,7 +97,7 @@ function initializeConsult() {
       caveat.textContent = responseText.caveat;
       caveat.hidden = !responseText.caveat;
       answer.hidden = false;
-      submit.textContent = 'Ask again';
+      submit.textContent = 'Revise and ask again';
       message('To clarify, edit your question above and ask again. This does not start a chat.');
     } catch (error) {
       if (current === generation && error?.name !== 'AbortError') message(error?.message || 'Cyril could not answer just now.', true);

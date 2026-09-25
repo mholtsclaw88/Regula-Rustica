@@ -739,7 +739,13 @@ function showView(id) {
 
 function settingsOperatingMode() {
   const context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
-  if (context?.homesteadId) return 'Cloud connected';
+  if (context?.homesteadId) {
+    const premium = context.premium;
+    const premiumEndsAt = premium?.ends_at ? Date.parse(premium.ends_at) : Infinity;
+    return premium?.status === 'active' && premium.feature_keys?.includes('cloud_sync') && premiumEndsAt > Date.now()
+      ? 'Cloud connected'
+      : 'Cloud Sync paused · Premium needed';
+  }
   if (context?.session) return 'Signed in · local until joined';
   return 'Local only';
 }
@@ -3103,6 +3109,10 @@ $('#homesteadForm').addEventListener('submit', async event => {
   status.classList.remove('error');
   let savedLocally = false;
   try {
+    const premium = context?.premium;
+    const cloudIdentityEnabled = Boolean(context?.homesteadId && premium?.status === 'active'
+      && premium.feature_keys?.includes('cloud_sync')
+      && (!premium.ends_at || Date.parse(premium.ends_at) > Date.now()));
     if (context?.homesteadId && !context.canManageHomestead) throw new Error('Only a Steward can change shared Homestead identity.');
     if (pendingHomesteadLogoFile) {
       next.homesteadLogo = await window.RegulaRusticaDocuments.saveHomesteadLogo(pendingHomesteadLogoFile);
@@ -3110,7 +3120,7 @@ $('#homesteadForm').addEventListener('submit', async event => {
     data.settings = next;
     saveData(data, 'homestead-identity');
     savedLocally = true;
-    if (context?.homesteadId) {
+    if (cloudIdentityEnabled) {
       if (pendingHomesteadLogoFile) {
         next.homesteadLogo = await window.RegulaRusticaDocuments.uploadHomesteadLogo(next.homesteadLogo);
         saveData(data, 'homestead-identity-logo-upload');
@@ -3128,7 +3138,7 @@ $('#homesteadForm').addEventListener('submit', async event => {
     if (oldLogo && oldLogo.id !== next.homesteadLogo?.id) {
       try {
         await window.RegulaRusticaDocuments.removeLocal([oldLogo.id]);
-        if (oldLogo.storagePath && context?.homesteadId) await window.RegulaRusticaDocuments.removeRemote([oldLogo.storagePath]);
+        if (oldLogo.storagePath && cloudIdentityEnabled) await window.RegulaRusticaDocuments.removeRemote([oldLogo.storagePath]);
       } catch (error) {
         console.warn('Previous Homestead logo cleanup will be retried later.', error);
       }
@@ -3138,7 +3148,7 @@ $('#homesteadForm').addEventListener('submit', async event => {
     $('#homesteadLogoInput').value = '';
     if (homesteadLogoPreviewUrl) URL.revokeObjectURL(homesteadLogoPreviewUrl);
     homesteadLogoPreviewUrl = '';
-    status.textContent = context?.homesteadId ? 'Shared Homestead identity saved.' : 'Homestead identity saved on this device.';
+    status.textContent = cloudIdentityEnabled ? 'Shared Homestead identity saved.' : 'Homestead identity saved on this device.';
   } catch (error) {
     console.warn('Homestead identity could not be fully saved.', error);
     status.textContent = savedLocally && context?.homesteadId

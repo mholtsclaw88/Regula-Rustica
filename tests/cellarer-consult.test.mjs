@@ -27,7 +27,7 @@ test('Consult Cyril is one question and one replaceable answer, not a chat', () 
   assert.match(client, /answer\.hidden = true/);
   assert.doesNotMatch(client, /previous_response_id|conversationId|chatHistory/);
   assert.match(app, /function cellarerConsultContext\(\)/);
-  assert.match(worker, /cellarer-consult\.mjs\?v=cyril-consult-v1/);
+  assert.match(worker, /cellarer-consult\.mjs\?v=cyril-copy-v1/);
   assert.equal(config.path, '/api/cyril/consult');
 });
 
