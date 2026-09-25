@@ -4,6 +4,7 @@ import {
   invitationStatus,
   invitationTokenFromUrl
 } from './cloud-invitations.mjs';
+import { premiumCloudEntitled } from './sync/premium-access.mjs';
 
 const status = document.querySelector('#cloudStatus');
 const authForm = document.querySelector('#cloudAuthForm');
@@ -58,22 +59,22 @@ async function initializeCloud() {
     if (!premiumStatus) return;
     premiumStatus.classList.toggle('error', Boolean(error));
     if (error) {
-      premiumStatus.textContent = 'Premium status is temporarily unavailable. Cloud Sync remains unaffected.';
+      premiumStatus.textContent = 'Premium status is temporarily unavailable. Cloud Sync is paused; local work remains safe on this device.';
       return;
     }
     if (!hasMembership) {
       premiumStatus.textContent = 'Sign in and join a cloud Homestead to check Premium.';
       return;
     }
-    if (entitlement?.status === 'active') {
+    if (premiumCloudEntitled(entitlement)) {
       premiumStatus.textContent = entitlement.ends_at
-        ? `Premium is active through ${formatDate(entitlement.ends_at)} for this Homestead.`
-        : 'Premium is active for this Homestead.';
+        ? `Premium is active through ${formatDate(entitlement.ends_at)} for this Homestead. Cloud Sync is included.`
+        : 'Premium is active for this Homestead. Cloud Sync is included.';
       return;
     }
     premiumStatus.textContent = canManageHomestead
-      ? 'This Homestead is on the free plan. A Steward may redeem a Premium gift below.'
-      : 'This Homestead is on the free plan. A Steward can manage Premium access.';
+      ? 'This Homestead is using the standard local plan. Redeem a Premium gift below to enable Cloud Sync and Cyril.'
+      : 'This Homestead is using the standard local plan. A Steward can enable Premium Cloud Sync.';
   }
 
   async function loadPremiumEntitlement(hasMembership) {
@@ -180,7 +181,9 @@ async function initializeCloud() {
     document.querySelector('#cloudRole').textContent = role || '';
     renderPremium(premiumResult.entitlement, hasMembership, Boolean(canManageHomestead), premiumResult.error);
     showStatus(hasMembership
-      ? 'Account connected. Local-first synchronization is available below.'
+      ? premiumCloudEntitled(premiumResult.entitlement)
+        ? 'Account connected. Premium Cloud Sync is available below.'
+        : 'Account connected. Cloud Sync is paused until this Homestead has Premium; local work remains available.'
       : invitationToken
         ? 'Invitation ready. Review it below and accept when you are ready.'
         : 'Account ready. Choose how this account joins a Homestead.');

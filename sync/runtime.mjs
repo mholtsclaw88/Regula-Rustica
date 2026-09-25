@@ -2,6 +2,7 @@ import { SupabaseSyncAdapter } from './cloud-adapter.mjs';
 import { SyncEngine } from './engine.mjs';
 import { conflictPresentation } from './entities.mjs';
 import { LocalSyncState, syncDiagnosticSummary } from './local-state.mjs?v=clean-cloud-baseline-v1';
+import { premiumSyncAvailable } from './premium-access.mjs';
 
 const state = new LocalSyncState();
 const status = document.querySelector('#syncStatus');
@@ -50,6 +51,7 @@ window.RegulaRusticaSync = Object.freeze({
   initializeUpload: async () => {
     await connectPromise;
     if (!context?.homesteadId) throw new Error('The shared Homestead is not connected yet.');
+    if (!premiumSyncAvailable(context)) throw new Error('Premium is required for Cloud Sync. Your changes remain saved on this device.');
     await engine.initialize('upload', context.homesteadId);
     firstCase = null;
     startAttachmentSync();
@@ -58,6 +60,7 @@ window.RegulaRusticaSync = Object.freeze({
 });
 
 function message(kind, error) {
+  if (context?.homesteadId && !premiumSyncAvailable(context)) return 'Premium required for Cloud Sync. Changes remain saved on this device.';
   const waiting = state.state.outbox.length;
   const conflicts = state.state.conflicts.filter(item => item.status === 'unresolved').length;
   const blocked = state.state.outbox.filter(item => ['blocked', 'dependency'].includes(item.status));
@@ -71,17 +74,17 @@ function message(kind, error) {
   if (kind === 'problem') return `Sync problem${error?.message ? ` — ${error.message}` : ''}`;
   if (waiting) return `${waiting} change${waiting === 1 ? '' : 's'} waiting`;
   if (!context?.homesteadId) return 'Cloud synchronization is disconnected.';
-  if (!state.state.enabled) return 'Cloud synchronization is not connected.';
-  if (!state.state.initialSyncCompleted) return 'Cloud setup is incomplete. Changes remain safely queued on this device.';
+  if (!state.state.enabled || !state.state.initialSyncCompleted) return 'Cloud Sync is included with Premium. Finish this device’s one-time setup below; local changes remain on this device until then.';
   return 'Synced';
 }
 
 function headerStatusSnapshot(kind) {
+  if (context?.homesteadId && !premiumSyncAvailable(context)) return { state: 'issue', label: 'Sync paused', detail: 'Premium needed · local work is safe' };
   const conflicts = state.state.conflicts.some(item => item.status === 'unresolved');
   const blocked = state.state.outbox.some(item => ['blocked', 'dependency'].includes(item.status));
-  if (!context?.homesteadId || !state.state.enabled) return { state: 'local', label: 'Local only', detail: 'Saved on this device' };
+  if (!context?.homesteadId) return { state: 'local', label: 'Local only', detail: 'Saved on this device' };
+  if (!state.state.enabled || !state.state.initialSyncCompleted) return { state: 'issue', label: 'Sync setup', detail: 'Finish connecting this device' };
   if (kind === 'offline' || !navigator.onLine) return { state: 'offline', label: 'Offline', detail: 'Cloud sync unavailable' };
-  if (!state.state.initialSyncCompleted) return { state: 'issue', label: 'Sync setup', detail: state.state.outbox.length ? `${state.state.outbox.length} change${state.state.outbox.length === 1 ? '' : 's'} waiting safely` : 'Finish cloud setup' };
   if (conflicts || blocked || kind === 'problem' || kind === 'attention') return { state: 'issue', label: 'Sync issue', detail: 'Some changes could not sync' };
   if (kind === 'syncing' || state.state.outbox.length) return { state: 'syncing', label: 'Syncing', detail: 'Changes are being synchronized' };
   return { state: 'synced', label: 'Synced', detail: state.state.lastSuccessfulSyncAt ? 'Just now' : 'Everything is up to date' };
@@ -104,11 +107,14 @@ function render(kind = 'ready', error = null) {
   status.textContent = message(kind, error);
   renderHeaderStatus(kind);
   status.classList.toggle('error', kind === 'problem' || kind === 'attention' || state.state.outbox.some(item => item.status === 'blocked'));
-  syncNow.classList.toggle('hidden', !context?.homesteadId || !state.state.initialSyncCompleted);
+  syncNow.classList.toggle('hidden', !premiumSyncAvailable(context) || !state.state.initialSyncCompleted);
   const recoveryInProgress = state.state.initialSyncState?.case === 'device-cloud-recovery'
     && state.state.initialSyncState.status !== 'complete';
-  syncRecovery.classList.toggle('hidden', !context?.homesteadId || (!state.state.initialSyncCompleted && !recoveryInProgress));
-  actions.classList.toggle('hidden', !firstCase || state.state.initialSyncCompleted);
+  syncRecovery.classList.toggle('hidden', !premiumSyncAvailable(context) || (!state.state.initialSyncCompleted && !recoveryInProgress));
+  actions.classList.toggle('hidden', !premiumSyncAvailable(context) || !firstCase || state.state.initialSyncCompleted);
+  const premiumCloudAccess = document.querySelector('#premiumCloudAccess');
+  if (premiumCloudAccess) premiumCloudAccess.textContent = premiumSyncAvailable(context) && !state.state.initialSyncCompleted
+    ? 'Finish Cloud Sync setup' : 'Sign in or connect a Homestead';
   actions.querySelectorAll('[data-cases]').forEach(button => {
     button.classList.toggle('hidden', !button.dataset.cases.includes(firstCase));
   });
@@ -155,6 +161,7 @@ function render(kind = 'ready', error = null) {
       button.className = `btn ${style}`;
       button.dataset.choice = choice;
       button.textContent = label;
+      button.disabled = !premiumSyncAvailable(context);
       button.addEventListener('click', () => run(() => engine.resolveConflict(conflict.id, choice)));
       choices.appendChild(button);
     });
@@ -177,13 +184,14 @@ function render(kind = 'ready', error = null) {
 }
 
 async function run(action) {
+  if (!premiumSyncAvailable(context)) return render('ready');
   render('syncing');
   try { await action(); render('ready'); }
   catch (error) { render(navigator.onLine ? 'problem' : 'offline', error); }
 }
 
 function canSync() {
-  return navigator.onLine && context?.homesteadId && state.state.initialSyncCompleted;
+  return navigator.onLine && premiumSyncAvailable(context) && state.state.initialSyncCompleted;
 }
 
 function startAttachmentSync() {
@@ -207,10 +215,15 @@ function scheduleSync({ retryBlocked = false } = {}) {
 }
 
 async function connect(nextContext) {
+  clearTimeout(syncTimer);
   context = nextContext;
   engine = offlineEngine;
   firstCase = null;
   if (!context?.session || !context.homesteadId) {
+    render('ready');
+    return;
+  }
+  if (!premiumSyncAvailable(context)) {
     render('ready');
     return;
   }
@@ -250,10 +263,16 @@ window.addEventListener('online', () => scheduleSync());
 window.addEventListener('offline', () => render('offline'));
 window.addEventListener('focus', () => scheduleSync());
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') scheduleSync();
+  if (document.visibilityState === 'visible') {
+    if (context?.homesteadId && !premiumSyncAvailable(context)) render('ready');
+    else scheduleSync();
+  }
 });
 setInterval(() => {
-  if (document.visibilityState === 'visible') scheduleSync();
+  if (document.visibilityState === 'visible') {
+    if (context?.homesteadId && !premiumSyncAvailable(context)) render('ready');
+    else scheduleSync();
+  }
 }, 60000);
 
 syncNow.addEventListener('click', () => {
@@ -285,7 +304,7 @@ document.querySelector('#syncInitializeEmpty').addEventListener('click', () => r
   await engine.initialize('empty', context.homesteadId);
   startAttachmentSync();
 }));
-document.querySelector('#syncCancel').addEventListener('click', () => { firstCase = null; render('ready'); });
+document.querySelector('#syncCancel').addEventListener('click', () => document.querySelector('#settingCloud .settings-back')?.click());
 
 render();
 if (window.REGULA_RUSTICA_CLOUD_CONTEXT) connectPromise = connect(window.REGULA_RUSTICA_CLOUD_CONTEXT);

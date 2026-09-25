@@ -5,7 +5,8 @@
   if (!root || !window.RegulaRusticaLocal) return;
   const $ = selector => root.querySelector(selector);
   const screens = [...root.querySelectorAll('[data-onboarding-step]')];
-  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+  const standardSteps = [1, 2, 3, 5, 6, 7, 8];
   const today = () => {
     const date = new Date();
     date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
@@ -29,20 +30,20 @@
   }
 
   function nextStep(step = currentStep) {
-    const mode = onboarding(window.RegulaRusticaLocal.read()).mode;
-    return step === 3 && mode === 'local' ? 5 : Math.min(8, step + 1);
+    return step === 3 ? 5 : Math.min(8, step + 1);
   }
 
   function previousStep(step = currentStep) {
-    const mode = onboarding(window.RegulaRusticaLocal.read()).mode;
-    return step === 5 && mode === 'local' ? 3 : Math.max(1, step - 1);
+    return step === 5 ? 3 : Math.max(1, step - 1);
   }
 
   function showStep(step, persist = true) {
     currentStep = Math.min(8, Math.max(1, Number(step || 1)));
+    if (currentStep === 4) currentStep = 3;
     screens.forEach(screen => screen.classList.toggle('hidden', Number(screen.dataset.onboardingStep) !== currentStep));
-    $('#onboardingProgress').textContent = `Step ${roman[currentStep - 1]}`;
-    $('#onboardingProgress').setAttribute('aria-label', `Onboarding section ${currentStep} of 8`);
+    const position = standardSteps.indexOf(currentStep);
+    $('#onboardingProgress').textContent = position < 0 ? 'Cloud' : `Step ${roman[position]}`;
+    $('#onboardingProgress').setAttribute('aria-label', position < 0 ? 'Cloud account setup' : `Onboarding section ${position + 1} of 7`);
     $('#onboardingBack').classList.toggle('hidden', currentStep === 1);
     $('#onboardingLater').classList.toggle('hidden', currentStep === 1 || currentStep === 8);
     if (persist) updateState({ step: currentStep, dismissed: false });
@@ -153,10 +154,8 @@
   });
 
   $('#onboardingModeContinue').addEventListener('click', () => {
-    const selected = root.querySelector('[name="onboardingMode"]:checked')?.value;
-    if (!selected) return;
-    updateState({ mode: selected, step: selected === 'shared' ? 4 : 5 });
-    showStep(selected === 'shared' ? 4 : 5, false);
+    updateState({ mode: 'local', step: 5 });
+    showStep(5, false);
   });
   root.querySelectorAll('[name="onboardingAuthMode"]').forEach(input => input.addEventListener('change', () => {
     const signup = input.value === 'signup' && input.checked;
@@ -165,7 +164,6 @@
   }));
   $('#onboardingReturnLocal').addEventListener('click', () => {
     updateState({ mode: 'local', step: 5 });
-    root.querySelector('[name="onboardingMode"][value="local"]').checked = true;
     showStep(5, false);
   });
   $('#onboardingAuthForm').addEventListener('submit', async event => {
@@ -190,6 +188,7 @@
       let context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
       if (!context?.homesteadId) context = await api.createHomestead(window.RegulaRusticaLocal.read().settings.homesteadName);
       if (!context?.homesteadId) throw new Error('The shared Homestead could not be established.');
+      if (context.premium?.status !== 'active' || context.premium.plan_key !== 'premium' || (context.premium.ends_at && Date.parse(context.premium.ends_at) <= Date.now())) throw new Error('Premium is required for Cloud Sync. Your local Farm Book is unchanged. Redeem a gift in Settings → Premium to continue.');
       const local = window.RegulaRusticaLocal.read();
       if (local.settings.homesteadLogo && !local.settings.homesteadLogo.storagePath) {
         local.settings.homesteadLogo = await window.RegulaRusticaDocuments.uploadHomesteadLogo(local.settings.homesteadLogo);
@@ -409,15 +408,25 @@
   $('#onboardingBack').addEventListener('click', () => showStep(previousStep()));
   $('#onboardingLater').addEventListener('click', () => { updateState({ dismissed: true }); close(); });
   document.querySelector('#onboardingResumeButton').addEventListener('click', () => { updateState({ dismissed: false }); open(); });
-  $('#onboardingFinish').addEventListener('click', () => {
+  function finish(openPremium = false) {
     updateState({ step: 8, completed: true, dismissed: false });
     close();
     window.RegulaRustica.materializeRecurringTasks('onboarding-finish');
-    document.querySelector('.nav button[data-view="today"]')?.click();
+    document.querySelector(`.nav button[data-view="${openPremium ? 'settings' : 'today'}"]`)?.click();
+    if (openPremium) requestAnimationFrame(() => document.querySelector('[data-settings-category="premium"]')?.click());
+  }
+  $('#onboardingFinish').addEventListener('click', () => finish());
+  $('#onboardingExplorePremium').addEventListener('click', () => finish(true));
+  $('#onboardingSkipSetup').addEventListener('click', () => { updateState({ mode: 'local', dismissed: true }); close(); });
+  $('#onboardingReturningSignIn').addEventListener('click', () => {
+    updateState({ dismissed: true });
+    close();
+    document.querySelector('.nav button[data-view="settings"]')?.click();
+    requestAnimationFrame(() => document.querySelector('[data-settings-category="cloud"]')?.click());
   });
+  document.querySelector('#premiumCloudAccess')?.addEventListener('click', () => document.querySelector('[data-settings-category="cloud"]')?.click());
   window.addEventListener('regula-rustica:cloud-context', () => { if (currentStep === 5) renderPeople(); });
 
   const state = onboarding(window.RegulaRusticaLocal.read());
-  root.querySelector(`[name="onboardingMode"][value="${state.mode || 'local'}"]`).checked = true;
   if (!state.completed && !state.dismissed) open();
 })();

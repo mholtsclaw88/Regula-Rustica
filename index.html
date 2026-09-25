@@ -9,9 +9,9 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=cyril-receipt-reader-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=cyril-consult-v1">
   <link rel="stylesheet" href="cloud-auth.css">
-  <link rel="stylesheet" href="onboarding.css?v=onboarding-v4">
+  <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=calendar-projections-v1" defer></script>
   <script src="task-foundation.js?v=record-lifecycle-v1" defer></script>
@@ -20,15 +20,16 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
-  <script src="app.js?v=cyril-record-matching-v1" defer></script>
+  <script src="app.js?v=premium-sync-setup-v1" defer></script>
   <script src="ledger-allocations.js?v=ledger-api-v2" data-ledger-allocations="true" defer></script>
-  <script src="onboarding.js?v=onboarding-v4" defer></script>
+  <script src="onboarding.js?v=premium-preview-compat-v1" defer></script>
   <script src="ui-refinements.js?v=cyril-record-matching-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="cloud-auth.js?v=premium-foundation-v1" type="module"></script>
-  <script src="cellarer-assisted-entry.mjs?v=cyril-record-matching-v1" type="module"></script>
-  <script src="cellarer-receipt-reader.mjs?v=cyril-record-matching-v1" type="module"></script>
-  <script src="sync/runtime.mjs?v=monastic-icons-v1" type="module"></script>
+  <script src="cloud-auth.js?v=premium-preview-compat-v1" type="module"></script>
+  <script src="cellarer-assisted-entry.mjs?v=cyril-consult-v1" type="module"></script>
+  <script src="cellarer-receipt-reader.mjs?v=cyril-draft-review-v1" type="module"></script>
+  <script src="cellarer-consult.mjs?v=cyril-copy-v1" type="module"></script>
+  <script src="sync/runtime.mjs?v=premium-sync-setup-v1" type="module"></script>
 </head>
 <body>
   <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
@@ -46,6 +47,7 @@
         <p>Inspired by the ordered rhythm of the Benedictine Rule and way of life, where prayer, work, responsibility, and rest each have their place, Regula Rustica—the rural rule—helps bring that same sense of order to your daily stewardship.</p>
         <p class="onboarding-motto">Ora et labora · Ut in omnibus glorificetur Deus.</p>
         <button class="btn primary onboarding-primary" type="button" data-onboarding-next>Begin</button>
+        <div class="onboarding-returning"><button class="btn ghost" id="onboardingReturningSignIn" type="button">Returning Homestead? Sign in</button><button class="btn ghost" id="onboardingSkipSetup" type="button">Skip setup for now</button></div>
       </section>
 
       <section class="onboarding-screen hidden" data-onboarding-step="2">
@@ -68,13 +70,10 @@
       </section>
 
       <section class="onboarding-screen hidden" data-onboarding-step="3">
-        <p class="onboarding-eyebrow">Keeping the Ledger</p><h2>Choose how this ledger will be kept.</h2>
-        <div class="onboarding-choice-grid">
-          <label class="onboarding-choice"><input type="radio" name="onboardingMode" value="local"><strong>Local only</strong><span>No account required. Your ledger remains usable on this device, ordinary work needs no internet, and backup and export remain available.</span></label>
-          <label class="onboarding-choice"><input type="radio" name="onboardingMode" value="shared"><strong>Cloud / shared Homestead</strong><span>Synchronize across devices, invite household members, and give each participating person an individual account.</span></label>
-        </div>
-        <p class="onboarding-note">Nothing is permanent here. You may begin with a local ledger and enable household sharing later. Regula Rustica will never require the cloud simply to tend the Homestead.</p>
-        <button class="btn primary" id="onboardingModeContinue" type="button">Continue</button>
+        <p class="onboarding-eyebrow">The Standard Farm Book</p><h2>Begin with what is here.</h2>
+        <p class="onboarding-lead">Regula Rustica works on this device without an account. Keep Records, Tasks, Yield, Journal, Ledger, and Calendar close to the work itself—even without internet.</p>
+        <p class="onboarding-note">Your work is saved on this device. Download backups regularly. Premium Cloud Sync can be added later to share this Homestead across devices; it is not required for ordinary work.</p>
+        <button class="btn primary" id="onboardingModeContinue" type="button">Continue locally</button>
       </section>
 
       <section class="onboarding-screen hidden" data-onboarding-step="4">
@@ -127,12 +126,13 @@
 
       <section class="onboarding-screen hidden" data-onboarding-step="8">
         <p class="onboarding-eyebrow">The Rule in Practice</p><h2>Your day now has an order.</h2>
-        <p class="onboarding-lead">The Homestead has its name, the household is known, what is entrusted to your care has been recorded, and the recurring work has found its place. This is how Regula Rustica begins: not with more administration, but with a clearer rhythm for the work already before you.</p>
+        <p class="onboarding-lead">The Homestead has its name, the household is known, what is entrusted to your care has been recorded, and the recurring work has found its place. Your standard Farm Book is ready on this device.</p>
         <div class="onboarding-bookplate" id="onboardingFinalBookplate"></div>
         <p class="onboarding-preview-label">Example · Your Today page</p>
         <section class="onboarding-today-preview" aria-labelledby="onboardingTodayTitle"><header><div><span>Horarium</span><h3 id="onboardingTodayTitle">Today</h3></div><time id="onboardingFinalDate"></time></header><div class="onboarding-final-stats" id="onboardingFinalStats"></div><div class="onboarding-final-schedule" id="onboardingFinalSchedule"></div></section>
         <blockquote><strong>The rule is not the work itself.</strong> It is the order that gives prayer, labor, responsibility, and rest each their proper place—so that what has been entrusted to your care may be tended faithfully, and the work of the Homestead may serve the good of the household rather than consume it.</blockquote>
         <p class="onboarding-motto">Ora et labora · Ut in omnibus glorificetur Deus.</p>
+        <section class="onboarding-premium-invitation"><span class="onboarding-eyebrow">When you are ready</span><h3>Go further with Premium.</h3><p>Cloud Sync connects this Homestead across your devices and household. Cyril the Cellarer can help prepare entries, read receipts, and answer questions. Premium is optional; your local Farm Book remains yours.</p><small>Premium gift codes are available now. Purchases are not available yet.</small><button class="btn secondary" id="onboardingExplorePremium" type="button">Explore Premium</button></section>
         <button class="btn primary onboarding-primary" id="onboardingFinish" type="button">Enter Regula Rustica</button>
       </section>
     </main>
@@ -474,7 +474,7 @@
               </button>
               <button class="settings-category-card" type="button" data-settings-category="premium">
                 <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 16h12M8 16V8l4-3 4 3v8M10 11h4M12 9v4"/></svg></span>
-                <span><strong>Cyril &amp; Premium</strong><small>AI assistance, gifts, and Premium status</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+                <span><strong>Premium</strong><small>Cloud Sync, Cyril, gifts, and status</small></span><span class="settings-chevron" aria-hidden="true">›</span>
               </button>
               <button class="settings-category-card" type="button" data-settings-category="backup">
                 <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12l-3 3 3 3"/><path d="M7 15h7a3 3 0 0 1 3 3"/></svg></span>
@@ -640,7 +640,7 @@
         </article>
         <article class="card premium-card settings-section hidden" id="settingPremium" data-settings-panel="premium">
           <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">Cyril the Cellarer</span><h2 tabindex="-1">Premium assistance</h2><p class="muted">Cloud-connected help for recording, reading, and finding what your Homestead has entrusted to the farm book.</p></header>
+          <header class="settings-section-head"><span class="label">The wider Homestead</span><h2 tabindex="-1">Regula Rustica Premium</h2><p class="muted">Connect your Farm Book across devices and consult Cyril when you need a careful hand.</p></header>
           <section class="premium-status-card" aria-labelledby="premiumStatusTitle">
             <div>
               <span class="label">Household plan</span>
@@ -648,17 +648,19 @@
             </div>
             <p id="premiumStatus" class="cloud-status" role="status">Sign in and join a cloud Homestead to check Premium.</p>
           </section>
-          <div class="premium-feature-list" aria-label="Cyril Premium features">
+          <div class="premium-feature-list" aria-label="Premium features">
+            <div><strong>Cloud Sync</strong><span>Keep your Homestead in step across devices and share it with your household.</span></div>
             <div><strong>Assisted Entry · Available</strong><span>Turn a plain-language note into a reviewable Task, Yield, Ledger, Event, or Journal draft.</span></div>
             <div><strong>Receipt Reader</strong><span>Prepare a reviewable Ledger draft from a receipt photo.</span></div>
-            <div><strong>Ask the Farm Book</strong><span>Ask read-only questions and return answers with links to the underlying entries.</span></div>
+            <div><strong>Consult Cyril</strong><span>Ask one question about your Farm Book and receive a careful answer.</span></div>
           </div>
+          <button class="btn secondary" id="premiumCloudAccess" type="button">Sign in or connect a Homestead</button>
           <form id="premiumRedeemForm" class="form-grid hidden">
             <label>Premium gift code<input id="premiumGiftCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RR-XXXX-XXXX-XXXX-XXXX" required></label>
             <button class="btn primary" type="submit">Redeem gift</button>
           </form>
           <p id="premiumRedeemResult" class="muted" role="status"></p>
-          <p class="premium-note">Cyril will remain optional, require a connection, and return drafts for your approval. The ordinary local-first app will continue to work without Premium or while offline.</p>
+          <p class="premium-note">Premium is optional. The standard Farm Book continues to work on this device without an account or internet connection. Cyril prepares drafts for your approval and never records them for you.</p>
           <p class="muted">Purchases are not available yet. This foundation supports gifted access now and verified web, Apple, or Google purchases in a future release.</p>
         </article>
         <article class="card settings-section hidden" id="settingAbout" data-settings-panel="about">
@@ -667,7 +669,7 @@
           <dl class="settings-about-list">
             <div><dt>Application</dt><dd>Regula Rustica</dd></div>
             <div><dt>Version</dt><dd>v5</dd></div>
-            <div><dt>Storage</dt><dd>Local-first, with optional cloud synchronization</dd></div>
+            <div><dt>Storage</dt><dd>Local-first, with optional Premium Cloud Sync</dd></div>
             <div><dt>Offline use</dt><dd>Available after the app has been installed or cached</dd></div>
           </dl>
           <p class="settings-about-note">The app remembers so you do not have to.</p>
@@ -744,12 +746,11 @@
 
   <div class="cellarer-access">
     <section id="cellarerDesk" class="cellarer-desk" aria-labelledby="cellarerDeskTitle" hidden>
-      <header class="cellarer-desk-header"><span class="label">The Cellarer's Desk</span><h2 id="cellarerDeskTitle">Cyril the Cellarer</h2><p>How may I help with the Homestead?</p></header>
+      <header class="cellarer-desk-header"><span class="label">The Cellarer's Desk</span><h2 id="cellarerDeskTitle">Cyril the Cellarer</h2><p>A little help keeping the Homestead in order.</p></header>
       <div class="cellarer-desk-rows">
-        <button id="cellarerPrepare" class="cellarer-desk-row" type="button"><strong>Prepare an Entry</strong><span>Tell Cyril what happened or what needs recording. He’ll prepare a draft for your review.</span></button>
-        <button id="cellarerReceipt" class="cellarer-desk-row" type="button"><strong>Read a Receipt</strong><span>Use a receipt photo to prepare a Ledger draft for your review.</span></button>
-        <button class="cellarer-desk-row" type="button" disabled><strong>Ask About the Homestead <small>Coming later</small></strong><span>Ask a question using what has been kept in Regula Rustica.</span></button>
-        <button class="cellarer-desk-row" type="button" disabled><strong>Consult Cyril <small>Coming later</small></strong><span>Work through a question, decision, or plan with the Cellarer.</span></button>
+        <button id="cellarerPrepare" class="cellarer-desk-row" type="button"><strong>Prepare an Entry</strong><span>Describe what happened or what needs doing. Cyril prepares a draft for your review.</span></button>
+        <button id="cellarerReceipt" class="cellarer-desk-row" type="button"><strong>Read a Receipt</strong><span>Turn a receipt photo into a Ledger draft for your review.</span></button>
+        <button id="cellarerConsult" class="cellarer-desk-row" type="button"><strong>Consult Cyril</strong><span>Ask one question about the Farm Book and receive a careful answer.</span></button>
       </div>
       <p class="cellarer-desk-stewardship">Cyril assists; you remain the steward.<span>Nothing is recorded without your review.</span></p>
     </section>
@@ -798,6 +799,19 @@
         <p id="cellarerReceiptStatus" class="cellarer-status" role="status"></p>
       </div>
       <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerReceiptCancel">Cancel</button><button type="submit" class="btn primary" id="cellarerReceiptSubmit" disabled>Prepare Ledger draft</button></div>
+    </form>
+  </dialog>
+  <dialog id="cellarerConsultDialog" class="cellarer-dialog" aria-labelledby="cellarerConsultTitle">
+    <form id="cellarerConsultForm">
+      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2 id="cellarerConsultTitle">Consult Cyril</h2><p class="muted form-modal-subtitle">Ask a question and receive one answer—not a chat.</p></div><button type="button" class="btn ghost" id="cellarerConsultClose" aria-label="Close">✕</button></div>
+      <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
+      <div class="form-grid">
+        <label>What would you like to know?<textarea id="cellarerConsultQuestion" maxlength="1200" required placeholder="Example: How much milk did Daisy produce this month?"></textarea></label>
+        <p class="muted cellarer-privacy-note">When you ask, a limited snapshot of your Homestead Records, Tasks, Yield, Ledger, Calendar, and notes is sent to Cyril. Photos and attachments are not sent. Nothing is changed.</p>
+        <p id="cellarerConsultStatus" class="cellarer-status" role="status"></p>
+        <section id="cellarerConsultAnswer" class="cellarer-consult-answer" aria-label="Cyril’s answer" hidden><strong>Cyril’s answer</strong><p id="cellarerConsultAnswerText"></p><p id="cellarerConsultCaveat" class="muted"></p></section>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerConsultCancel">Close</button><button type="submit" class="btn primary" id="cellarerConsultSubmit">Ask Cyril</button></div>
     </form>
   </dialog>
   <dialog id="profileCropDialog" class="profile-crop-dialog">

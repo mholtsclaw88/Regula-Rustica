@@ -33,14 +33,14 @@ test('Ledger mobile masthead does not reserve a hidden seal column', () => {
 });
 
 test('Ledger page assets use the current offline cache version', () => {
-  assert.match(worker, /regula-rustica-ledger-api-v3/);
+  assert.match(worker, /regula-rustica-cyril-draft-review-v1/);
   assert.match(worker, /housekeeping\.css\?v=cyril-receipt-reader-v1/);
-  assert.match(worker, /app\.js\?v=cyril-record-matching-v1/);
+  assert.match(worker, /app\.js\?v=cyril-draft-review-v1/);
   for (const asset of ['ui-refinements.js', 'ui-refinements-core.js']) {
     assert.match(worker, new RegExp(`${asset.replace('.', '\\.')}\\?v=${asset === 'ui-refinements.js' ? 'cyril-record-matching-v1' : 'ledger-page-v1'}`));
   }
   assert.match(html, /housekeeping\.css\?v=cyril-receipt-reader-v1/);
-  assert.match(html, /app\.js\?v=cyril-record-matching-v1/);
+  assert.match(html, /app\.js\?v=cyril-draft-review-v1/);
   assert.match(html, /ui-refinements\.js\?v=cyril-record-matching-v1/);
   assert.match(loader, /ui-refinements-core\.js\?v=ledger-page-v1/);
 });

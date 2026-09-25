@@ -56,6 +56,21 @@ test('Record matching uses unique animal species, but never guesses among peers'
   assert.equal(resolveCellarerRecord('Pig feed and cat food', records), null);
   assert.equal(resolveCellarerRecord('Buy cat food', [...records, { id: 'luna', name: 'Luna', type: 'Animal', species: 'Cat' }]), null);
   assert.equal(resolveCellarerRecord('Feed Milo', records), 'milo');
+  assert.equal(resolveCellarerRecord('Service the tractor', [{ id: 'tractor', name: 'John Deere', type: 'Equipment', equipmentType: 'Tractor' }]), 'tractor');
+  assert.equal(resolveCellarerRecord('Bale hay', [{ id: 'field', name: 'North Field', type: 'Land', currentUse: 'Hay' }]), 'field');
+  assert.equal(resolveCellarerRecord('Collect eggs', [{ id: 'flock', name: 'Freedom Rangers', type: 'Animal', eligibleYieldTypes: ['eggs'] }], 'task'), 'flock');
+  assert.equal(resolveCellarerRecord('Buy eggs', [{ id: 'flock', name: 'Freedom Rangers', type: 'Animal', eligibleYieldTypes: ['eggs'] }], 'ledger'), null);
+  assert.equal(resolveCellarerRecord('Buy eggs', [{ id: 'flock', name: 'Freedom Rangers', type: 'Animal', eligibleYieldTypes: ['eggs'] }], 'task'), null);
+  assert.equal(resolveCellarerRecord('Buy milk', [{ id: 'cow', name: 'Daisy', type: 'Animal', eligibleYieldTypes: ['milk'] }], 'task'), null);
+  assert.equal(resolveCellarerRecord('Collect eggs and feed pigs', [
+    { id: 'flock', name: 'Freedom Rangers', type: 'Animal', species: 'Chicken', eligibleYieldTypes: ['eggs'] },
+    { id: 'pigs', name: 'Feeder pigs', type: 'Animal', species: 'Pig' }
+  ], 'task'), null);
+  assert.equal(resolveCellarerRecord('Collect eggs', [
+    { id: 'flock-a', name: 'A', eligibleYieldTypes: ['eggs'] },
+    { id: 'flock-b', name: 'B', eligibleYieldTypes: ['eggs'] }
+  ], 'task'), null);
+  assert.equal(resolveCellarerRecord('Add a task', [{ id: 'a', name: 'A', type: 'Animal' }], 'task'), null);
 });
 
 test('AI context keeps bounded Record facts and prior Ledger summaries, not receipt bytes', () => {
@@ -67,6 +82,7 @@ test('AI context keeps bounded Record facts and prior Ledger summaries, not rece
   assert.equal(clean.ledgerHistory[0].vendorOrSource, 'Feed Store');
   assert.equal('privateNotes' in clean.records[0], false);
   assert.equal('receiptPhoto' in clean.ledgerHistory[0], false);
+  assert.equal(clean.records[0].equipmentType, null);
 });
 
 test('Yield drafts must use an eligible type for the selected Record', () => {
@@ -86,8 +102,8 @@ test('Assisted Entry uses existing forms and always marks the result as a review
   assert.doesNotMatch(html, /data-cellarer-kind=|Draft with Cyril/);
   assert.match(html, /id="cellarerDesk"[^>]*hidden/);
   assert.match(html, /id="cellarerPrepare"/);
-  assert.match(html, /Ask About the Homestead[\s\S]*?Coming later[\s\S]*?disabled/);
-  assert.match(html, /Consult Cyril[\s\S]*?Coming later/);
+  assert.match(html, /id="cellarerConsult"/);
+  assert.doesNotMatch(html, /Ask About the Homestead|Consult Cyril <small>Coming later/);
   assert.match(html, /Cyril will determine where it belongs/);
   assert.match(client, /kind\.value = 'auto'/);
   assert.match(client, /toggle\.setAttribute\('aria-expanded', 'true'\)/);
@@ -99,6 +115,10 @@ test('Assisted Entry uses existing forms and always marks the result as a review
   assert.match(app, /openModal\('document'/);
   assert.match(app, /openModal\('event'/);
   assert.match(app, /openModal\('calendar'/);
+  assert.match(app, /setModalDraftValue\('value', draft\.eventValue\)/);
+  assert.match(app, /\['recurrenceUntil', draft\.recurrenceUntil\]/);
+  assert.ok(CELLARER_DRAFT_SCHEMA.required.includes('eventValue'));
+  assert.ok(CELLARER_DRAFT_SCHEMA.required.includes('recurrenceUntil'));
   assert.match(app, /Review and adjust this entry before recording it/);
   assert.match(styles, /\.cellarer-draft-notice/);
 });
@@ -175,12 +195,43 @@ test('server endpoint returns a validated draft and never writes the entry itsel
   }
 });
 
+test('server links an unambiguous Record Event even when AI leaves recordId blank', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalNetlify = globalThis.Netlify;
+  globalThis.Netlify = { env: { get: name => ({
+    SUPABASE_URL: 'https://example.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'publishable',
+    OPENAI_BASE_URL: 'https://gateway.example/v1', OPENAI_API_KEY: 'gateway-key'
+  }[name]) } };
+  globalThis.fetch = async url => {
+    if (String(url).endsWith('/auth/v1/user')) return Response.json({ id: 'user' });
+    if (String(url).includes('consume_premium_feature')) return Response.json([{ allowed: true }]);
+    return Response.json({ output_text: JSON.stringify({
+      kind: 'record_event', recordId: null, recordEventType: 'Weighed', date: '2026-09-22',
+      description: 'Weighed Daisy', eventValue: '500', eventUnit: 'lb'
+    }) });
+  };
+  try {
+    const response = await cellarerHandler(new Request('https://example.test/api/cyril/assisted-entry', {
+      method: 'POST', headers: { Authorization: 'Bearer token' },
+      body: JSON.stringify({ prompt: 'Weighed Daisy at 500 lb', context })
+    }));
+    const { draft } = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(draft.recordId, 'daisy');
+    assert.equal(draft.eventValue, '500');
+    assert.equal(draft.eventUnit, 'lb');
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.Netlify = originalNetlify;
+  }
+});
+
 test('daily quota is private, atomic, Homestead-scoped, and cached assets are versioned', () => {
   assert.match(migration, /create table private\.premium_feature_usage/);
   assert.match(migration, /primary key \(homestead_id, feature_key, window_started_at\)/);
   assert.match(migration, /on conflict on constraint premium_feature_usage_pkey/);
   assert.match(migration, /public\.has_premium_feature\(normalized_feature\)/);
   assert.match(migration, /revoke all on table private\.premium_feature_usage from public, anon, authenticated/);
-  assert.match(worker, /regula-rustica-cyril-record-matching-v1/);
-  assert.match(worker, /cellarer-assisted-entry\.mjs\?v=cyril-record-matching-v1/);
+  assert.match(worker, /regula-rustica-premium-preview-compat-v1/);
+  assert.match(worker, /cellarer-assisted-entry\.mjs\?v=cyril-consult-v1/);
 });

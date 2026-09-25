@@ -739,7 +739,13 @@ function showView(id) {
 
 function settingsOperatingMode() {
   const context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
-  if (context?.homesteadId) return 'Cloud connected';
+  if (context?.homesteadId) {
+    const premium = context.premium;
+    const premiumEndsAt = premium?.ends_at ? Date.parse(premium.ends_at) : Infinity;
+    if (premium?.status !== 'active' || premium.plan_key !== 'premium' || premiumEndsAt <= Date.now())
+      return 'Cloud Sync paused · Premium needed';
+    return window.RegulaRusticaSync?.isInitialized() === false ? 'Cloud setup needed on this device' : 'Cloud connected';
+  }
   if (context?.session) return 'Signed in · local until joined';
   return 'Local only';
 }
@@ -2502,6 +2508,10 @@ function cellarerContext(preferredKind = null) {
         breed: record.identity?.breed || '',
         purpose: record.identity?.purpose || '',
         currentUse: record.stewardship?.currentUse || '',
+        landType: record.identity?.landType || '',
+        equipmentType: record.identity?.equipmentType || '',
+        structureType: record.identity?.structureType || '',
+        workType: record.identity?.workType || '',
         eligibleYieldTypes: window.RegulaRusticaTasks.eligibleYieldTypes(record)
       })),
     people: activePeople().map(person => ({ id: person.id, name: personDisplayName(person) })),
@@ -2526,6 +2536,41 @@ function cellarerContext(preferredKind = null) {
           .map(item => item.recordId)
       }))
   };
+}
+
+function cellarerConsultContext() {
+  const active = values => values.filter(item => !item.deletedAt);
+  const recent = (values, dateKey, limit) => active(values)
+    .sort((a, b) => String(b[dateKey] || b.createdAt || '').localeCompare(String(a[dateKey] || a.createdAt || '')))
+    .slice(0, limit);
+  const all = {
+    records: active(data.records).map(item => ({ id: item.id, name: item.name, type: item.type, status: item.status,
+      species: item.identity?.species || '', purpose: item.identity?.purpose || '' })),
+    tasks: recent(data.tasks, 'dueDate', 100).map(item => ({ title: item.title, status: item.status, recordId: item.recordId,
+      availableFrom: item.availableFrom, dueDate: item.dueDate, completedAt: item.completedAt,
+      choreWindowId: item.choreWindowId, recurrence: item.recurrenceRule?.frequency || '' })),
+    yield: recent(data.yieldEntries, 'occurredAt', 60).map(item => ({ type: item.type, recordId: item.recordId,
+      occurredAt: item.occurredAt, quantity: item.quantity, unit: item.unit, product: item.product })),
+    ledger: recent(data.ledger, 'date', 60).map(item => ({ type: item.type, date: item.date, amount: item.amount,
+      description: item.description, category: item.category, vendorOrSource: item.vendorOrSource,
+      recordId: item.recordId, allocatedRecordIds: active(data.ledgerAllocations).filter(row => row.ledgerEntryId === item.id).map(row => row.recordId) })),
+    calendar: recent(data.calendarEvents, 'startDate', 60).map(item => ({ title: item.title, startDate: item.startDate,
+      endDate: item.endDate, location: item.location, recordId: item.recordId, recurrence: item.recurrenceRule?.frequency || '' })),
+    recordEvents: recent(data.events, 'date', 60).map(item => ({ eventType: item.eventType, date: item.date,
+      recordId: item.recordId, details: item.details })),
+    journal: recent(data.notes, 'createdAt', 60).map(item => ({ kind: 'note', date: item.createdAt,
+      recordId: item.recordId, text: item.text })),
+    choreWindows: active(data.choreWindows).map(item => ({ id: item.id, name: item.name, startTime: item.startTime,
+      endTime: item.endTime, enabled: item.enabled }))
+  };
+  const coverage = {
+    records: active(data.records).length, tasks: active(data.tasks).length, yield: active(data.yieldEntries).length,
+    ledger: active(data.ledger).length, calendar: active(data.calendarEvents).length,
+    recordEvents: active(data.events).length, journal: active(data.notes).length,
+    choreWindows: active(data.choreWindows).length
+  };
+  return { today: today(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    homesteadName: data.settings.homesteadName, sections: all, coverage };
 }
 
 function setModalDraftValue(name, value) {
@@ -2597,6 +2642,8 @@ function openCellarerDraft(draft) {
     const requested = draft.recordEventType || draft.title;
     setModalDraftValue('eventType', [...eventSelect.options].some(option => option.value === requested) ? requested : 'Other');
     setModalDraftValue('date', draft.date);
+    setModalDraftValue('value', draft.eventValue);
+    setModalDraftValue('unit', draft.eventUnit);
     setModalDraftValue('details', draft.description || draft.body || requested);
   }
   if (draft.kind === 'calendar_event') {
@@ -2604,7 +2651,9 @@ function openCellarerDraft(draft) {
     [
       ['title', draft.title], ['startDate', draft.startDate], ['endDate', draft.endDate || draft.startDate],
       ['allDay', draft.allDay], ['startTime', draft.startTime], ['endTime', draft.endTime],
-      ['location', draft.location], ['notes', draft.description || draft.body], ['recordId', draft.recordId]
+      ['recurrenceFrequency', draft.recurrenceFrequency], ['recurrenceInterval', draft.recurrenceInterval],
+      ['recurrenceUntil', draft.recurrenceUntil], ['location', draft.location],
+      ['notes', draft.description || draft.body], ['recordId', draft.recordId]
     ].forEach(([name, value]) => setModalDraftValue(name, value));
   }
   markCellarerDraft(draft);
@@ -3060,6 +3109,10 @@ $('#homesteadForm').addEventListener('submit', async event => {
   status.classList.remove('error');
   let savedLocally = false;
   try {
+    const premium = context?.premium;
+    const cloudIdentityEnabled = Boolean(context?.homesteadId && premium?.status === 'active'
+      && premium.plan_key === 'premium'
+      && (!premium.ends_at || Date.parse(premium.ends_at) > Date.now()));
     if (context?.homesteadId && !context.canManageHomestead) throw new Error('Only a Steward can change shared Homestead identity.');
     if (pendingHomesteadLogoFile) {
       next.homesteadLogo = await window.RegulaRusticaDocuments.saveHomesteadLogo(pendingHomesteadLogoFile);
@@ -3067,7 +3120,7 @@ $('#homesteadForm').addEventListener('submit', async event => {
     data.settings = next;
     saveData(data, 'homestead-identity');
     savedLocally = true;
-    if (context?.homesteadId) {
+    if (cloudIdentityEnabled) {
       if (pendingHomesteadLogoFile) {
         next.homesteadLogo = await window.RegulaRusticaDocuments.uploadHomesteadLogo(next.homesteadLogo);
         saveData(data, 'homestead-identity-logo-upload');
@@ -3085,7 +3138,7 @@ $('#homesteadForm').addEventListener('submit', async event => {
     if (oldLogo && oldLogo.id !== next.homesteadLogo?.id) {
       try {
         await window.RegulaRusticaDocuments.removeLocal([oldLogo.id]);
-        if (oldLogo.storagePath && context?.homesteadId) await window.RegulaRusticaDocuments.removeRemote([oldLogo.storagePath]);
+        if (oldLogo.storagePath && cloudIdentityEnabled) await window.RegulaRusticaDocuments.removeRemote([oldLogo.storagePath]);
       } catch (error) {
         console.warn('Previous Homestead logo cleanup will be retried later.', error);
       }
@@ -3095,7 +3148,7 @@ $('#homesteadForm').addEventListener('submit', async event => {
     $('#homesteadLogoInput').value = '';
     if (homesteadLogoPreviewUrl) URL.revokeObjectURL(homesteadLogoPreviewUrl);
     homesteadLogoPreviewUrl = '';
-    status.textContent = context?.homesteadId ? 'Shared Homestead identity saved.' : 'Homestead identity saved on this device.';
+    status.textContent = cloudIdentityEnabled ? 'Shared Homestead identity saved.' : 'Homestead identity saved on this device.';
   } catch (error) {
     console.warn('Homestead identity could not be fully saved.', error);
     status.textContent = savedLocally && context?.homesteadId
@@ -3136,8 +3189,9 @@ window.addEventListener('regula-rustica:cloud-context', () => {
   renderSettingsSummary();
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 });
+window.addEventListener('regula-rustica:sync-status', renderSettingsSummary);
 
-window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, openCellarerDraft };
+window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, cellarerConsultContext, openCellarerDraft };
 renderAll();
 window.addEventListener('load', () => materializeRecurringTasks());
 if (startupMigrationBefore) setTimeout(() => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {

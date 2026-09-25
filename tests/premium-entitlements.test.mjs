@@ -30,11 +30,12 @@ test('Premium is a Homestead entitlement with narrow read and gift redemption RP
 
 test('Cyril Premium settings clearly separate current access from future features', () => {
   assert.match(html, /data-settings-category="premium"/);
-  assert.match(html, /Cyril &amp; Premium/);
+  assert.match(html, /<strong>Premium<\/strong><small>Cloud Sync, Cyril, gifts, and status<\/small>/);
   assert.match(html, /Cyril the Cellarer/);
   assert.match(html, /Assisted Entry/);
   assert.match(html, /Receipt Reader/);
-  assert.match(html, /Ask the Farm Book/);
+  assert.match(html, /Consult Cyril/);
+  assert.match(html, /<strong>Cloud Sync<\/strong>/);
   assert.match(html, /Purchases are not available yet/);
   assert.match(css, /\.premium-feature-list/);
 });
@@ -44,5 +45,5 @@ test('cloud context reads effective Premium and redemption refreshes it', () => 
   assert.match(auth, /premium: premiumResult\.entitlement/);
   assert.match(auth, /client\.rpc\('redeem_premium_gift', \{ gift_code: giftCode \}\)/);
   assert.match(auth, /await refreshAccount\(session\)/);
-  assert.match(auth, /Premium status is temporarily unavailable\. Cloud Sync remains unaffected\./);
+  assert.match(auth, /Premium status is temporarily unavailable\. Cloud Sync is paused/);
 });

@@ -16,7 +16,7 @@ export const CELLARER_DRAFT_SCHEMA = Object.freeze({
     'priority', 'recurrenceFrequency', 'recurrenceInterval', 'recurrenceMode',
     'choreWindowId', 'yieldType', 'quantity', 'unit', 'unusableQuantity', 'session',
     'occurredAt', 'ledgerType', 'amount', 'vendorOrSource', 'category', 'date',
-    'body', 'recordEventType', 'allDay', 'endDate', 'startTime', 'endTime', 'location'
+    'body', 'recordEventType', 'eventValue', 'eventUnit', 'allDay', 'endDate', 'startTime', 'endTime', 'location', 'recurrenceUntil'
   ],
   properties: {
     kind: { type: 'string', enum: CELLARER_DRAFT_KINDS },
@@ -44,11 +44,14 @@ export const CELLARER_DRAFT_SCHEMA = Object.freeze({
     date: nullableString,
     body: nullableString,
     recordEventType: nullableString,
+    eventValue: nullableString,
+    eventUnit: nullableString,
     allDay: nullableBoolean,
     endDate: nullableString,
     startTime: nullableString,
     endTime: nullableString,
-    location: nullableString
+    location: nullableString,
+    recurrenceUntil: nullableString
   }
 });
 
@@ -65,21 +68,39 @@ const animalWords = {
   dog: ['dog', 'dogs', 'puppy', 'puppies', 'canine']
 };
 
-export function resolveCellarerRecord(value, records = []) {
+export function resolveCellarerRecord(value, records = [], kind = null) {
   const words = input => ` ${String(input || '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ')} `;
   const haystack = words(value);
-  const named = records.filter(record => record?.name && haystack.includes(words(record.name)));
+  const named = records.filter(record => record?.name && words(record.name).trim().length >= 3 && haystack.includes(words(record.name)));
   if (named.length) return named.length === 1 ? named[0].id : null;
   const matchingSpecies = Object.entries(animalWords)
     .filter(([, aliases]) => aliases.some(alias => haystack.includes(` ${alias} `)))
     .map(([species]) => species);
-  if (matchingSpecies.length !== 1) return null;
-  const matches = records.filter(record => {
-    if (record.type !== 'Animal') return false;
-    const species = words(record.species);
-    return animalWords[matchingSpecies[0]].some(alias => species.includes(` ${alias} `));
-  });
-  return matches.length === 1 ? matches[0].id : null;
+  if (matchingSpecies.length > 1) return null;
+  const candidates = new Set();
+  if (matchingSpecies.length === 1) {
+    const matches = records.filter(record => record.type === 'Animal'
+      && animalWords[matchingSpecies[0]].some(alias => words(record.species).includes(` ${alias} `)));
+    if (!matches.length) return null;
+    matches.forEach(record => candidates.add(record.id));
+  }
+  const descriptors = records.filter(record =>
+    [record.landType, record.equipmentType, record.structureType, record.workType, record.purpose, record.currentUse]
+      .some(detail => detail && words(detail).trim().length >= 3 && haystack.includes(words(detail))));
+  descriptors.forEach(record => candidates.add(record.id));
+  if (['task', 'yield'].includes(kind)) {
+    const eggs = /\beggs?\b/i.test(value) && (kind === 'yield' || /\b(collect|gather|record)\b/i.test(value));
+    const milk = /\b(milk|milking)\b/i.test(value) && (kind === 'yield'
+      || /\bmilking\b|\b(record|collect|measure)\b[^.!?]*\bmilk\b/i.test(value));
+    if (eggs && milk) return null;
+    const yieldType = eggs ? 'eggs' : milk ? 'milk' : null;
+    if (yieldType) {
+      const matches = records.filter(record => record.eligibleYieldTypes?.includes(yieldType));
+      if (!matches.length) return null;
+      matches.forEach(record => candidates.add(record.id));
+    }
+  }
+  return candidates.size === 1 ? [...candidates][0] : null;
 }
 
 export function sanitizeCellarerContext(input = {}) {
@@ -91,6 +112,10 @@ export function sanitizeCellarerContext(input = {}) {
     breed: text(record.breed, 80),
     purpose: text(record.purpose, 80),
     currentUse: text(record.currentUse, 120),
+    landType: text(record.landType, 80),
+    equipmentType: text(record.equipmentType, 80),
+    structureType: text(record.structureType, 80),
+    workType: text(record.workType, 80),
     eligibleYieldTypes: (Array.isArray(record.eligibleYieldTypes) ? record.eligibleYieldTypes : [])
       .filter(type => ['milk', 'eggs', 'meat', 'harvest', 'forage'].includes(type))
   })).filter(record => record.id && record.name);
@@ -165,11 +190,14 @@ export function validateCellarerDraft(input, context = {}) {
     date: text(input.date, 10),
     body: text(input.body, 2000),
     recordEventType: text(input.recordEventType, 100),
+    eventValue: text(input.eventValue, 100),
+    eventUnit: text(input.eventUnit, 80),
     allDay: typeof input.allDay === 'boolean' ? input.allDay : true,
     endDate: text(input.endDate, 10),
     startTime: text(input.startTime, 8),
     endTime: text(input.endTime, 8),
-    location: text(input.location, 200)
+    location: text(input.location, 200),
+    recurrenceUntil: text(input.recurrenceUntil, 10)
   };
   if (draft.kind === 'task' && !draft.title) throw new Error('A Task draft needs a title.');
   if (draft.kind === 'yield' && (!Number.isFinite(draft.quantity) || draft.quantity <= 0)) throw new Error('A Yield draft needs a positive quantity.');
@@ -246,6 +274,10 @@ function initializeCellarerDialog() {
   document.querySelector('#cellarerReceipt')?.addEventListener('click', () => {
     closeDesk();
     window.dispatchEvent(new Event('regula-rustica:cellarer-receipt-request'));
+  });
+  document.querySelector('#cellarerConsult')?.addEventListener('click', () => {
+    closeDesk();
+    window.dispatchEvent(new Event('regula-rustica:cellarer-consult-request'));
   });
   document.querySelector('#cellarerClose')?.addEventListener('click', close);
   document.querySelector('#cellarerCancel')?.addEventListener('click', close);

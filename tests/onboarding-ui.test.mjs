@@ -7,9 +7,10 @@ const [html, onboarding, app, auth, sync, worker] = await Promise.all([
   read('index.html'), read('onboarding.js'), read('app.js'), read('cloud-auth.js'), read('sync/runtime.mjs'), read('service-worker.js')
 ]);
 
-test('first-run flow exposes eight ordered, resumable screens', () => {
+test('first-run flow exposes a seven-step local route and remains resumable', () => {
   const steps = [...html.matchAll(/data-onboarding-step="(\d)"/g)].map(match => Number(match[1]));
   assert.deepEqual(steps, [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.match(onboarding, /standardSteps = \[1, 2, 3, 5, 6, 7, 8\]/);
   assert.match(html, /Put the Homestead in order\./);
   assert.match(html, /Enter Regula Rustica/);
   assert.match(html, /Continue establishing your Homestead/);
@@ -17,11 +18,15 @@ test('first-run flow exposes eight ordered, resumable screens', () => {
   assert.match(onboarding, /onboardingResumeButton/);
 });
 
-test('local path skips account setup while shared path uses production cloud services', () => {
-  assert.match(onboarding, /step === 3 && mode === 'local' \? 5/);
-  assert.match(onboarding, /selected === 'shared' \? 4 : 5/);
-  assert.match(onboarding, /RegulaRusticaCloudAuth/);
-  assert.match(onboarding, /RegulaRusticaSync\.initializeUpload\(\)/);
+test('Local is standard; returning sign-in and Premium are optional exits', () => {
+  assert.match(onboarding, /step === 3 \? 5/);
+  assert.match(onboarding, /updateState\(\{ mode: 'local', step: 5 \}\)/);
+  assert.doesNotMatch(html, /name="onboardingMode"/);
+  assert.match(html, /id="onboardingReturningSignIn"/);
+  assert.match(html, /id="onboardingSkipSetup"/);
+  assert.match(html, /id="onboardingExplorePremium"/);
+  assert.match(onboarding, /data-settings-category="cloud"/);
+  assert.match(onboarding, /data-settings-category="premium"/);
   assert.match(auth, /RegulaRusticaCloudAuth = Object\.freeze\(\{ signIn, signUp, createHomestead, createInvitation \}\)/);
   assert.match(sync, /initializeUpload: async/);
 });
@@ -66,7 +71,7 @@ test('new installs start empty and incomplete while legacy installs default to c
 });
 
 test('onboarding assets are part of the offline shell', () => {
-  assert.match(worker, /regula-rustica-cyril-record-matching-v1/);
-  assert.match(worker, /onboarding\.css\?v=onboarding-v4/);
-  assert.match(worker, /onboarding\.js\?v=onboarding-v4/);
+  assert.match(worker, /regula-rustica-premium-preview-compat-v1/);
+  assert.match(worker, /onboarding\.css\?v=standard-onboarding-v1/);
+  assert.match(worker, /onboarding\.js\?v=premium-preview-compat-v1/);
 });
