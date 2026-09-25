@@ -742,7 +742,7 @@ function settingsOperatingMode() {
   if (context?.homesteadId) {
     const premium = context.premium;
     const premiumEndsAt = premium?.ends_at ? Date.parse(premium.ends_at) : Infinity;
-    return premium?.status === 'active' && premium.feature_keys?.includes('cloud_sync') && premiumEndsAt > Date.now()
+    return premium?.status === 'active' && premium.plan_key === 'premium' && premiumEndsAt > Date.now()
       ? 'Cloud connected'
       : 'Cloud Sync paused · Premium needed';
   }
@@ -3111,7 +3111,7 @@ $('#homesteadForm').addEventListener('submit', async event => {
   try {
     const premium = context?.premium;
     const cloudIdentityEnabled = Boolean(context?.homesteadId && premium?.status === 'active'
-      && premium.feature_keys?.includes('cloud_sync')
+      && premium.plan_key === 'premium'
       && (!premium.ends_at || Date.parse(premium.ends_at) > Date.now()));
     if (context?.homesteadId && !context.canManageHomestead) throw new Error('Only a Steward can change shared Homestead identity.');
     if (pendingHomesteadLogoFile) {

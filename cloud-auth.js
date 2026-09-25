@@ -4,6 +4,7 @@ import {
   invitationStatus,
   invitationTokenFromUrl
 } from './cloud-invitations.mjs';
+import { premiumCloudEntitled } from './sync/premium-access.mjs';
 
 const status = document.querySelector('#cloudStatus');
 const authForm = document.querySelector('#cloudAuthForm');
@@ -65,10 +66,10 @@ async function initializeCloud() {
       premiumStatus.textContent = 'Sign in and join a cloud Homestead to check Premium.';
       return;
     }
-    if (entitlement?.status === 'active') {
+    if (premiumCloudEntitled(entitlement)) {
       premiumStatus.textContent = entitlement.ends_at
-        ? `Premium is active through ${formatDate(entitlement.ends_at)} for this Homestead.${entitlement.feature_keys?.includes('cloud_sync') ? ' Cloud Sync is included.' : ''}`
-        : `Premium is active for this Homestead.${entitlement.feature_keys?.includes('cloud_sync') ? ' Cloud Sync is included.' : ''}`;
+        ? `Premium is active through ${formatDate(entitlement.ends_at)} for this Homestead. Cloud Sync is included.`
+        : 'Premium is active for this Homestead. Cloud Sync is included.';
       return;
     }
     premiumStatus.textContent = canManageHomestead
@@ -180,7 +181,7 @@ async function initializeCloud() {
     document.querySelector('#cloudRole').textContent = role || '';
     renderPremium(premiumResult.entitlement, hasMembership, Boolean(canManageHomestead), premiumResult.error);
     showStatus(hasMembership
-      ? premiumResult.entitlement?.status === 'active' && premiumResult.entitlement.feature_keys?.includes('cloud_sync')
+      ? premiumCloudEntitled(premiumResult.entitlement)
         ? 'Account connected. Premium Cloud Sync is available below.'
         : 'Account connected. Cloud Sync is paused until this Homestead has Premium; local work remains available.'
       : invitationToken

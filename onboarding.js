@@ -188,7 +188,7 @@
       let context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
       if (!context?.homesteadId) context = await api.createHomestead(window.RegulaRusticaLocal.read().settings.homesteadName);
       if (!context?.homesteadId) throw new Error('The shared Homestead could not be established.');
-      if (context.premium?.status !== 'active' || !context.premium.feature_keys?.includes('cloud_sync')) throw new Error('Premium is required for Cloud Sync. Your local Farm Book is unchanged. Redeem a gift in Settings → Premium to continue.');
+      if (context.premium?.status !== 'active' || context.premium.plan_key !== 'premium' || (context.premium.ends_at && Date.parse(context.premium.ends_at) <= Date.now())) throw new Error('Premium is required for Cloud Sync. Your local Farm Book is unchanged. Redeem a gift in Settings → Premium to continue.');
       const local = window.RegulaRusticaLocal.read();
       if (local.settings.homesteadLogo && !local.settings.homesteadLogo.storagePath) {
         local.settings.homesteadLogo = await window.RegulaRusticaDocuments.uploadHomesteadLogo(local.settings.homesteadLogo);
