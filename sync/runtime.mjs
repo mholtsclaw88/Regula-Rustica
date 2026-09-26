@@ -7,6 +7,7 @@ import { premiumSyncAvailable } from './premium-access.mjs';
 const state = new LocalSyncState();
 const status = document.querySelector('#syncStatus');
 const actions = document.querySelector('#syncFirstActions');
+const firstDescription = document.querySelector('#syncFirstDescription');
 const conflictList = document.querySelector('#syncConflicts');
 const syncNow = document.querySelector('#syncNow');
 const syncRecovery = document.querySelector('#syncRecovery');
@@ -30,6 +31,7 @@ let firstCase = null;
 let attachmentRun = null;
 let syncTimer = null;
 let connectPromise = Promise.resolve();
+let lastStatusKind = 'ready';
 
 const DOMAIN_LABELS = Object.freeze({
   homestead_people: 'People', records: 'Records', record_documents: 'Documents', record_attachments: 'Attachments',
@@ -48,6 +50,7 @@ const HEADER_STATUS_ICONS = Object.freeze({
 
 window.RegulaRusticaSync = Object.freeze({
   isInitialized: () => state.state.initialSyncCompleted,
+  getStatus: () => headerStatusSnapshot(lastStatusKind),
   initializeUpload: async () => {
     await connectPromise;
     if (!context?.homesteadId) throw new Error('The shared Homestead is not connected yet.');
@@ -104,6 +107,7 @@ function renderHeaderStatus(kind) {
 }
 
 function render(kind = 'ready', error = null) {
+  lastStatusKind = kind;
   status.textContent = message(kind, error);
   renderHeaderStatus(kind);
   status.classList.toggle('error', kind === 'problem' || kind === 'attention' || state.state.outbox.some(item => item.status === 'blocked'));
@@ -112,9 +116,13 @@ function render(kind = 'ready', error = null) {
     && state.state.initialSyncState.status !== 'complete';
   syncRecovery.classList.toggle('hidden', !premiumSyncAvailable(context) || (!state.state.initialSyncCompleted && !recoveryInProgress));
   actions.classList.toggle('hidden', !premiumSyncAvailable(context) || !firstCase || state.state.initialSyncCompleted);
-  const premiumCloudAccess = document.querySelector('#premiumCloudAccess');
-  if (premiumCloudAccess) premiumCloudAccess.textContent = premiumSyncAvailable(context) && !state.state.initialSyncCompleted
-    ? 'Finish Cloud Sync setup' : 'Sign in or connect a Homestead';
+  const firstDescriptions = {
+    A: 'This device has saved work and the cloud Homestead is empty. Move this device’s work to the cloud to begin syncing.',
+    B: 'The cloud Homestead has saved work and this device has no meaningful work. Download the cloud copy to this device.',
+    C: 'Both this device and the cloud have saved work. Back up this device first, then replace its working copy with the cloud Homestead. Nothing is merged automatically.',
+    D: 'Both this device and the cloud are empty. Start Cloud Sync without changing any saved work.'
+  };
+  firstDescription.textContent = firstDescriptions[firstCase] || 'Choose how this device should begin. Nothing is merged automatically.';
   actions.querySelectorAll('[data-cases]').forEach(button => {
     button.classList.toggle('hidden', !button.dataset.cases.includes(firstCase));
   });
@@ -304,7 +312,7 @@ document.querySelector('#syncInitializeEmpty').addEventListener('click', () => r
   await engine.initialize('empty', context.homesteadId);
   startAttachmentSync();
 }));
-document.querySelector('#syncCancel').addEventListener('click', () => document.querySelector('#settingCloud .settings-back')?.click());
+document.querySelector('#syncCancel').addEventListener('click', () => { document.querySelector('#accountCloudDeviceDetails').close(); });
 
 render();
 if (window.REGULA_RUSTICA_CLOUD_CONTEXT) connectPromise = connect(window.REGULA_RUSTICA_CLOUD_CONTEXT);

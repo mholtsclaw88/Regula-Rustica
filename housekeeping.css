@@ -928,6 +928,33 @@ body.onboarding-open .cellarer-access { display: none; }
 #settingChoreWindows .routine-management-row { border-width: 0 0 1px; border-radius: 0; background: transparent; box-shadow: none; }
 #settingChoreWindows .routine-management-row:last-child { border-bottom: 0; }
 #settingCloud.cloud-card { border-color: var(--line); background: var(--paper); }
+.account-cloud-overview { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
+.account-cloud-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 16px; }
+.account-cloud-row + .account-cloud-row { border-top: 1px solid var(--line); }
+.account-cloud-row > div { min-width: 0; }
+.account-cloud-row .label { display: block; margin-bottom: 4px; }
+.account-cloud-row strong { display: block; color: var(--forest); font: 700 1.02rem Georgia, serif; }
+.account-cloud-row small { display: block; margin-top: 3px; color: var(--muted); font: .76rem/1.4 Arial, sans-serif; overflow-wrap: anywhere; }
+.account-cloud-row .btn { white-space: nowrap; }
+.account-cloud-next { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 16px 0 10px; padding: 15px 17px; border-left: 3px solid var(--gold); border-radius: 0 10px 10px 0; background: var(--raised); }
+.account-cloud-next strong { color: var(--forest); font: 700 1.08rem Georgia, serif; }
+.account-cloud-next .muted { margin: 4px 0 0; font: .78rem/1.45 Arial, sans-serif; }
+.account-cloud-next .btn { flex: 0 0 auto; }
+.account-cloud-dialog { width: min(680px, calc(100% - 24px)); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 0 20px 20px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
+.account-cloud-dialog-head { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 -20px 16px; padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--paper); }
+.account-cloud-dialog-head h3 { margin: 0; color: var(--forest); }
+.account-cloud-dialog-head .btn { flex: 0 0 auto; }
+.account-cloud-dialog > .muted { margin: 0 0 12px; }
+.account-cloud-dialog form { padding: 0; }
+.account-cloud-dialog .premium-status-card { margin-top: 4px; }
+@media (max-width: 520px) {
+  .account-cloud-row { gap: 8px; padding: 12px; }
+  .account-cloud-row .btn { padding-inline: 9px; }
+  .account-cloud-next { align-items: stretch; flex-direction: column; padding: 14px; }
+  .account-cloud-next .btn { width: 100%; }
+  .account-cloud-dialog { width: calc(100% - 16px); max-height: calc(100dvh - 16px); padding: 0 14px max(16px, env(safe-area-inset-bottom)); }
+  .account-cloud-dialog-head { margin-inline: -14px; padding: 13px 14px; }
+}
 .settings-about-list { display: grid; margin: 0; }
 .settings-about-list > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; padding: 11px 0; border-bottom: 1px solid rgba(164,123,60,.25); }
 .settings-about-list dt { color: var(--forest2); font: 700 .68rem Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; }

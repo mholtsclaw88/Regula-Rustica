@@ -35,12 +35,16 @@ test('active Premium grants created before cloud_sync exists remain valid in dep
 test('Premium awaiting first sync is shown as setup needed, not Local only or connected', () => {
   assert.match(runtime, /if \(!context\?\.homesteadId\) return \{ state: 'local', label: 'Local only'/);
   assert.match(runtime, /if \(!state\.state\.enabled \|\| !state\.state\.initialSyncCompleted\) return \{ state: 'issue', label: 'Sync setup'/);
-  assert.match(runtime, /premiumCloudAccess\.textContent = premiumSyncAvailable\(context\) && !state\.state\.initialSyncCompleted/);
-  assert.match(runtime, /#settingCloud \.settings-back/);
+  assert.match(runtime, /getStatus: \(\) => headerStatusSnapshot\(lastStatusKind\)/);
+  assert.match(runtime, /#accountCloudDeviceDetails/);
+  assert.match(runtime, /C: 'Both this device and the cloud have saved work\. Back up this device first/);
+  assert.match(html, /id="syncFirstDescription"/);
   assert.doesNotMatch(runtime, /syncCancel'\)\.addEventListener\('click', \(\) => \{ firstCase = null/);
-  assert.match(app, /isInitialized\(\) === false \? 'Cloud setup needed on this device' : 'Cloud connected'/);
+  assert.match(app, /isInitialized\(\) === false\) return 'Cloud setup needed on this device'/);
+  assert.match(app, /sync\?\.state === 'issue'\) return 'Sync needs attention'/);
   assert.match(app, /addEventListener\('regula-rustica:sync-status', renderSettingsSummary\)/);
-  assert.match(html, /sync\/runtime\.mjs\?v=premium-sync-setup-v1/);
+  assert.match(html, /id="accountCloudNextAction"/);
+  assert.match(html, /id="accountCloudPremiumDetails"/);
 });
 
 test('Premium Cloud Sync is checked at the database boundary, not only in the browser', () => {

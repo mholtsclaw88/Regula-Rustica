@@ -28,9 +28,9 @@ test('Premium is a Homestead entitlement with narrow read and gift redemption RP
   assert.match(migration, /code_hash text not null unique/);
 });
 
-test('Cyril Premium settings clearly separate current access from future features', () => {
-  assert.match(html, /data-settings-category="premium"/);
-  assert.match(html, /<strong>Premium<\/strong><small>Cloud Sync, Cyril, gifts, and status<\/small>/);
+test('Cyril Premium plan remains accessible inside Account & Cloud', () => {
+  assert.match(html, /data-settings-category="cloud"/);
+  assert.match(html, /id="accountCloudPremiumDetails"/);
   assert.match(html, /Cyril the Cellarer/);
   assert.match(html, /Assisted Entry/);
   assert.match(html, /Receipt Reader/);

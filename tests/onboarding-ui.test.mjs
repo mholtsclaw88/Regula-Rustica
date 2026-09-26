@@ -26,7 +26,7 @@ test('Local is standard; returning sign-in and Premium are optional exits', () =
   assert.match(html, /id="onboardingSkipSetup"/);
   assert.match(html, /id="onboardingExplorePremium"/);
   assert.match(onboarding, /data-settings-category="cloud"/);
-  assert.match(onboarding, /data-settings-category="premium"/);
+  assert.match(onboarding, /accountCloudPremiumDetails/);
   assert.match(auth, /RegulaRusticaCloudAuth = Object\.freeze\(\{ signIn, signUp, createHomestead, createInvitation \}\)/);
   assert.match(sync, /initializeUpload: async/);
 });
@@ -71,7 +71,7 @@ test('new installs start empty and incomplete while legacy installs default to c
 });
 
 test('onboarding assets are part of the offline shell', () => {
-  assert.match(worker, /regula-rustica-premium-preview-compat-v1/);
+  assert.match(worker, /regula-rustica-account-storage-v1/);
   assert.match(worker, /onboarding\.css\?v=standard-onboarding-v1/);
-  assert.match(worker, /onboarding\.js\?v=premium-preview-compat-v1/);
+  assert.match(worker, /onboarding\.js\?v=account-cloud-dialogs-v1/);
 });

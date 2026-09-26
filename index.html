@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=cyril-consult-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=account-cloud-dialogs-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
@@ -20,16 +20,16 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
-  <script src="app.js?v=premium-sync-setup-v1" defer></script>
+  <script src="app.js?v=account-cloud-dialogs-v1" defer></script>
   <script src="ledger-allocations.js?v=ledger-api-v2" data-ledger-allocations="true" defer></script>
-  <script src="onboarding.js?v=premium-preview-compat-v1" defer></script>
+  <script src="onboarding.js?v=account-cloud-dialogs-v1" defer></script>
   <script src="ui-refinements.js?v=cyril-record-matching-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="cloud-auth.js?v=premium-preview-compat-v1" type="module"></script>
+  <script src="cloud-auth.js?v=account-cloud-dialogs-v1" type="module"></script>
   <script src="cellarer-assisted-entry.mjs?v=cyril-consult-v1" type="module"></script>
   <script src="cellarer-receipt-reader.mjs?v=cyril-draft-review-v1" type="module"></script>
   <script src="cellarer-consult.mjs?v=cyril-copy-v1" type="module"></script>
-  <script src="sync/runtime.mjs?v=premium-sync-setup-v1" type="module"></script>
+  <script src="sync/runtime.mjs?v=account-cloud-dialogs-v1" type="module"></script>
 </head>
 <body>
   <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
@@ -448,7 +448,7 @@
               </button>
               <button class="settings-category-card" type="button" data-settings-category="people">
                 <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></span>
-                <span><strong>People &amp; Roles</strong><small>Members, children, invitations, and permissions</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+                <span><strong>People &amp; Roles</strong><small>Household people, children, and roles</small></span><span class="settings-chevron" aria-hidden="true">›</span>
               </button>
             </div>
           </section>
@@ -466,19 +466,11 @@
             </div>
           </section>
           <section class="settings-category-group" aria-labelledby="settingsDeviceGroup">
-            <h3 class="settings-category-group-title" id="settingsDeviceGroup">Cloud &amp; Device</h3>
+            <h3 class="settings-category-group-title" id="settingsDeviceGroup">Account &amp; Storage</h3>
             <div class="settings-category-list">
               <button class="settings-category-card" type="button" data-settings-category="cloud">
                 <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/><path d="m9 12 2 2 4-4"/></svg></span>
-                <span><strong>Cloud Sync</strong><small>Account, sync, and household invitations</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-              </button>
-              <button class="settings-category-card" type="button" data-settings-category="premium">
-                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 16h12M8 16V8l4-3 4 3v8M10 11h4M12 9v4"/></svg></span>
-                <span><strong>Premium</strong><small>Cloud Sync, Cyril, gifts, and status</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-              </button>
-              <button class="settings-category-card" type="button" data-settings-category="backup">
-                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12l-3 3 3 3"/><path d="M7 15h7a3 3 0 0 1 3 3"/></svg></span>
-                <span><strong>Backup &amp; Restore</strong><small>Download a backup or restore local data</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+                <span><strong>Account &amp; Storage</strong><small>Sign in, Premium, sync, and backups</small></span><span class="settings-chevron" aria-hidden="true">›</span>
               </button>
               <button class="settings-category-card" type="button" data-settings-category="about">
                 <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span>
@@ -516,17 +508,6 @@
             <button class="btn primary" id="saveHomesteadIdentity" type="submit">Save identity</button>
           </form>
         </article>
-        <article class="card settings-section hidden" id="settingBackup" data-settings-panel="backup">
-          <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">Own your records</span><h2 tabindex="-1">Data &amp; backup</h2><p class="muted">Keep a portable copy of the homestead records entrusted to this device.</p></header>
-          <p class="muted">Download a backup regularly. Records remain available in this browser, including while cloud synchronization is disconnected.</p>
-          <h3 class="settings-rule-title">Routine data actions</h3>
-          <div class="quick compact-actions">
-            <button class="btn secondary" id="exportData">Download backup</button>
-            <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
-          </div>
-          <details class="danger-zone"><summary>Destructive actions</summary><p class="muted">Reset replaces every local record with the sample Homestead.</p><button class="btn danger" id="resetData">Reset sample data</button></details>
-        </article>
         <article class="card settings-section hidden" id="settingPeople" data-settings-panel="people">
           <button class="settings-back" type="button">← Settings</button>
           <header class="settings-section-head"><span class="label">Household participation</span><h2 tabindex="-1">People &amp; stewardship</h2><p class="muted">See who participates and manage local child profiles used for task assignment.</p></header>
@@ -552,8 +533,17 @@
         </article>
         <article class="card cloud-card settings-section hidden" id="settingCloud" data-settings-panel="cloud">
           <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">Optional connection</span><h2 tabindex="-1">Cloud &amp; sharing</h2><p class="muted">Connect an account, synchronize safely, and invite household members when useful.</p></header>
-          <p class="muted">Account access and synchronization are optional. Your working records remain local-first and available offline.</p>
+          <header class="settings-section-head"><span class="label">Account &amp; storage</span><h2 tabindex="-1">Account &amp; Storage</h2><p class="muted">Your account, Premium plan, device sync, and portable backups in one place.</p></header>
+          <div class="account-cloud-overview" aria-label="Account and storage status">
+            <div class="account-cloud-row"><div><span class="label">Account</span><strong id="accountCloudAccountState">Checking account…</strong><small id="accountCloudAccountDetail">Your work stays on this device.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudAccountDetails">Manage</button></div>
+            <div class="account-cloud-row"><div><span class="label">Premium</span><strong id="accountCloudPremiumState">Checking plan…</strong><small id="accountCloudPremiumDetail">Cloud Sync and Cyril are Premium features.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudPremiumDetails">View plan</button></div>
+            <div class="account-cloud-row"><div><span class="label">This device</span><strong id="accountCloudDeviceState">Checking sync…</strong><small id="accountCloudDeviceDetail">Local work remains available offline.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudDeviceDetails">Details</button></div>
+            <div class="account-cloud-row"><div><span class="label">Backup &amp; Restore</span><strong>Portable copy</strong><small>Download or restore this device's local data.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudBackupDetails">Manage</button></div>
+          </div>
+          <div class="account-cloud-next" id="accountCloudNext" aria-live="polite"><div><strong id="accountCloudNextTitle">Checking connection…</strong><p id="accountCloudNextDetail" class="muted">Your records remain available on this device.</p></div><button class="btn primary" id="accountCloudNextAction" data-account-cloud-open="accountCloudAccountDetails" type="button">Continue</button></div>
+          <dialog class="account-cloud-dialog" id="accountCloudAccountDetails" aria-labelledby="accountCloudAccountTitle">
+          <header class="account-cloud-dialog-head"><h3 id="accountCloudAccountTitle">Account &amp; household</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
+          <p class="muted">An account is optional for local work. Sign in to connect a shared Homestead.</p>
           <p id="cloudStatus" class="cloud-status" role="status">Checking cloud configuration…</p>
           <form id="cloudAuthForm" class="form-grid hidden">
             <label>Display name<input id="cloudDisplayName" autocomplete="name"></label>
@@ -609,10 +599,37 @@
               <button class="btn secondary" id="cloudAcceptInvitation" type="button">Accept invitation</button>
             </div>
           </div>
+          <form id="cloudPasswordForm" class="form-grid hidden">
+            <label>New password<input id="cloudNewPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+            <button class="btn primary" type="submit">Save new password</button>
+          </form>
+          </dialog>
+          <dialog class="account-cloud-dialog" id="accountCloudPremiumDetails" aria-labelledby="accountCloudPremiumTitle">
+            <header class="account-cloud-dialog-head"><h3 id="accountCloudPremiumTitle">Premium plan &amp; gifts</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
+            <section class="premium-status-card" aria-labelledby="premiumStatusTitle">
+              <div><span class="label">Household plan</span><h3 id="premiumStatusTitle">Premium status</h3></div>
+              <p id="premiumStatus" class="cloud-status" role="status">Sign in and join a cloud Homestead to check Premium.</p>
+            </section>
+            <div class="premium-feature-list" aria-label="Premium features">
+              <div><strong>Cloud Sync</strong><span>Keep your Homestead in step across devices and share it with your household.</span></div>
+              <div><strong>Assisted Entry · Available</strong><span>Turn a plain-language note into a reviewable Task, Yield, Ledger, Event, or Journal draft.</span></div>
+              <div><strong>Receipt Reader</strong><span>Prepare a reviewable Ledger draft from a receipt photo.</span></div>
+              <div><strong>Consult Cyril</strong><span>Ask one question about your Farm Book and receive a careful answer.</span></div>
+            </div>
+            <form id="premiumRedeemForm" class="form-grid hidden">
+              <label>Premium gift code<input id="premiumGiftCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RR-XXXX-XXXX-XXXX-XXXX" required></label>
+              <button class="btn primary" type="submit">Redeem gift</button>
+            </form>
+            <p id="premiumRedeemResult" class="muted" role="status"></p>
+            <p class="premium-note">Premium is optional. The standard Farm Book continues to work on this device without an account or internet connection. Cyril prepares drafts for your approval and never records them for you.</p>
+            <p class="muted">Purchases are not available yet. This foundation supports gifted access now and verified web, Apple, or Google purchases in a future release.</p>
+          </dialog>
+          <dialog class="account-cloud-dialog" id="accountCloudDeviceDetails" aria-labelledby="accountCloudDeviceTitle">
+          <header class="account-cloud-dialog-head"><h3 id="accountCloudDeviceTitle">This device &amp; synchronization</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
           <div id="syncControls" class="form-grid">
             <p id="syncStatus" class="cloud-status" role="status">Cloud synchronization is not connected.</p>
             <div id="syncFirstActions" class="form-grid hidden">
-              <p class="muted">Choose how this device should begin. Regula Rustica will never merge two populated Homesteads automatically.</p>
+              <p class="muted" id="syncFirstDescription">Choose how this device should begin. Regula Rustica will never merge two populated Homesteads automatically.</p>
               <button class="btn primary hidden" id="syncUpload" data-cases="A" type="button">Move this Homestead to the cloud</button>
               <button class="btn primary hidden" id="syncDownload" data-cases="B" type="button">Download cloud Homestead</button>
               <button class="btn primary hidden" id="syncUseCloud" data-cases="C" type="button">Back up this device and use cloud Homestead</button>
@@ -633,35 +650,17 @@
               </div>
             </details>
           </div>
-          <form id="cloudPasswordForm" class="form-grid hidden">
-            <label>New password<input id="cloudNewPassword" type="password" autocomplete="new-password" minlength="8" required></label>
-            <button class="btn primary" type="submit">Save new password</button>
-          </form>
-        </article>
-        <article class="card premium-card settings-section hidden" id="settingPremium" data-settings-panel="premium">
-          <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">The wider Homestead</span><h2 tabindex="-1">Regula Rustica Premium</h2><p class="muted">Connect your Farm Book across devices and consult Cyril when you need a careful hand.</p></header>
-          <section class="premium-status-card" aria-labelledby="premiumStatusTitle">
-            <div>
-              <span class="label">Household plan</span>
-              <h3 id="premiumStatusTitle">Premium status</h3>
+          </dialog>
+          <dialog class="account-cloud-dialog" id="accountCloudBackupDetails" aria-labelledby="accountCloudBackupTitle">
+            <header class="account-cloud-dialog-head"><h3 id="accountCloudBackupTitle">Backup &amp; Restore</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
+            <p class="muted">Download a backup regularly. Records remain available in this browser, including while cloud synchronization is disconnected.</p>
+            <h3 class="settings-rule-title">Routine data actions</h3>
+            <div class="quick compact-actions">
+              <button class="btn secondary" id="exportData">Download backup</button>
+              <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
             </div>
-            <p id="premiumStatus" class="cloud-status" role="status">Sign in and join a cloud Homestead to check Premium.</p>
-          </section>
-          <div class="premium-feature-list" aria-label="Premium features">
-            <div><strong>Cloud Sync</strong><span>Keep your Homestead in step across devices and share it with your household.</span></div>
-            <div><strong>Assisted Entry · Available</strong><span>Turn a plain-language note into a reviewable Task, Yield, Ledger, Event, or Journal draft.</span></div>
-            <div><strong>Receipt Reader</strong><span>Prepare a reviewable Ledger draft from a receipt photo.</span></div>
-            <div><strong>Consult Cyril</strong><span>Ask one question about your Farm Book and receive a careful answer.</span></div>
-          </div>
-          <button class="btn secondary" id="premiumCloudAccess" type="button">Sign in or connect a Homestead</button>
-          <form id="premiumRedeemForm" class="form-grid hidden">
-            <label>Premium gift code<input id="premiumGiftCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RR-XXXX-XXXX-XXXX-XXXX" required></label>
-            <button class="btn primary" type="submit">Redeem gift</button>
-          </form>
-          <p id="premiumRedeemResult" class="muted" role="status"></p>
-          <p class="premium-note">Premium is optional. The standard Farm Book continues to work on this device without an account or internet connection. Cyril prepares drafts for your approval and never records them for you.</p>
-          <p class="muted">Purchases are not available yet. This foundation supports gifted access now and verified web, Apple, or Google purchases in a future release.</p>
+            <details class="danger-zone"><summary>Destructive actions</summary><p class="muted">Reset replaces every local record with the sample Homestead.</p><button class="btn danger" id="resetData">Reset sample data</button></details>
+          </dialog>
         </article>
         <article class="card settings-section hidden" id="settingAbout" data-settings-panel="about">
           <button class="settings-back" type="button">← Settings</button>

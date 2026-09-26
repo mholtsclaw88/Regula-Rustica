@@ -26,6 +26,7 @@ document.querySelector('#cloudInvitationToken').value = invitationToken;
 const showStatus = (message, isError = false) => {
   status.textContent = message;
   status.classList.toggle('error', isError);
+  window.dispatchEvent(new CustomEvent('regula-rustica:cloud-status'));
 };
 
 const config = window.REGULA_RUSTICA_CLOUD || {};
@@ -136,6 +137,11 @@ async function initializeCloud() {
     authForm.classList.toggle('hidden', Boolean(user));
     signedIn.classList.toggle('hidden', !user);
     passwordForm.classList.toggle('hidden', event !== 'PASSWORD_RECOVERY');
+    if (event === 'PASSWORD_RECOVERY' || invitationToken) {
+      const cloudPanel = document.querySelector('#settingCloud');
+      if (cloudPanel?.classList.contains('hidden')) cloudPanel.dataset.pendingAccountCloud = 'true';
+      else document.querySelector('[data-account-cloud-open="accountCloudAccountDetails"]')?.click();
+    }
 
     if (!user) {
       clearInvitationResult();

@@ -12,12 +12,38 @@ const [html, app, css, styles] = await Promise.all([
 test('Settings home exposes one focused destination for every category', () => {
   const categories = [...html.matchAll(/data-settings-category="([^"]+)"/g)].map(match => match[1]);
   const panels = [...html.matchAll(/data-settings-panel="([^"]+)"/g)].map(match => match[1]);
-  assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'cloud', 'premium', 'backup', 'about']);
+  assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'cloud', 'about']);
   assert.deepEqual(panels.sort(), [...categories].sort());
   assert.match(app, /showSettingsSection\(button\.dataset\.settingsCategory\)/);
   assert.match(html, /data-settings-view="calendar"/);
   assert.match(app, /button\.dataset\.settingsView/);
   assert.match(app, /showSettingsSection\('home'\)/);
+  assert.match(html, /Account &amp; Storage/);
+  assert.doesNotMatch(html, /data-settings-category="backup"|data-settings-panel="backup"/);
+  assert.match(html, /id="accountCloudAccountDetails"/);
+  assert.match(html, /id="accountCloudPremiumDetails"/);
+  assert.match(html, /id="accountCloudDeviceDetails"/);
+  assert.match(html, /id="accountCloudBackupDetails"/);
+  assert.match(app, /data-account-cloud-open/);
+  assert.match(html, /id="accountCloudNextAction" data-account-cloud-open="accountCloudAccountDetails"/);
+  assert.doesNotMatch(html, /data-settings-category="premium"/);
+});
+
+test('Account and Storage details open as focused, dismissible panels', () => {
+  for (const [id, title] of [
+    ['Account', 'Account'], ['Premium', 'Premium'], ['Device', 'Device'], ['Backup', 'Backup']
+  ]) {
+    assert.match(html, new RegExp(`<dialog class="account-cloud-dialog" id="accountCloud${id}Details" aria-labelledby="accountCloud${title}Title">`));
+  }
+  assert.equal((html.match(/data-account-cloud-close/g) || []).length, 4);
+  assert.match(html, /data-account-cloud-open="accountCloudBackupDetails"/);
+  assert.match(html, /id="accountCloudBackupDetails"[\s\S]*id="exportData"[\s\S]*id="importData"[\s\S]*id="resetData"[\s\S]*<\/dialog>/);
+  assert.doesNotMatch(html, /class="account-cloud-details"/);
+  assert.match(app, /dialog\.showModal\(\)/);
+  assert.match(app, /button\.closest\('dialog'\)\?\.close\(\)/);
+  assert.match(app, /if \(section !== 'cloud'\) closeAccountCloudDialogs\(\)/);
+  assert.match(app, /dataset\.pendingAccountCloud === 'true'/);
+  assert.match(css, /\.account-cloud-dialog \{[^}]*max-height: calc\(100dvh - 32px\)/);
 });
 
 test('existing Settings control contracts remain present exactly once', () => {
@@ -44,6 +70,10 @@ test('Settings summary derives from real local and cloud state', () => {
   assert.match(app, /data\.choreWindows\.filter/);
   assert.match(app, /REGULA_RUSTICA_CLOUD_CONTEXT/);
   assert.match(app, /data\.settings\.homesteadName/);
+  assert.match(app, /sync\?\.label === 'Sync setup'/);
+  assert.match(app, /sync\?\.state === 'issue'/);
+  assert.match(app, /premiumError \? 'Status unavailable'/);
+  assert.match(app, /title = 'Premium status could not be checked'/);
 });
 
 test('Homestead identity is restrained on Today and names every primary section consistently', () => {
