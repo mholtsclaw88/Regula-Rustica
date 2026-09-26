@@ -72,7 +72,7 @@ export function resolveCellarerRecord(value, records = [], kind = null) {
   const words = input => ` ${String(input || '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ')} `;
   const haystack = words(value);
   const named = records.filter(record => record?.name && words(record.name).trim().length >= 3 && haystack.includes(words(record.name)));
-  if (named.length) return named.length === 1 ? named[0].id : null;
+  if (named.length > 1) return null;
   const matchingSpecies = Object.entries(animalWords)
     .filter(([, aliases]) => aliases.some(alias => haystack.includes(` ${alias} `)))
     .map(([species]) => species);
@@ -81,9 +81,16 @@ export function resolveCellarerRecord(value, records = [], kind = null) {
   if (matchingSpecies.length === 1) {
     const matches = records.filter(record => record.type === 'Animal'
       && animalWords[matchingSpecies[0]].some(alias => words(record.species).includes(` ${alias} `)));
-    if (!matches.length) return null;
+    if (!matches.length) {
+      // Older Records may omit species while naming the animal explicitly.
+      // Accept that exact name, but not a contradictory species mentioned elsewhere.
+      return named.length === 1 && animalWords[matchingSpecies[0]]
+        .some(alias => words(named[0].name).includes(` ${alias} `)) ? named[0].id : null;
+    }
     matches.forEach(record => candidates.add(record.id));
   }
+  // An explicit name is decisive only when it does not contradict the species in the request.
+  if (named.length === 1) return candidates.size && !candidates.has(named[0].id) ? null : named[0].id;
   const descriptors = records.filter(record =>
     [record.landType, record.equipmentType, record.structureType, record.workType, record.purpose, record.currentUse]
       .some(detail => detail && words(detail).trim().length >= 3 && haystack.includes(words(detail))));
@@ -264,9 +271,7 @@ function initializeCellarerDialog() {
     kind.value = 'auto';
     kindChoice.open = false;
     prompt.value = '';
-    showStatus(premiumAvailable()
-      ? 'Cyril will prepare a draft. You remain in control of what is recorded.'
-      : 'Cyril requires an active Premium Homestead and Cloud connection.', !premiumAvailable());
+    showStatus(premiumAvailable() ? '' : 'Connect to your Premium Homestead to use Cyril.', !premiumAvailable());
     submit.disabled = !premiumAvailable();
     dialog.showModal();
     setTimeout(() => prompt.focus(), 30);

@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=account-cloud-dialogs-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=cyril-dialog-copy-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
@@ -26,9 +26,9 @@
   <script src="ui-refinements.js?v=cyril-record-matching-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
   <script src="cloud-auth.js?v=account-cloud-dialogs-v1" type="module"></script>
-  <script src="cellarer-assisted-entry.mjs?v=cyril-consult-v1" type="module"></script>
-  <script src="cellarer-receipt-reader.mjs?v=cyril-draft-review-v1" type="module"></script>
-  <script src="cellarer-consult.mjs?v=cyril-copy-v1" type="module"></script>
+  <script src="cellarer-assisted-entry.mjs?v=cyril-dialog-copy-v1" type="module"></script>
+  <script src="cellarer-receipt-reader.mjs?v=cyril-dialog-copy-v1" type="module"></script>
+  <script src="cellarer-consult.mjs?v=cyril-dialog-copy-v1" type="module"></script>
   <script src="sync/runtime.mjs?v=account-cloud-dialogs-v1" type="module"></script>
 </head>
 <body>
@@ -614,7 +614,7 @@
               <div><strong>Cloud Sync</strong><span>Keep your Homestead in step across devices and share it with your household.</span></div>
               <div><strong>Assisted Entry · Available</strong><span>Turn a plain-language note into a reviewable Task, Yield, Ledger, Event, or Journal draft.</span></div>
               <div><strong>Receipt Reader</strong><span>Prepare a reviewable Ledger draft from a receipt photo.</span></div>
-              <div><strong>Consult Cyril</strong><span>Ask one question about your Farm Book and receive a careful answer.</span></div>
+              <div><strong>Consult Cyril</strong><span>Ask about your Farm Book.</span></div>
             </div>
             <form id="premiumRedeemForm" class="form-grid hidden">
               <label>Premium gift code<input id="premiumGiftCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RR-XXXX-XXXX-XXXX-XXXX" required></label>
@@ -749,7 +749,7 @@
       <div class="cellarer-desk-rows">
         <button id="cellarerPrepare" class="cellarer-desk-row" type="button"><strong>Prepare an Entry</strong><span>Describe what happened or what needs doing. Cyril prepares a draft for your review.</span></button>
         <button id="cellarerReceipt" class="cellarer-desk-row" type="button"><strong>Read a Receipt</strong><span>Turn a receipt photo into a Ledger draft for your review.</span></button>
-        <button id="cellarerConsult" class="cellarer-desk-row" type="button"><strong>Consult Cyril</strong><span>Ask one question about the Farm Book and receive a careful answer.</span></button>
+        <button id="cellarerConsult" class="cellarer-desk-row" type="button"><strong>Consult Cyril</strong><span>Ask about your Farm Book.</span></button>
       </div>
       <p class="cellarer-desk-stewardship">Cyril assists; you remain the steward.<span>Nothing is recorded without your review.</span></p>
     </section>
@@ -771,13 +771,12 @@
   </dialog>
   <dialog id="cellarerDialog" class="cellarer-dialog">
     <form id="cellarerForm">
-      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2>Prepare an entry</h2><p class="muted form-modal-subtitle">Describe what happened or what needs recording. Cyril will prepare a draft for your review.</p></div><button type="button" class="btn ghost" id="cellarerClose" aria-label="Close">✕</button></div>
+      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2>Prepare an entry</h2><p class="muted form-modal-subtitle">Describe what you'd like to record.</p></div><button type="button" class="btn ghost" id="cellarerClose" aria-label="Close">✕</button></div>
       <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
       <div class="form-grid">
-        <label>What should Cyril prepare?<textarea id="cellarerPrompt" name="prompt" maxlength="1200" required placeholder="Example: Paid Miller Feed $84.50 today for layer feed, linked to the laying hens."></textarea></label>
-        <p class="cellarer-prompt-help muted">Cyril will determine where it belongs. You can choose an entry type if needed.</p>
+        <label>Your entry<textarea id="cellarerPrompt" name="prompt" maxlength="1200" required placeholder="Paid $84.50 for feed for the laying hens."></textarea></label>
         <details class="cellarer-kind-choice"><summary>Choose an entry type <span>(optional)</span></summary><label>Entry type<select id="cellarerKind" name="kind"><option value="auto">Let Cyril decide</option><option value="task">Task</option><option value="yield">Yield</option><option value="ledger">Ledger entry</option><option value="journal_note">Journal note</option><option value="record_event">Record event</option><option value="calendar_event">Calendar event</option></select></label></details>
-        <p class="cellarer-privacy-note muted">Only this request and a compact list of active Records, people, and Chore Windows are sent for drafting.</p>
+        <details class="cellarer-privacy-details"><summary>What Cyril can see</summary><p class="cellarer-privacy-note muted">Cyril receives your request and relevant Farm Book context. Nothing is saved until you review the draft.</p></details>
         <p id="cellarerStatus" class="cellarer-status" role="status"></p>
       </div>
       <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerCancel">Cancel</button><button type="submit" class="btn primary" id="cellarerSubmit">Prepare draft</button></div>
@@ -785,28 +784,28 @@
   </dialog>
   <dialog id="cellarerReceiptDialog" class="cellarer-dialog" aria-labelledby="cellarerReceiptTitle">
     <form id="cellarerReceiptForm">
-      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2 id="cellarerReceiptTitle">Read a receipt</h2><p class="muted form-modal-subtitle">Cyril will prepare a Ledger draft. You review and save it yourself.</p></div><button type="button" class="btn ghost" id="cellarerReceiptClose" aria-label="Close">✕</button></div>
+      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2 id="cellarerReceiptTitle">Read a receipt</h2><p class="muted form-modal-subtitle">Turn a photo into a Ledger draft.</p></div><button type="button" class="btn ghost" id="cellarerReceiptClose" aria-label="Close">✕</button></div>
       <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
       <div class="form-grid">
         <div class="cellarer-receipt-choices"><button type="button" class="btn secondary" id="cellarerReceiptTake">Take photo</button><button type="button" class="btn secondary" id="cellarerReceiptChoose">Choose photo</button></div>
         <input id="cellarerReceiptCamera" class="cellarer-receipt-file" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Take receipt photo">
         <input id="cellarerReceiptFile" class="cellarer-receipt-file" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose receipt photo">
         <img id="cellarerReceiptPreview" class="cellarer-receipt-preview hidden" alt="Selected receipt preview">
-        <label>Record for this expense (optional)<select id="cellarerReceiptRecord"><option value="">Let Cyril suggest one</option></select></label>
-        <label>Anything Cyril should know? (optional)<input id="cellarerReceiptNote" type="text" maxlength="300" placeholder="For example: feed for the laying hens"></label>
-        <p class="muted cellarer-privacy-note">The selected image is sent for AI reading only when you choose Prepare draft. If you save the Ledger entry, its receipt photo stays on this device and in downloaded backups; receipt photos do not cloud-sync.</p>
+        <label>Related Record (optional)<select id="cellarerReceiptRecord"><option value="">Let Cyril suggest one</option></select></label>
+        <label>Add a detail (optional)<input id="cellarerReceiptNote" type="text" maxlength="300" placeholder="Feed for the laying hens"></label>
+        <details class="cellarer-privacy-details"><summary>About your receipt photo</summary><p class="muted cellarer-privacy-note">Cyril reads the photo when you prepare the draft. If saved, the photo stays on this device and in downloaded backups. Receipt photos do not cloud-sync.</p></details>
         <p id="cellarerReceiptStatus" class="cellarer-status" role="status"></p>
       </div>
-      <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerReceiptCancel">Cancel</button><button type="submit" class="btn primary" id="cellarerReceiptSubmit" disabled>Prepare Ledger draft</button></div>
+      <div class="dialog-actions"><button type="button" class="btn secondary" id="cellarerReceiptCancel">Cancel</button><button type="submit" class="btn primary" id="cellarerReceiptSubmit" disabled>Prepare draft</button></div>
     </form>
   </dialog>
   <dialog id="cellarerConsultDialog" class="cellarer-dialog" aria-labelledby="cellarerConsultTitle">
     <form id="cellarerConsultForm">
-      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2 id="cellarerConsultTitle">Consult Cyril</h2><p class="muted form-modal-subtitle">Ask a question and receive one answer—not a chat.</p></div><button type="button" class="btn ghost" id="cellarerConsultClose" aria-label="Close">✕</button></div>
+      <div class="form-modal-header row"><div><span class="label">Cyril the Cellarer</span><h2 id="cellarerConsultTitle">Consult Cyril</h2><p class="muted form-modal-subtitle">Ask about your homestead.</p></div><button type="button" class="btn ghost" id="cellarerConsultClose" aria-label="Close">✕</button></div>
       <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
       <div class="form-grid">
-        <label>What would you like to know?<textarea id="cellarerConsultQuestion" maxlength="1200" required placeholder="Example: How much milk did Daisy produce this month?"></textarea></label>
-        <p class="muted cellarer-privacy-note">When you ask, a limited snapshot of your Homestead Records, Tasks, Yield, Ledger, Calendar, and notes is sent to Cyril. Photos and attachments are not sent. Nothing is changed.</p>
+        <label>Your question<textarea id="cellarerConsultQuestion" maxlength="1200" required placeholder="How much milk did Daisy produce this month?"></textarea></label>
+        <details class="cellarer-privacy-details"><summary>What Cyril can see</summary><p class="muted cellarer-privacy-note">Cyril reads a limited snapshot of your Farm Book. Photos and attachments aren't sent, and he can't change your records.</p></details>
         <p id="cellarerConsultStatus" class="cellarer-status" role="status"></p>
         <section id="cellarerConsultAnswer" class="cellarer-consult-answer" aria-label="Cyril’s answer" hidden><strong>Cyril’s answer</strong><p id="cellarerConsultAnswerText"></p><p id="cellarerConsultCaveat" class="muted"></p></section>
       </div>

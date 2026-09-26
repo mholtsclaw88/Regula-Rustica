@@ -1,4 +1,4 @@
-import { resolveCellarerRecord, sanitizeCellarerContext, validateCellarerDraft } from './cellarer-assisted-entry.mjs?v=cyril-draft-review-v1';
+import { resolveCellarerRecord, sanitizeCellarerContext, validateCellarerDraft } from './cellarer-assisted-entry.mjs?v=cyril-dialog-copy-v1';
 
 export const CELLARER_RECEIPT_FEATURE_KEY = 'cellarer_receipt_reader';
 
@@ -109,9 +109,7 @@ function initializeReceiptReader() {
     preview.removeAttribute('src');
     preview.classList.add('hidden');
     submit.disabled = true;
-    message(premiumAvailable()
-      ? 'Choose a clear photo showing the date and total.'
-      : 'Receipt Reader requires an active Premium Homestead and Cloud connection.', !premiumAvailable());
+    message(premiumAvailable() ? '' : 'Connect to your Premium Homestead to read a receipt.', !premiumAvailable());
     dialog.showModal();
   });
   document.querySelector('#cellarerReceiptTake')?.addEventListener('click', () => camera.click());
@@ -133,8 +131,8 @@ function initializeReceiptReader() {
       preview.src = prepared.dataUrl;
       preview.classList.remove('hidden');
       submit.disabled = !premiumAvailable();
-      message(premiumAvailable() ? 'Photo ready. Review the draft before saving anything.'
-        : 'Receipt Reader requires an active Premium Homestead and Cloud connection.', !premiumAvailable());
+      message(premiumAvailable() ? 'Photo ready.'
+        : 'Connect to your Premium Homestead to read a receipt.', !premiumAvailable());
     } catch (error) {
       if (current === selection) message(error?.message || 'This photo could not be prepared.', true);
     }
