@@ -728,6 +728,7 @@ function addEvent(recordId, eventType, details = '', options = {}) {
 }
 
 function showView(id) {
+  if (id !== 'settings') closeAccountCloudDialogs();
   $$('.view,.record-shell').forEach(element => element.classList.remove('active'));
   $$('.nav button').forEach(button => button.classList.toggle('active', button.dataset.view === id));
   $(`#${id}`).classList.add('active');
@@ -815,11 +816,16 @@ function renderSettingsSummary() {
 }
 
 function showSettingsSection(section = 'home', focus = true) {
+  if (section !== 'cloud') closeAccountCloudDialogs();
   settingsSection = section;
   const home = $('#settingHome');
   if (!home) return;
   home.classList.toggle('hidden', section !== 'home');
   $$('[data-settings-panel]').forEach(panel => panel.classList.toggle('hidden', panel.dataset.settingsPanel !== section));
+  if (section === 'cloud' && $('#settingCloud').dataset.pendingAccountCloud === 'true') {
+    delete $('#settingCloud').dataset.pendingAccountCloud;
+    $('[data-account-cloud-open="accountCloudAccountDetails"]')?.click();
+  }
   renderSettingsSummary();
   if (focus) (section === 'home' ? $('.settings-page-head h2') : $(`[data-settings-panel="${section}"] h2`))?.focus?.({ preventScroll: true });
   if (focus) window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3085,13 +3091,16 @@ $$('[name="recordTypeFilter"]').forEach(input => input.addEventListener('change'
 $$('[name="yieldTypeFilter"], [name="yieldDateFilter"]').forEach(input => input.addEventListener('change', renderYield));
 $$('[name="ledgerTypeFilter"], [name="ledgerDateFilter"]').forEach(input => input.addEventListener('change', renderLedger));
 $$('[data-settings-category]').forEach(button => button.addEventListener('click', () => showSettingsSection(button.dataset.settingsCategory)));
+function closeAccountCloudDialogs() {
+  $$('.account-cloud-dialog[open]').forEach(dialog => dialog.close());
+}
 $$('[data-account-cloud-open]').forEach(button => button.addEventListener('click', () => {
-  const section = document.getElementById(button.dataset.accountCloudOpen);
-  if (!section) return;
-  section.open = true;
-  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  section.querySelector('summary')?.focus({ preventScroll: true });
+  const dialog = document.getElementById(button.dataset.accountCloudOpen);
+  if (!dialog || dialog.open) return;
+  closeAccountCloudDialogs();
+  dialog.showModal();
 }));
+$$('[data-account-cloud-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog')?.close()));
 $$('[data-settings-view]').forEach(button => button.addEventListener('click', () => $(`.nav button[data-view="${button.dataset.settingsView}"]`)?.click()));
 $$('.settings-back').forEach(button => button.addEventListener('click', () => showSettingsSection('home')));
 if (window.matchMedia('(max-width: 520px)').matches) $('#taskAdvancedFilters').removeAttribute('open');

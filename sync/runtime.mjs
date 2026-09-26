@@ -312,7 +312,7 @@ document.querySelector('#syncInitializeEmpty').addEventListener('click', () => r
   await engine.initialize('empty', context.homesteadId);
   startAttachmentSync();
 }));
-document.querySelector('#syncCancel').addEventListener('click', () => { document.querySelector('#accountCloudDeviceDetails').open = false; });
+document.querySelector('#syncCancel').addEventListener('click', () => { document.querySelector('#accountCloudDeviceDetails').close(); });
 
 render();
 if (window.REGULA_RUSTICA_CLOUD_CONTEXT) connectPromise = connect(window.REGULA_RUSTICA_CLOUD_CONTEXT);

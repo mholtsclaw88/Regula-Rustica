@@ -137,7 +137,11 @@ async function initializeCloud() {
     authForm.classList.toggle('hidden', Boolean(user));
     signedIn.classList.toggle('hidden', !user);
     passwordForm.classList.toggle('hidden', event !== 'PASSWORD_RECOVERY');
-    if (event === 'PASSWORD_RECOVERY' || invitationToken) document.querySelector('#accountCloudAccountDetails').open = true;
+    if (event === 'PASSWORD_RECOVERY' || invitationToken) {
+      const cloudPanel = document.querySelector('#settingCloud');
+      if (cloudPanel?.classList.contains('hidden')) cloudPanel.dataset.pendingAccountCloud = 'true';
+      else document.querySelector('[data-account-cloud-open="accountCloudAccountDetails"]')?.click();
+    }
 
     if (!user) {
       clearInvitationResult();

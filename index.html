@@ -9,7 +9,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=account-cloud-settings-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=account-cloud-dialogs-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
@@ -20,16 +20,16 @@
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
-  <script src="app.js?v=account-cloud-settings-v1" defer></script>
+  <script src="app.js?v=account-cloud-dialogs-v1" defer></script>
   <script src="ledger-allocations.js?v=ledger-api-v2" data-ledger-allocations="true" defer></script>
-  <script src="onboarding.js?v=account-cloud-settings-v1" defer></script>
+  <script src="onboarding.js?v=account-cloud-dialogs-v1" defer></script>
   <script src="ui-refinements.js?v=cyril-record-matching-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="cloud-auth.js?v=account-cloud-settings-v1" type="module"></script>
+  <script src="cloud-auth.js?v=account-cloud-dialogs-v1" type="module"></script>
   <script src="cellarer-assisted-entry.mjs?v=cyril-consult-v1" type="module"></script>
   <script src="cellarer-receipt-reader.mjs?v=cyril-draft-review-v1" type="module"></script>
   <script src="cellarer-consult.mjs?v=cyril-copy-v1" type="module"></script>
-  <script src="sync/runtime.mjs?v=account-cloud-settings-v1" type="module"></script>
+  <script src="sync/runtime.mjs?v=account-cloud-dialogs-v1" type="module"></script>
 </head>
 <body>
   <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
@@ -555,7 +555,8 @@
             <div class="account-cloud-row"><div><span class="label">This device</span><strong id="accountCloudDeviceState">Checking sync…</strong><small id="accountCloudDeviceDetail">Local work remains available offline.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudDeviceDetails">Details</button></div>
           </div>
           <div class="account-cloud-next" id="accountCloudNext" aria-live="polite"><div><strong id="accountCloudNextTitle">Checking connection…</strong><p id="accountCloudNextDetail" class="muted">Your records remain available on this device.</p></div><button class="btn primary" id="accountCloudNextAction" data-account-cloud-open="accountCloudAccountDetails" type="button">Continue</button></div>
-          <details class="account-cloud-details" id="accountCloudAccountDetails"><summary>Account &amp; household</summary>
+          <dialog class="account-cloud-dialog" id="accountCloudAccountDetails" aria-labelledby="accountCloudAccountTitle">
+          <header class="account-cloud-dialog-head"><h3 id="accountCloudAccountTitle">Account &amp; household</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
           <p class="muted">An account is optional for local work. Sign in to connect a shared Homestead.</p>
           <p id="cloudStatus" class="cloud-status" role="status">Checking cloud configuration…</p>
           <form id="cloudAuthForm" class="form-grid hidden">
@@ -616,8 +617,9 @@
             <label>New password<input id="cloudNewPassword" type="password" autocomplete="new-password" minlength="8" required></label>
             <button class="btn primary" type="submit">Save new password</button>
           </form>
-          </details>
-          <details class="account-cloud-details" id="accountCloudPremiumDetails"><summary>Premium plan &amp; gifts</summary>
+          </dialog>
+          <dialog class="account-cloud-dialog" id="accountCloudPremiumDetails" aria-labelledby="accountCloudPremiumTitle">
+            <header class="account-cloud-dialog-head"><h3 id="accountCloudPremiumTitle">Premium plan &amp; gifts</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
             <section class="premium-status-card" aria-labelledby="premiumStatusTitle">
               <div><span class="label">Household plan</span><h3 id="premiumStatusTitle">Premium status</h3></div>
               <p id="premiumStatus" class="cloud-status" role="status">Sign in and join a cloud Homestead to check Premium.</p>
@@ -635,8 +637,9 @@
             <p id="premiumRedeemResult" class="muted" role="status"></p>
             <p class="premium-note">Premium is optional. The standard Farm Book continues to work on this device without an account or internet connection. Cyril prepares drafts for your approval and never records them for you.</p>
             <p class="muted">Purchases are not available yet. This foundation supports gifted access now and verified web, Apple, or Google purchases in a future release.</p>
-          </details>
-          <details class="account-cloud-details" id="accountCloudDeviceDetails"><summary>This device &amp; synchronization</summary>
+          </dialog>
+          <dialog class="account-cloud-dialog" id="accountCloudDeviceDetails" aria-labelledby="accountCloudDeviceTitle">
+          <header class="account-cloud-dialog-head"><h3 id="accountCloudDeviceTitle">This device &amp; synchronization</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
           <div id="syncControls" class="form-grid">
             <p id="syncStatus" class="cloud-status" role="status">Cloud synchronization is not connected.</p>
             <div id="syncFirstActions" class="form-grid hidden">
@@ -661,7 +664,7 @@
               </div>
             </details>
           </div>
-          </details>
+          </dialog>
         </article>
         <article class="card settings-section hidden" id="settingAbout" data-settings-panel="about">
           <button class="settings-back" type="button">← Settings</button>

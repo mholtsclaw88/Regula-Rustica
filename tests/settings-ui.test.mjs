@@ -27,6 +27,21 @@ test('Settings home exposes one focused destination for every category', () => {
   assert.doesNotMatch(html, /data-settings-category="premium"/);
 });
 
+test('Account and Cloud details open as focused, dismissible panels', () => {
+  for (const [id, title] of [
+    ['Account', 'Account'], ['Premium', 'Premium'], ['Device', 'Device']
+  ]) {
+    assert.match(html, new RegExp(`<dialog class="account-cloud-dialog" id="accountCloud${id}Details" aria-labelledby="accountCloud${title}Title">`));
+  }
+  assert.equal((html.match(/data-account-cloud-close/g) || []).length, 3);
+  assert.doesNotMatch(html, /class="account-cloud-details"/);
+  assert.match(app, /dialog\.showModal\(\)/);
+  assert.match(app, /button\.closest\('dialog'\)\?\.close\(\)/);
+  assert.match(app, /if \(section !== 'cloud'\) closeAccountCloudDialogs\(\)/);
+  assert.match(app, /dataset\.pendingAccountCloud === 'true'/);
+  assert.match(css, /\.account-cloud-dialog \{[^}]*max-height: calc\(100dvh - 32px\)/);
+});
+
 test('existing Settings control contracts remain present exactly once', () => {
   [
     'homesteadForm', 'homesteadName', 'homesteadMotto', 'homesteadLocation',

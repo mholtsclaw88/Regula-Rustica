@@ -415,7 +415,7 @@
     document.querySelector(`.nav button[data-view="${openPremium ? 'settings' : 'today'}"]`)?.click();
     if (openPremium) requestAnimationFrame(() => {
       document.querySelector('[data-settings-category="cloud"]')?.click();
-      document.querySelector('#accountCloudPremiumDetails').open = true;
+      document.querySelector('[data-account-cloud-open="accountCloudPremiumDetails"]')?.click();
     });
   }
   $('#onboardingFinish').addEventListener('click', () => finish());
@@ -427,7 +427,7 @@
     document.querySelector('.nav button[data-view="settings"]')?.click();
     requestAnimationFrame(() => {
       document.querySelector('[data-settings-category="cloud"]')?.click();
-      document.querySelector('#accountCloudAccountDetails').open = true;
+      document.querySelector('[data-account-cloud-open="accountCloudAccountDetails"]')?.click();
     });
   });
   window.addEventListener('regula-rustica:cloud-context', () => { if (currentStep === 5) renderPeople(); });
