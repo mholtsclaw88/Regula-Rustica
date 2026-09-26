@@ -466,15 +466,11 @@
             </div>
           </section>
           <section class="settings-category-group" aria-labelledby="settingsDeviceGroup">
-            <h3 class="settings-category-group-title" id="settingsDeviceGroup">Cloud &amp; Device</h3>
+            <h3 class="settings-category-group-title" id="settingsDeviceGroup">Account &amp; Storage</h3>
             <div class="settings-category-list">
               <button class="settings-category-card" type="button" data-settings-category="cloud">
                 <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/><path d="m9 12 2 2 4-4"/></svg></span>
-                <span><strong>Account &amp; Cloud</strong><small>Sign in, Premium, and device sync</small></span><span class="settings-chevron" aria-hidden="true">›</span>
-              </button>
-              <button class="settings-category-card" type="button" data-settings-category="backup">
-                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12l-3 3 3 3"/><path d="M7 15h7a3 3 0 0 1 3 3"/></svg></span>
-                <span><strong>Backup &amp; Restore</strong><small>Download a backup or restore local data</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+                <span><strong>Account &amp; Storage</strong><small>Sign in, Premium, sync, and backups</small></span><span class="settings-chevron" aria-hidden="true">›</span>
               </button>
               <button class="settings-category-card" type="button" data-settings-category="about">
                 <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span>
@@ -512,17 +508,6 @@
             <button class="btn primary" id="saveHomesteadIdentity" type="submit">Save identity</button>
           </form>
         </article>
-        <article class="card settings-section hidden" id="settingBackup" data-settings-panel="backup">
-          <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">Own your records</span><h2 tabindex="-1">Data &amp; backup</h2><p class="muted">Keep a portable copy of the homestead records entrusted to this device.</p></header>
-          <p class="muted">Download a backup regularly. Records remain available in this browser, including while cloud synchronization is disconnected.</p>
-          <h3 class="settings-rule-title">Routine data actions</h3>
-          <div class="quick compact-actions">
-            <button class="btn secondary" id="exportData">Download backup</button>
-            <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
-          </div>
-          <details class="danger-zone"><summary>Destructive actions</summary><p class="muted">Reset replaces every local record with the sample Homestead.</p><button class="btn danger" id="resetData">Reset sample data</button></details>
-        </article>
         <article class="card settings-section hidden" id="settingPeople" data-settings-panel="people">
           <button class="settings-back" type="button">← Settings</button>
           <header class="settings-section-head"><span class="label">Household participation</span><h2 tabindex="-1">People &amp; stewardship</h2><p class="muted">See who participates and manage local child profiles used for task assignment.</p></header>
@@ -548,11 +533,12 @@
         </article>
         <article class="card cloud-card settings-section hidden" id="settingCloud" data-settings-panel="cloud">
           <button class="settings-back" type="button">← Settings</button>
-          <header class="settings-section-head"><span class="label">Cloud &amp; device</span><h2 tabindex="-1">Account &amp; Cloud</h2><p class="muted">Your account, Premium plan, and this device's sync in one place.</p></header>
-          <div class="account-cloud-overview" aria-label="Account and Cloud status">
+          <header class="settings-section-head"><span class="label">Account &amp; storage</span><h2 tabindex="-1">Account &amp; Storage</h2><p class="muted">Your account, Premium plan, device sync, and portable backups in one place.</p></header>
+          <div class="account-cloud-overview" aria-label="Account and storage status">
             <div class="account-cloud-row"><div><span class="label">Account</span><strong id="accountCloudAccountState">Checking account…</strong><small id="accountCloudAccountDetail">Your work stays on this device.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudAccountDetails">Manage</button></div>
             <div class="account-cloud-row"><div><span class="label">Premium</span><strong id="accountCloudPremiumState">Checking plan…</strong><small id="accountCloudPremiumDetail">Cloud Sync and Cyril are Premium features.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudPremiumDetails">View plan</button></div>
             <div class="account-cloud-row"><div><span class="label">This device</span><strong id="accountCloudDeviceState">Checking sync…</strong><small id="accountCloudDeviceDetail">Local work remains available offline.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudDeviceDetails">Details</button></div>
+            <div class="account-cloud-row"><div><span class="label">Backup &amp; Restore</span><strong>Portable copy</strong><small>Download or restore this device's local data.</small></div><button class="btn ghost" type="button" data-account-cloud-open="accountCloudBackupDetails">Manage</button></div>
           </div>
           <div class="account-cloud-next" id="accountCloudNext" aria-live="polite"><div><strong id="accountCloudNextTitle">Checking connection…</strong><p id="accountCloudNextDetail" class="muted">Your records remain available on this device.</p></div><button class="btn primary" id="accountCloudNextAction" data-account-cloud-open="accountCloudAccountDetails" type="button">Continue</button></div>
           <dialog class="account-cloud-dialog" id="accountCloudAccountDetails" aria-labelledby="accountCloudAccountTitle">
@@ -664,6 +650,16 @@
               </div>
             </details>
           </div>
+          </dialog>
+          <dialog class="account-cloud-dialog" id="accountCloudBackupDetails" aria-labelledby="accountCloudBackupTitle">
+            <header class="account-cloud-dialog-head"><h3 id="accountCloudBackupTitle">Backup &amp; Restore</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
+            <p class="muted">Download a backup regularly. Records remain available in this browser, including while cloud synchronization is disconnected.</p>
+            <h3 class="settings-rule-title">Routine data actions</h3>
+            <div class="quick compact-actions">
+              <button class="btn secondary" id="exportData">Download backup</button>
+              <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
+            </div>
+            <details class="danger-zone"><summary>Destructive actions</summary><p class="muted">Reset replaces every local record with the sample Homestead.</p><button class="btn danger" id="resetData">Reset sample data</button></details>
           </dialog>
         </article>
         <article class="card settings-section hidden" id="settingAbout" data-settings-panel="about">

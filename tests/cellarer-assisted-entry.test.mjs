@@ -232,6 +232,6 @@ test('daily quota is private, atomic, Homestead-scoped, and cached assets are ve
   assert.match(migration, /on conflict on constraint premium_feature_usage_pkey/);
   assert.match(migration, /public\.has_premium_feature\(normalized_feature\)/);
   assert.match(migration, /revoke all on table private\.premium_feature_usage from public, anon, authenticated/);
-  assert.match(worker, /regula-rustica-account-cloud-dialogs-v1/);
+  assert.match(worker, /regula-rustica-account-storage-v1/);
   assert.match(worker, /cellarer-assisted-entry\.mjs\?v=cyril-consult-v1/);
 });
