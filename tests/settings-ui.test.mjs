@@ -12,12 +12,19 @@ const [html, app, css, styles] = await Promise.all([
 test('Settings home exposes one focused destination for every category', () => {
   const categories = [...html.matchAll(/data-settings-category="([^"]+)"/g)].map(match => match[1]);
   const panels = [...html.matchAll(/data-settings-panel="([^"]+)"/g)].map(match => match[1]);
-  assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'cloud', 'premium', 'backup', 'about']);
+  assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'cloud', 'backup', 'about']);
   assert.deepEqual(panels.sort(), [...categories].sort());
   assert.match(app, /showSettingsSection\(button\.dataset\.settingsCategory\)/);
   assert.match(html, /data-settings-view="calendar"/);
   assert.match(app, /button\.dataset\.settingsView/);
   assert.match(app, /showSettingsSection\('home'\)/);
+  assert.match(html, /Account &amp; Cloud/);
+  assert.match(html, /id="accountCloudAccountDetails"/);
+  assert.match(html, /id="accountCloudPremiumDetails"/);
+  assert.match(html, /id="accountCloudDeviceDetails"/);
+  assert.match(app, /data-account-cloud-open/);
+  assert.match(html, /id="accountCloudNextAction" data-account-cloud-open="accountCloudAccountDetails"/);
+  assert.doesNotMatch(html, /data-settings-category="premium"/);
 });
 
 test('existing Settings control contracts remain present exactly once', () => {
@@ -44,6 +51,10 @@ test('Settings summary derives from real local and cloud state', () => {
   assert.match(app, /data\.choreWindows\.filter/);
   assert.match(app, /REGULA_RUSTICA_CLOUD_CONTEXT/);
   assert.match(app, /data\.settings\.homesteadName/);
+  assert.match(app, /sync\?\.label === 'Sync setup'/);
+  assert.match(app, /sync\?\.state === 'issue'/);
+  assert.match(app, /premiumError \? 'Status unavailable'/);
+  assert.match(app, /title = 'Premium status could not be checked'/);
 });
 
 test('Homestead identity is restrained on Today and names every primary section consistently', () => {

@@ -740,14 +740,67 @@ function showView(id) {
 function settingsOperatingMode() {
   const context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
   if (context?.homesteadId) {
+    if ($('#premiumStatus')?.classList.contains('error')) return 'Cloud Sync paused · plan check unavailable';
     const premium = context.premium;
     const premiumEndsAt = premium?.ends_at ? Date.parse(premium.ends_at) : Infinity;
     if (premium?.status !== 'active' || premium.plan_key !== 'premium' || premiumEndsAt <= Date.now())
       return 'Cloud Sync paused · Premium needed';
-    return window.RegulaRusticaSync?.isInitialized() === false ? 'Cloud setup needed on this device' : 'Cloud connected';
+    if (!window.RegulaRusticaSync) return 'Checking Cloud Sync';
+    const sync = window.RegulaRusticaSync?.getStatus?.();
+    if (sync?.label === 'Sync setup' || window.RegulaRusticaSync?.isInitialized() === false) return 'Cloud setup needed on this device';
+    if (sync?.state === 'issue') return 'Sync needs attention';
+    if (sync?.state === 'offline') return 'Offline · local work safe';
+    return 'Cloud connected';
   }
   if (context?.session) return 'Signed in · local until joined';
   return 'Local only';
+}
+
+function renderAccountCloudOverview() {
+  if (!$('#accountCloudAccountState')) return;
+  const context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
+  const configured = Boolean(window.REGULA_RUSTICA_CLOUD?.url && window.REGULA_RUSTICA_CLOUD?.publishableKey);
+  const authError = !context && $('#cloudStatus')?.classList.contains('error');
+  const signedIn = Boolean(context?.session);
+  const joined = Boolean(context?.homesteadId);
+  const premium = context?.premium;
+  const premiumError = joined && $('#premiumStatus')?.classList.contains('error');
+  const premiumEndsAt = premium?.ends_at ? Date.parse(premium.ends_at) : Infinity;
+  const premiumActive = joined && premium?.status === 'active' && premium.plan_key === 'premium' && premiumEndsAt > Date.now();
+  const sync = window.RegulaRusticaSync?.getStatus?.();
+  const accountState = !configured || authError ? 'Cloud unavailable' : !context ? 'Checking account…' : signedIn ? 'Signed in' : 'Not signed in';
+  $('#accountCloudAccountState').textContent = accountState;
+  $('#accountCloudAccountDetail').textContent = joined
+    ? `${context.role || 'Member'} of ${context.homesteadIdentity?.name || 'this Homestead'}`
+    : signedIn ? 'Create a Homestead or accept an invitation.' : 'Local work remains available without an account.';
+  $('#accountCloudPremiumState').textContent = !joined ? 'Available after joining' : premiumError ? 'Status unavailable' : premiumActive ? 'Active' : 'Not active';
+  $('#accountCloudPremiumDetail').textContent = premiumError ? 'Plan status could not be checked. Local work remains safe.' : premiumActive
+    ? 'Cloud Sync and Cyril are included for this Homestead.'
+    : joined ? 'A Steward can activate Premium for this Homestead.' : 'Premium is tied to a shared Homestead.';
+  $('#accountCloudDeviceState').textContent = joined ? (sync?.label || 'Checking sync…') : 'Local only';
+  $('#accountCloudDeviceDetail').textContent = joined ? (sync?.detail || 'Checking this device…') : 'Saved on this device.';
+
+  let title = 'Your Farm Book works on this device';
+  let detail = 'An account is optional until you are ready to connect a Homestead.';
+  let action = 'Sign in';
+  let target = 'accountCloudAccountDetails';
+  if (!configured || authError) { title = 'Cloud access is unavailable'; detail = 'Local records and backups remain available. Review the account details for the error.'; action = authError ? 'Review account' : ''; }
+  else if (!context) { title = 'Checking your account…'; detail = 'Your local records remain available.'; action = ''; }
+  else if (signedIn && !joined) { title = 'Connect your Homestead'; detail = 'Create one or accept a private invitation before activating Cloud Sync.'; action = 'Continue'; }
+  else if (premiumError) { title = 'Premium status could not be checked'; detail = 'Cloud Sync is paused; your changes remain saved on this device.'; action = 'Review plan'; target = 'accountCloudPremiumDetails'; }
+  else if (joined && !premiumActive) { title = 'Premium is needed for Cloud Sync'; detail = 'Your changes remain saved on this device.'; action = 'View plan'; target = 'accountCloudPremiumDetails'; }
+  else if (sync?.label === 'Sync setup') { title = 'Finish syncing this device'; detail = 'Premium is active; choose how this device should begin. Nothing is merged automatically.'; action = 'Finish setup'; target = 'accountCloudDeviceDetails'; }
+  else if (sync?.state === 'issue') { title = 'Sync needs attention'; detail = 'Review this device’s sync details before retrying.'; action = 'Review issue'; target = 'accountCloudDeviceDetails'; }
+  else if (sync?.state === 'offline') { title = 'You are offline'; detail = 'Your work remains on this device until Cloud Sync can resume.'; action = ''; }
+  else if (sync?.state === 'syncing') { title = 'Syncing your Homestead'; detail = 'Changes are being synchronized.'; action = ''; }
+  else if (sync?.state === 'synced') { title = 'Your Homestead is in step'; detail = 'This device has completed Cloud Sync.'; action = ''; }
+  else if (premiumActive) { title = 'Checking this device…'; detail = 'Premium is active. Your local records remain available.'; action = ''; }
+  $('#accountCloudNextTitle').textContent = title;
+  $('#accountCloudNextDetail').textContent = detail;
+  const next = $('#accountCloudNextAction');
+  next.textContent = action;
+  next.dataset.accountCloudOpen = target;
+  next.classList.toggle('hidden', !action);
 }
 
 function renderSettingsSummary() {
@@ -758,6 +811,7 @@ function renderSettingsSummary() {
   $('#settingsSummaryPeople').textContent = `${people} ${people === 1 ? 'person' : 'people'}`;
   $('#settingsSummaryWindows').textContent = `${windows} active`;
   $('#settingsSummaryMode').textContent = settingsOperatingMode();
+  renderAccountCloudOverview();
 }
 
 function showSettingsSection(section = 'home', focus = true) {
@@ -3031,6 +3085,13 @@ $$('[name="recordTypeFilter"]').forEach(input => input.addEventListener('change'
 $$('[name="yieldTypeFilter"], [name="yieldDateFilter"]').forEach(input => input.addEventListener('change', renderYield));
 $$('[name="ledgerTypeFilter"], [name="ledgerDateFilter"]').forEach(input => input.addEventListener('change', renderLedger));
 $$('[data-settings-category]').forEach(button => button.addEventListener('click', () => showSettingsSection(button.dataset.settingsCategory)));
+$$('[data-account-cloud-open]').forEach(button => button.addEventListener('click', () => {
+  const section = document.getElementById(button.dataset.accountCloudOpen);
+  if (!section) return;
+  section.open = true;
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  section.querySelector('summary')?.focus({ preventScroll: true });
+}));
 $$('[data-settings-view]').forEach(button => button.addEventListener('click', () => $(`.nav button[data-view="${button.dataset.settingsView}"]`)?.click()));
 $$('.settings-back').forEach(button => button.addEventListener('click', () => showSettingsSection('home')));
 if (window.matchMedia('(max-width: 520px)').matches) $('#taskAdvancedFilters').removeAttribute('open');
@@ -3190,6 +3251,7 @@ window.addEventListener('regula-rustica:cloud-context', () => {
   if (currentRecordId && $('#recordView').classList.contains('active')) renderRecord();
 });
 window.addEventListener('regula-rustica:sync-status', renderSettingsSummary);
+window.addEventListener('regula-rustica:cloud-status', renderSettingsSummary);
 
 window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, cellarerConsultContext, openCellarerDraft };
 renderAll();

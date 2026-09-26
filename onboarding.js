@@ -413,7 +413,10 @@
     close();
     window.RegulaRustica.materializeRecurringTasks('onboarding-finish');
     document.querySelector(`.nav button[data-view="${openPremium ? 'settings' : 'today'}"]`)?.click();
-    if (openPremium) requestAnimationFrame(() => document.querySelector('[data-settings-category="premium"]')?.click());
+    if (openPremium) requestAnimationFrame(() => {
+      document.querySelector('[data-settings-category="cloud"]')?.click();
+      document.querySelector('#accountCloudPremiumDetails').open = true;
+    });
   }
   $('#onboardingFinish').addEventListener('click', () => finish());
   $('#onboardingExplorePremium').addEventListener('click', () => finish(true));
@@ -422,9 +425,11 @@
     updateState({ dismissed: true });
     close();
     document.querySelector('.nav button[data-view="settings"]')?.click();
-    requestAnimationFrame(() => document.querySelector('[data-settings-category="cloud"]')?.click());
+    requestAnimationFrame(() => {
+      document.querySelector('[data-settings-category="cloud"]')?.click();
+      document.querySelector('#accountCloudAccountDetails').open = true;
+    });
   });
-  document.querySelector('#premiumCloudAccess')?.addEventListener('click', () => document.querySelector('[data-settings-category="cloud"]')?.click());
   window.addEventListener('regula-rustica:cloud-context', () => { if (currentStep === 5) renderPeople(); });
 
   const state = onboarding(window.RegulaRusticaLocal.read());
