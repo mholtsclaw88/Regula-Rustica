@@ -271,9 +271,7 @@ function initializeCellarerDialog() {
     kind.value = 'auto';
     kindChoice.open = false;
     prompt.value = '';
-    showStatus(premiumAvailable()
-      ? 'Cyril will prepare a draft. You remain in control of what is recorded.'
-      : 'Cyril requires an active Premium Homestead and Cloud connection.', !premiumAvailable());
+    showStatus(premiumAvailable() ? '' : 'Connect to your Premium Homestead to use Cyril.', !premiumAvailable());
     submit.disabled = !premiumAvailable();
     dialog.showModal();
     setTimeout(() => prompt.focus(), 30);
