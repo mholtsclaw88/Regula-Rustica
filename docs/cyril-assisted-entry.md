@@ -37,8 +37,9 @@ photo.
    Homestead entitlement and atomically consumes one of 100 daily drafts.
 4. Netlify AI Gateway calls `gpt-5.6-luna` with storage disabled and a strict
    JSON Schema response format.
-5. The server validates all returned IDs and Yield eligibility against the
-   bounded request context before returning the draft.
+5. The server validates returned IDs and Yield eligibility against the bounded
+   request context. It independently resolves the linked Record from the
+   steward's words; a model-proposed Record ID alone is not sufficient.
 6. The browser validates the draft again, opens the existing form, and labels
    it **Cyril’s draft — review before recording**.
 

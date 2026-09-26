@@ -1,4 +1,4 @@
-import { resolveCellarerRecord, sanitizeCellarerContext, validateCellarerDraft } from './cellarer-assisted-entry.mjs?v=cyril-draft-review-v1';
+import { resolveCellarerRecord, sanitizeCellarerContext, validateCellarerDraft } from './cellarer-assisted-entry.mjs?v=cyril-record-safety-v1';
 
 export const CELLARER_RECEIPT_FEATURE_KEY = 'cellarer_receipt_reader';
 
