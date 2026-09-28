@@ -66,7 +66,7 @@ function initializeConsult() {
   window.addEventListener('regula-rustica:cellarer-consult-request', () => {
     generation++; request?.abort(); question.value = ''; answer.hidden = true; answerText.textContent = ''; caveat.textContent = '';
     submit.disabled = !premiumAvailable(); submit.textContent = 'Ask Cyril';
-    message(premiumAvailable() ? 'Ask one question. You can edit it and ask again.' : 'Consult Cyril requires an active Premium Homestead and Cloud connection.', !premiumAvailable());
+    message(premiumAvailable() ? '' : 'Connect to your Premium Homestead to consult Cyril.', !premiumAvailable());
     dialog.showModal(); setTimeout(() => question.focus(), 30);
   });
   document.querySelector('#cellarerConsultClose')?.addEventListener('click', close);
@@ -97,8 +97,8 @@ function initializeConsult() {
       caveat.textContent = responseText.caveat;
       caveat.hidden = !responseText.caveat;
       answer.hidden = false;
-      submit.textContent = 'Revise and ask again';
-      message('To clarify, edit your question above and ask again. This does not start a chat.');
+      submit.textContent = 'Update answer';
+      message('Edit your question above to refine this answer.');
     } catch (error) {
       if (current === generation && error?.name !== 'AbortError') message(error?.message || 'Cyril could not answer just now.', true);
     } finally {

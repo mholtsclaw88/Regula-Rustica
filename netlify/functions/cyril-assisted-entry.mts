@@ -116,9 +116,9 @@ export default async function handler(req: Request) {
     const output = extractResponseText(aiResult);
     if (!output) return json({ error: 'Cyril returned an empty draft.' }, 502);
     const proposed = JSON.parse(output);
-    if (!proposed.recordId) {
-      proposed.recordId = resolveCellarerRecord(prompt, context.records, proposed.kind);
-    }
+    // The model may propose an existing but unrelated ID. Link only when the
+    // steward's own words independently identify one available Record.
+    proposed.recordId = resolveCellarerRecord(prompt, context.records, proposed.kind);
     const draft = validateCellarerDraft(proposed, context);
     if (preferredKind && draft.kind !== preferredKind) throw new Error('Cyril returned a different entry type than requested.');
     return json({ draft, remaining: quota.remaining, resetAt: quota.reset_at });

@@ -200,10 +200,10 @@ test('receipt endpoint returns reviewable multi-Record allocations from clear li
     if (String(url).includes('consume_premium_feature')) return Response.json([{ allowed: true }]);
     return Response.json({ output_text: JSON.stringify({
       title: 'Animal feed', amount: 20, date: '2026-09-22', vendorOrSource: 'Feed Mill',
-      vendorSource: 'receipt', category: 'Feed', recordId: null,
+      vendorSource: 'receipt', category: 'Feed', recordId: 'cat',
       lineItems: [
-        { description: 'Cat food', amount: 10, recordId: null },
-        { description: 'Pig feed', amount: 10, recordId: null }
+        { description: 'Cat food', amount: 10, recordId: 'pig' },
+        { description: 'Pig feed', amount: 10, recordId: 'cat' }
       ]
     }) });
   };
@@ -252,7 +252,8 @@ test('receipt UI reuses the existing Ledger form and local-only attachment path'
   assert.match(html, /id="cellarerReceipt"/);
   assert.match(html, /id="cellarerReceiptDialog"/);
   assert.match(html, /id="cellarerReceiptRecord"/);
-  assert.match(html, /receipt photos do not cloud-sync/);
+  assert.match(html, /Receipt photos do not cloud-sync/);
+  assert.match(html, /<summary>About your receipt photo<\/summary>/);
   assert.match(client, /openCellarerDraft\(draft\)/);
   assert.match(client, /stageForOpenLedger\(receipt\)/);
   assert.match(receiptStorage, /stageForOpenLedger\(receipt\)/);
@@ -263,9 +264,9 @@ test('receipt UI reuses the existing Ledger form and local-only attachment path'
   assert.match(app, /RegulaRusticaLedgerAllocations\?\.applyDraft\(draft\.allocations\)/);
   assert.match(allocations, /function applyDraft\(allocations\)/);
   assert.match(html, /ledger-allocations\.js\?v=ledger-api-v2/);
-  assert.match(worker, /regula-rustica-account-storage-v1/);
-  assert.match(worker, /cellarer-receipt-reader\.mjs\?v=cyril-draft-review-v1/);
-  assert.match(client, /cellarer-assisted-entry\.mjs\?v=cyril-draft-review-v1/);
+  assert.match(worker, /regula-rustica-cyril-dialog-copy-v1/);
+  assert.match(worker, /cellarer-receipt-reader\.mjs\?v=cyril-dialog-copy-v1/);
+  assert.match(client, /cellarer-assisted-entry\.mjs\?v=cyril-dialog-copy-v1/);
   assert.match(worker, /event\.request\.mode==='navigate'/);
   assert.match(worker, /fetch\(event\.request\)\.catch/);
 });

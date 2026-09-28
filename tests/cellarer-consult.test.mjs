@@ -21,13 +21,15 @@ const request = body => new Request('https://example.test/api/cyril/consult', {
 test('Consult Cyril is one question and one replaceable answer, not a chat', () => {
   assert.equal((html.match(/id="cellarerConsult"/g) || []).length, 1);
   assert.match(html, /id="cellarerConsultDialog"/);
+  assert.match(html, /<summary>What Cyril can see<\/summary>/);
+  assert.match(client, /submit\.textContent = 'Update answer'/);
   assert.doesNotMatch(html, /Ask About the Homestead|Consult Cyril <small>Coming later/);
   assert.match(client, /question\.value\.trim\(\)/);
   assert.match(client, /answerText\.textContent = responseText\.answer/);
   assert.match(client, /answer\.hidden = true/);
   assert.doesNotMatch(client, /previous_response_id|conversationId|chatHistory/);
   assert.match(app, /function cellarerConsultContext\(\)/);
-  assert.match(worker, /cellarer-consult\.mjs\?v=cyril-copy-v1/);
+  assert.match(worker, /cellarer-consult\.mjs\?v=cyril-dialog-copy-v1/);
   assert.equal(config.path, '/api/cyril/consult');
 });
 
