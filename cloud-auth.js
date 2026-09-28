@@ -43,8 +43,28 @@ async function initializeCloud() {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   });
 
+  const socialButtonIds = new Set(['cloudGoogleSignIn', 'cloudAppleSignIn']);
   const setBusy = busy => document.querySelectorAll('.cloud-card button, .cloud-card input, .cloud-card select, .premium-card button, .premium-card input')
-    .forEach(element => { element.disabled = busy; });
+    .forEach(element => { element.disabled = busy || (socialButtonIds.has(element.id) && element.dataset.available !== 'true'); });
+
+  async function refreshSocialProviders() {
+    let providers = {};
+    try {
+      const response = await fetch(`${config.url.replace(/\/$/, '')}/auth/v1/settings`, { headers: { apikey: config.publishableKey } });
+      if (response.ok) providers = (await response.json()).external || {};
+    } catch { /* A transient check failure must not affect password sign-in. */ }
+    for (const provider of ['google', 'apple']) {
+      for (const id of [provider === 'google' ? 'cloudGoogleSignIn' : 'cloudAppleSignIn', provider === 'google' ? 'onboardingGoogleSignIn' : 'onboardingAppleSignIn']) {
+        const button = document.querySelector(`#${id}`);
+        button.dataset.available = providers[provider] ? 'true' : 'false';
+        button.disabled = !providers[provider];
+        button.title = providers[provider] ? '' : `${provider === 'google' ? 'Google' : 'Apple'} sign-in is not configured yet`;
+      }
+    }
+    const message = providers.google || providers.apple ? '' : 'Google and Apple sign-in are not configured yet; email sign-in remains available.';
+    for (const id of ['cloudSocialStatus', 'onboardingSocialStatus']) document.querySelector(`#${id}`).textContent = message;
+  }
+  refreshSocialProviders();
 
   const formatDate = value => new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium', timeStyle: 'short'
@@ -227,6 +247,15 @@ async function initializeCloud() {
     return result.data;
   }
 
+  async function signInWithProvider(provider) {
+    if (!['google', 'apple'].includes(provider)) throw new Error('This sign-in provider is unavailable.');
+    if (!/^https?:$/.test(location.protocol)) throw new Error('Google and Apple sign-in require the hosted app or a local web server.');
+    const redirectTo = `${location.origin}${location.pathname}${location.search}`;
+    const result = await client.auth.signInWithOAuth({ provider, options: { redirectTo } });
+    if (result.error) throw result.error;
+    return result.data;
+  }
+
   async function signUp(displayName, email, password) {
     const result = await client.auth.signUp({
       email,
@@ -257,13 +286,17 @@ async function initializeCloud() {
     return { invitation, link: buildInvitationLink(invitation.raw_token, location.href) };
   }
 
-  window.RegulaRusticaCloudAuth = Object.freeze({ signIn, signUp, createHomestead, createInvitation });
+  window.RegulaRusticaCloudAuth = Object.freeze({ signIn, signInWithProvider, signUp, createHomestead, createInvitation });
   window.dispatchEvent(new CustomEvent('regula-rustica:cloud-auth-ready'));
 
   authForm.addEventListener('submit', event => {
     event.preventDefault();
     run(() => signIn(document.querySelector('#cloudEmail').value.trim(), document.querySelector('#cloudPassword').value));
   });
+
+  for (const [id, provider] of [['cloudGoogleSignIn', 'google'], ['cloudAppleSignIn', 'apple']]) {
+    document.querySelector(`#${id}`).addEventListener('click', () => run(() => signInWithProvider(provider)));
+  }
 
   document.querySelector('#cloudSignUp').addEventListener('click', () => run(async () => {
     const data = await signUp(

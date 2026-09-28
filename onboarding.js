@@ -163,11 +163,47 @@
     $('#onboardingAuthPassword').autocomplete = signup ? 'new-password' : 'current-password';
   }));
   $('#onboardingReturnLocal').addEventListener('click', () => {
+    sessionStorage.removeItem('regula-rustica:onboarding-oauth');
     updateState({ mode: 'local', step: 5 });
     showStep(5, false);
   });
+  async function completeSharedSetup() {
+    const api = window.RegulaRusticaCloudAuth;
+    const status = $('#onboardingAuthStatus');
+    if (!api) throw new Error('Cloud access is still starting. Try again in a moment.');
+    let context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
+    if (!context?.session) throw new Error('Sign in to continue.');
+    const createdHomestead = !context?.homesteadId;
+    if (createdHomestead) context = await api.createHomestead(window.RegulaRusticaLocal.read().settings.homesteadName);
+    if (!context?.homesteadId) throw new Error('The shared Homestead could not be established.');
+    if (context.premium?.status !== 'active' || context.premium.plan_key !== 'premium' || (context.premium.ends_at && Date.parse(context.premium.ends_at) <= Date.now())) throw new Error('Premium is required for Cloud Sync. Your local Farm Book is unchanged. Redeem a gift in Settings → Premium to continue.');
+    const local = window.RegulaRusticaLocal.read();
+    if (createdHomestead && local.settings.homesteadLogo && !local.settings.homesteadLogo.storagePath) {
+      local.settings.homesteadLogo = await window.RegulaRusticaDocuments.uploadHomesteadLogo(local.settings.homesteadLogo);
+      write(local, 'onboarding-logo-upload');
+    }
+    // A returning account already has a shared identity. Do not overwrite it
+    // with an unfinished local onboarding draft after an OAuth redirect.
+    if (createdHomestead) {
+      const identity = await context.client.from('homesteads').update({
+        name: local.settings.homesteadName,
+        motto: local.settings.homesteadMotto || null,
+        location: local.settings.homesteadLocation || null,
+        logo_storage_path: local.settings.homesteadLogo?.storagePath || null,
+        logo_crop: local.settings.homesteadLogoCrop
+      }).eq('id', context.homesteadId).select('name,motto,location,logo_storage_path,logo_crop').single();
+      if (identity.error) throw identity.error;
+      context.homesteadIdentity = identity.data;
+    }
+    if (!window.RegulaRusticaSync?.isInitialized()) await window.RegulaRusticaSync.initializeUpload();
+    updateState({ step: 5 });
+    showStep(5, false);
+    status.classList.remove('error');
+  }
+
   $('#onboardingAuthForm').addEventListener('submit', async event => {
     event.preventDefault();
+    sessionStorage.removeItem('regula-rustica:onboarding-oauth');
     const api = window.RegulaRusticaCloudAuth;
     const status = $('#onboardingAuthStatus');
     if (!api) { status.textContent = 'Cloud access is still starting. Try again in a moment.'; return; }
@@ -185,30 +221,43 @@
         $('#onboardingAuthNameLabel').classList.add('hidden');
         return;
       }
-      let context = window.REGULA_RUSTICA_CLOUD_CONTEXT;
-      if (!context?.homesteadId) context = await api.createHomestead(window.RegulaRusticaLocal.read().settings.homesteadName);
-      if (!context?.homesteadId) throw new Error('The shared Homestead could not be established.');
-      if (context.premium?.status !== 'active' || context.premium.plan_key !== 'premium' || (context.premium.ends_at && Date.parse(context.premium.ends_at) <= Date.now())) throw new Error('Premium is required for Cloud Sync. Your local Farm Book is unchanged. Redeem a gift in Settings → Premium to continue.');
-      const local = window.RegulaRusticaLocal.read();
-      if (local.settings.homesteadLogo && !local.settings.homesteadLogo.storagePath) {
-        local.settings.homesteadLogo = await window.RegulaRusticaDocuments.uploadHomesteadLogo(local.settings.homesteadLogo);
-        write(local, 'onboarding-logo-upload');
-      }
-      const identity = await context.client.from('homesteads').update({
-        name: local.settings.homesteadName,
-        motto: local.settings.homesteadMotto || null,
-        location: local.settings.homesteadLocation || null,
-        logo_storage_path: local.settings.homesteadLogo?.storagePath || null,
-        logo_crop: local.settings.homesteadLogoCrop
-      }).eq('id', context.homesteadId).select('name,motto,location,logo_storage_path,logo_crop').single();
-      if (identity.error) throw identity.error;
-      context.homesteadIdentity = identity.data;
-      if (!window.RegulaRusticaSync?.isInitialized()) await window.RegulaRusticaSync.initializeUpload();
-      updateState({ step: 5 });
-      showStep(5, false);
+      await completeSharedSetup();
     } catch (error) {
       status.textContent = error.message || 'Cloud setup could not be completed.';
       status.classList.add('error');
+    }
+  });
+
+  for (const [id, provider] of [['onboardingGoogleSignIn', 'google'], ['onboardingAppleSignIn', 'apple']]) {
+    $(`#${id}`).addEventListener('click', async () => {
+      const status = $('#onboardingAuthStatus');
+      try {
+        if (!window.RegulaRusticaCloudAuth) throw new Error('Cloud access is still starting. Try again in a moment.');
+        sessionStorage.setItem('regula-rustica:onboarding-oauth', '1');
+        await window.RegulaRusticaCloudAuth.signInWithProvider(provider);
+      } catch (error) {
+        sessionStorage.removeItem('regula-rustica:onboarding-oauth');
+        status.textContent = error.message || 'Sign-in could not start.';
+        status.classList.add('error');
+      }
+    });
+  }
+
+  window.addEventListener('regula-rustica:cloud-context', async event => {
+    if (sessionStorage.getItem('regula-rustica:onboarding-oauth') !== '1') return;
+    if (!event.detail?.session) {
+      if (new URL(location.href).searchParams.has('error')) {
+        sessionStorage.removeItem('regula-rustica:onboarding-oauth');
+        $('#onboardingAuthStatus').textContent = 'Sign-in was not completed. Try again or continue locally.';
+      }
+      return;
+    }
+    if (onboarding(window.RegulaRusticaLocal.read()).step !== 4) return;
+    sessionStorage.removeItem('regula-rustica:onboarding-oauth');
+    try { await completeSharedSetup(); }
+    catch (error) {
+      $('#onboardingAuthStatus').textContent = error.message || 'Cloud setup could not be completed.';
+      $('#onboardingAuthStatus').classList.add('error');
     }
   });
 

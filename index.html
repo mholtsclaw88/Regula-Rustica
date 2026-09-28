@@ -22,10 +22,11 @@
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
   <script src="app.js?v=account-cloud-dialogs-v1" defer></script>
   <script src="ledger-allocations.js?v=ledger-api-v2" data-ledger-allocations="true" defer></script>
-  <script src="onboarding.js?v=account-cloud-dialogs-v1" defer></script>
+  <script src="onboarding.js?v=calendar-subscription-v1" defer></script>
   <script src="ui-refinements.js?v=cyril-record-matching-v1" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="cloud-auth.js?v=account-cloud-dialogs-v1" type="module"></script>
+  <script src="cloud-auth.js?v=calendar-subscription-v1" type="module"></script>
+  <script src="calendar-subscription-ui.mjs?v=calendar-subscription-v1" type="module"></script>
   <script src="cellarer-assisted-entry.mjs?v=cyril-dialog-copy-v1" type="module"></script>
   <script src="cellarer-receipt-reader.mjs?v=cyril-dialog-copy-v1" type="module"></script>
   <script src="cellarer-consult.mjs?v=cyril-dialog-copy-v1" type="module"></script>
@@ -86,6 +87,7 @@
           <label>Password<input id="onboardingAuthPassword" type="password" autocomplete="current-password" minlength="8" required></label>
           <p class="form-status" id="onboardingAuthStatus" role="status">Cloud access is optional and may be changed later.</p>
           <button class="btn primary" type="submit">Continue with cloud</button>
+          <div class="quick social-sign-in" aria-label="Other sign-in options"><button class="btn secondary" id="onboardingGoogleSignIn" type="button" disabled>Continue with Google</button><button class="btn secondary" id="onboardingAppleSignIn" type="button" disabled>Continue with Apple</button></div><small id="onboardingSocialStatus" class="muted">Checking sign-in options…</small>
           <button class="btn ghost" id="onboardingReturnLocal" type="button">Return to Local only</button>
         </form>
       </section>
@@ -309,8 +311,18 @@
       <div class="section-head section-masthead">
         <span class="section-masthead-seal hidden"><img alt="" hidden></span>
         <div class="section-masthead-copy"><div class="section-kicker"><span class="label">Tempora</span><details class="section-info"><summary aria-label="About Tempora"><span aria-hidden="true">i</span></summary><div class="section-info-popover"><strong>Times / Seasons</strong><p>Shared dates, events, and the rhythm of homestead life.</p></div></details></div><h2 id="calendarPageTitle">Homestead Calendar</h2></div>
-        <div class="section-actions"><button class="btn primary" id="addCalendarEvent">+ Event</button></div>
+        <div class="section-actions"><button class="btn secondary" id="calendarSubscribe" type="button">Subscribe</button><button class="btn primary" id="addCalendarEvent">+ Event</button></div>
       </div>
+      <dialog class="account-cloud-dialog" id="calendarSubscriptionDialog" aria-labelledby="calendarSubscriptionTitle">
+        <header class="account-cloud-dialog-head"><h3 id="calendarSubscriptionTitle">Subscribe to Calendar</h3><button class="btn secondary" id="calendarSubscriptionClose" type="button">Close</button></header>
+        <p class="muted">Add this Homestead’s cloud Calendar events to another calendar app. Event titles, dates, locations, and notes are included; Tasks and Chore Windows are not. This is read-only. Local changes appear after they sync.</p>
+        <p id="calendarSubscriptionStatus" class="cloud-status" role="status"></p>
+        <div id="calendarSubscriptionControls" class="form-grid hidden">
+          <label class="hidden" id="calendarSubscriptionLinkLabel">Private subscription link<input id="calendarSubscriptionLink" readonly></label>
+          <div class="quick"><button class="btn primary" id="calendarSubscriptionCreate" type="button">Create private link</button><button class="btn secondary hidden" id="calendarSubscriptionCopy" type="button">Copy link</button><button class="btn danger hidden" id="calendarSubscriptionRevoke" type="button">Stop sharing</button></div>
+          <p class="muted">Anyone with this link can read those events. Keep it private. Replacing or stopping the link prevents future downloads, though another calendar app may retain events it already copied.</p>
+        </div>
+      </dialog>
       <div class="card calendar-card">
         <div class="calendar-toolbar">
           <div class="quick calendar-nav">
@@ -554,6 +566,7 @@
               <button class="btn secondary" id="cloudSignUp" type="button">Create account</button>
               <button class="btn ghost" id="cloudResetRequest" type="button">Reset password</button>
             </div>
+            <div class="quick social-sign-in" aria-label="Other sign-in options"><button class="btn secondary" id="cloudGoogleSignIn" type="button" disabled>Continue with Google</button><button class="btn secondary" id="cloudAppleSignIn" type="button" disabled>Continue with Apple</button></div><small id="cloudSocialStatus" class="muted">Checking sign-in options…</small>
           </form>
           <div id="cloudSignedIn" class="form-grid hidden">
             <div class="row"><span id="cloudUserEmail" class="meta"></span><button class="btn secondary" id="cloudSignOut" type="button">Sign out</button></div>
