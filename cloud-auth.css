@@ -65,6 +65,22 @@
   text-transform: capitalize;
 }
 
+.social-sign-in { align-items: center; gap: 10px; }
+.social-brand-button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 20px;
+  cursor: pointer;
+  display: block;
+  height: 40px;
+  padding: 0;
+  width: 180px;
+}
+.social-brand-button img { display: block; height: 40px; width: 180px; }
+.social-brand-button:disabled { cursor: not-allowed; opacity: 1; }
+.social-brand-button:focus-visible { outline: 3px solid var(--forest); outline-offset: 3px; }
+
 @media(max-width:520px) {
   .invitation-item { align-items: flex-start; flex-direction: column; }
 }

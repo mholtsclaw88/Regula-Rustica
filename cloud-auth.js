@@ -49,9 +49,13 @@ async function initializeCloud() {
 
   async function refreshSocialProviders() {
     let providers = {};
+    let checked = false;
     try {
       const response = await fetch(`${config.url.replace(/\/$/, '')}/auth/v1/settings`, { headers: { apikey: config.publishableKey } });
-      if (response.ok) providers = (await response.json()).external || {};
+      if (response.ok) {
+        providers = (await response.json()).external || {};
+        checked = true;
+      }
     } catch { /* A transient check failure must not affect password sign-in. */ }
     for (const provider of ['google', 'apple']) {
       for (const id of [provider === 'google' ? 'cloudGoogleSignIn' : 'cloudAppleSignIn', provider === 'google' ? 'onboardingGoogleSignIn' : 'onboardingAppleSignIn']) {
@@ -61,7 +65,8 @@ async function initializeCloud() {
         button.title = providers[provider] ? '' : `${provider === 'google' ? 'Google' : 'Apple'} sign-in is not configured yet`;
       }
     }
-    const message = providers.google || providers.apple ? '' : 'Google and Apple sign-in are not configured yet; email sign-in remains available.';
+    const message = !checked ? 'Could not check Google and Apple sign-in options; email sign-in remains available.'
+      : providers.google || providers.apple ? '' : 'Google and Apple sign-in are not configured yet; email sign-in remains available.';
     for (const id of ['cloudSocialStatus', 'onboardingSocialStatus']) document.querySelector(`#${id}`).textContent = message;
   }
   refreshSocialProviders();

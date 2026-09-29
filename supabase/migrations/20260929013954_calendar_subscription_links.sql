@@ -9,6 +9,10 @@ create table private.calendar_subscription_links (
   created_by uuid references auth.users(id) on delete set null
 );
 
+-- The private schema is not part of the Data API, but keep RLS on as a
+-- second boundary. Only the deliberately scoped SECURITY DEFINER RPCs read it.
+alter table private.calendar_subscription_links enable row level security;
+
 revoke all on private.calendar_subscription_links from public, anon, authenticated;
 
 create function public.calendar_subscription_status()

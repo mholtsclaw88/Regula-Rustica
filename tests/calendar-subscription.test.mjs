@@ -46,19 +46,22 @@ test('folded content never exceeds 75 UTF-8 octets per line', () => {
 
 test('UI and database keep link issuance Steward-only and revocable', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  const migration = readFileSync(new URL('../supabase/migrations/20260928020000_calendar_subscription_links.sql', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../supabase/migrations/20260929013954_calendar_subscription_links.sql', import.meta.url), 'utf8');
   assert.match(html, /id="calendarSubscribe"/);
   assert.match(html, /id="calendarSubscriptionRevoke"/);
   assert.match(migration, /has_capability\('manage_homestead'\)/);
   assert.match(migration, /has_premium_feature\('cloud_sync'\)/);
   assert.match(migration, /delete from private\.calendar_subscription_links/);
   assert.match(migration, /revoke all on private\.calendar_subscription_links from public, anon, authenticated/);
+  assert.match(migration, /alter table private\.calendar_subscription_links enable row level security/);
 });
 
 test('Google and Apple buttons use the shared Supabase OAuth session', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const auth = readFileSync(new URL('../cloud-auth.js', import.meta.url), 'utf8');
   for (const id of ['cloudGoogleSignIn', 'cloudAppleSignIn', 'onboardingGoogleSignIn', 'onboardingAppleSignIn']) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /assets\/auth\/google-signin\.png/);
+  assert.match(html, /assets\/auth\/apple-signin\.png/);
   assert.match(auth, /client\.auth\.signInWithOAuth\(\{ provider, options: \{ redirectTo \} \}\)/);
 });
 

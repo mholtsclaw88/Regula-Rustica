@@ -87,7 +87,7 @@
           <label>Password<input id="onboardingAuthPassword" type="password" autocomplete="current-password" minlength="8" required></label>
           <p class="form-status" id="onboardingAuthStatus" role="status">Cloud access is optional and may be changed later.</p>
           <button class="btn primary" type="submit">Continue with cloud</button>
-          <div class="quick social-sign-in" aria-label="Other sign-in options"><button class="btn secondary" id="onboardingGoogleSignIn" type="button" disabled>Continue with Google</button><button class="btn secondary" id="onboardingAppleSignIn" type="button" disabled>Continue with Apple</button></div><small id="onboardingSocialStatus" class="muted">Checking sign-in options…</small>
+          <div class="quick social-sign-in" aria-label="Other sign-in options"><button class="social-brand-button" id="onboardingGoogleSignIn" type="button" aria-label="Sign in with Google" disabled><img src="assets/auth/google-signin.png" alt="" width="180" height="40"></button><button class="social-brand-button" id="onboardingAppleSignIn" type="button" aria-label="Sign in with Apple" disabled><img src="assets/auth/apple-signin.png" alt="" width="180" height="40"></button></div><small id="onboardingSocialStatus" class="muted">Checking sign-in options…</small>
           <button class="btn ghost" id="onboardingReturnLocal" type="button">Return to Local only</button>
         </form>
       </section>
@@ -566,7 +566,7 @@
               <button class="btn secondary" id="cloudSignUp" type="button">Create account</button>
               <button class="btn ghost" id="cloudResetRequest" type="button">Reset password</button>
             </div>
-            <div class="quick social-sign-in" aria-label="Other sign-in options"><button class="btn secondary" id="cloudGoogleSignIn" type="button" disabled>Continue with Google</button><button class="btn secondary" id="cloudAppleSignIn" type="button" disabled>Continue with Apple</button></div><small id="cloudSocialStatus" class="muted">Checking sign-in options…</small>
+            <div class="quick social-sign-in" aria-label="Other sign-in options"><button class="social-brand-button" id="cloudGoogleSignIn" type="button" aria-label="Sign in with Google" disabled><img src="assets/auth/google-signin.png" alt="" width="180" height="40"></button><button class="social-brand-button" id="cloudAppleSignIn" type="button" aria-label="Sign in with Apple" disabled><img src="assets/auth/apple-signin.png" alt="" width="180" height="40"></button></div><small id="cloudSocialStatus" class="muted">Checking sign-in options…</small>
           </form>
           <div id="cloudSignedIn" class="form-grid hidden">
             <div class="row"><span id="cloudUserEmail" class="meta"></span><button class="btn secondary" id="cloudSignOut" type="button">Sign out</button></div>

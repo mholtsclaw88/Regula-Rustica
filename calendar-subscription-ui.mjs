@@ -42,7 +42,8 @@ async function refresh() {
   if (!canManage()) return;
   const result = await context().client.rpc('calendar_subscription_status');
   if (result.error) {
-    setStatus('Calendar sharing is not available yet. The cloud update may still be pending.', true);
+    const code = result.error.code ? ` (${result.error.code})` : '';
+    setStatus(`Could not check calendar sharing${code}. Refresh and try again.`, true);
     controls.classList.add('hidden');
     return;
   }

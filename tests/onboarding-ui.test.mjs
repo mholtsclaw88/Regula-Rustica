@@ -71,7 +71,7 @@ test('new installs start empty and incomplete while legacy installs default to c
 });
 
 test('onboarding assets are part of the offline shell', () => {
-  assert.match(worker, /regula-rustica-calendar-subscription-v1/);
+  assert.match(worker, /regula-rustica-calendar-subscription-v2/);
   assert.match(worker, /onboarding\.css\?v=standard-onboarding-v1/);
   assert.match(worker, /onboarding\.js\?v=calendar-subscription-v1/);
 });
