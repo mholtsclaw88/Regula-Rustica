@@ -10,7 +10,7 @@
 
   function activeRecords(data) {
     return (data.records || [])
-      .filter(record => !record.deletedAt && record.status !== 'Archived')
+      .filter(record => !record.deletedAt)
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
