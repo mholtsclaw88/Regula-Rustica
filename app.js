@@ -1271,15 +1271,16 @@ function renderRecords() {
 }
 
 function eventChoices(record) {
+  if (!record) return ['Other'];
   const standard = RECORD_CONFIG[record.type]?.events || [];
   const specialized = [];
   if (record.type === 'Animal') {
     const purpose = (record.identity?.purpose || '').toLowerCase();
     const species = (record.identity?.species || '').toLowerCase();
-    if (purpose.includes('dairy')) specialized.push('Freshened', 'Dry Off');
-    if (species.includes('bee') || purpose.includes('honey')) specialized.push('Inspection', 'Honey Harvest', 'Split', 'Requeened');
+    if (window.RegulaRusticaTasks.animalKind(record) === 'dairy') specialized.push('Freshened', 'Dry Off');
+    if (/\b(?:bees?|honeybees?)\b/.test(species) || (purpose.includes('honey') && window.RegulaRusticaTasks.animalPurposeOptions(species).includes('Honey'))) specialized.push('Inspection', 'Honey Harvest', 'Split', 'Requeened');
   }
-  return [...new Set([...specialized, ...standard])].slice(0, 9).concat('Other');
+  return [...new Set([...specialized, ...standard]), 'Other'];
 }
 
 function activeDocumentAttachments(documentId) {
@@ -1472,13 +1473,13 @@ function renderRecord() {
   $('#recordIdentity').textContent = identityText(record);
   $('#recordStewardship').textContent = stewardshipText(record);
   const eligibleYieldTypes = window.RegulaRusticaTasks.eligibleYieldTypes(record);
-  const yieldEligible = eligibleYieldTypes.length > 0;
+  const yieldEligible = eligibleYieldTypes.length > 0 && !INACTIVE_RECORD_STATUSES.has(record.status);
   const recordAddYield = $('#recordSectionYieldAdd');
   const recordAddYieldMenu = $('#recordAddYieldMenu');
   recordAddYield.classList.toggle('hidden', !yieldEligible);
   recordAddYield.open = false;
   recordAddYieldMenu.innerHTML = '';
-  eligibleYieldTypes.forEach(type => {
+  (yieldEligible ? eligibleYieldTypes : []).forEach(type => {
     const button = document.createElement('button');
     button.type = 'button';
     button.innerHTML = `<strong>${escapeHtml(window.RegulaRusticaTasks.YIELD_TYPES[type].label)}</strong>`;
@@ -1556,12 +1557,16 @@ function renderTasks() {
   const selectedAssignee = assigneeFilter.value || 'all';
   recordFilter.innerHTML = '<option value="all">All records</option><option value="standalone">Standalone</option>';
   data.records
-    .filter(record => !record.deletedAt && record.status !== 'Archived')
+    .filter(record => !record.deletedAt)
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(record => recordFilter.add(new Option(`${record.name} (${record.type})`, record.id)));
   if ([...recordFilter.options].some(option => option.value === selectedRecord)) recordFilter.value = selectedRecord;
   assigneeFilter.innerHTML = '<option value="all">All people</option><option value="unassigned">Unassigned</option>';
-  activePeople().forEach(person => assigneeFilter.add(new Option(`${personDisplayName(person)}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
+  const activeIds = new Set(activePeople().map(person => person.id));
+  const historicalAssignments = data.assignments.filter(item => !item.removedAt && item.assignmentType === 'assignee');
+  data.people.filter(person => !person.deletedAt && (activeIds.has(person.id) || historicalAssignments.some(item => item.personId === person.id || (person.memberId && item.memberId === person.memberId))))
+    .sort((a, b) => personDisplayName(a).localeCompare(personDisplayName(b)))
+    .forEach(person => assigneeFilter.add(new Option(`${personDisplayName(person)}${person.personType === 'child' ? ' (child)' : ''}`, person.id)));
   if ([...assigneeFilter.options].some(option => option.value === selectedAssignee)) assigneeFilter.value = selectedAssignee;
 
   const status = document.querySelector('[name="taskStatusFilter"]:checked')?.value || 'open';
@@ -2123,7 +2128,7 @@ function followStartDate(startInput, endInput, automatic = true) {
   startInput.addEventListener('input', () => { if (followsStart) endInput.value = startInput.value; });
 }
 
-function addRecordSelect(root, labelText, name, selected = '', excludeId = '') {
+function addRecordSelect(root, labelText, name, selected = '', excludeId = '', activeOnly = false) {
   const label = document.createElement('label');
   label.className = `form-field${/\(optional\)/i.test(labelText) ? ' form-field-optional' : ''}`;
   label.textContent = labelText;
@@ -2131,7 +2136,7 @@ function addRecordSelect(root, labelText, name, selected = '', excludeId = '') {
   select.name = name;
   select.add(new Option('None', ''));
   data.records
-    .filter(record => !record.deletedAt && record.status !== 'Archived' && record.id !== excludeId)
+    .filter(record => !record.deletedAt && record.id !== excludeId && (!activeOnly || record.id === selected || !INACTIVE_RECORD_STATUSES.has(record.status)))
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(record => select.add(new Option(`${record.name} (${record.type})`, record.id)));
   select.value = selected || '';
@@ -2146,7 +2151,10 @@ function addPersonSelect(root, selected = '') {
   const select = document.createElement('select');
   select.name = 'personId';
   select.add(new Option('Unassigned', ''));
-  activePeople().forEach(person => select.add(new Option(
+  const people = activePeople();
+  const previous = data.people.find(person => person.id === selected && !person.deletedAt);
+  if (previous && !people.some(person => person.id === previous.id)) people.push(previous);
+  people.forEach(person => select.add(new Option(
     `${personDisplayName(person)}${person.personType === 'child' ? ' (child)' : ''}`,
     person.id
   )));
@@ -2185,9 +2193,10 @@ function addYieldRecordSelect(root, type, selected = '') {
   label.textContent = 'Record';
   const select = document.createElement('select');
   select.name = 'recordId';
-  const records = data.records.filter(record => !record.deletedAt && record.status !== 'Archived' && window.RegulaRusticaTasks.eligibleYieldTypes(record).includes(type));
+  const records = data.records.filter(record => !record.deletedAt && (!INACTIVE_RECORD_STATUSES.has(record.status) || record.id === selected) && window.RegulaRusticaTasks.eligibleYieldTypes(record).includes(type));
+  select.add(new Option(records.length ? 'Choose Record' : 'No eligible active Records', ''));
   records.sort((a,b)=>a.name.localeCompare(b.name)).forEach(record=>select.add(new Option(`${record.name} (${record.type})`,record.id)));
-  select.value = selected || records[0]?.id || '';
+  select.value = selected || '';
   select.required = true;
   label.appendChild(select);
   root.appendChild(label);
@@ -2203,7 +2212,24 @@ function appendRecordFields(root, record, type) {
     root.append(field('Managed as', 'managedAs', 'select', identity.managedAs || 'Individual', ['Individual', 'Group']));
     root.append(field('Species', 'species', 'text', identity.species));
     root.append(field('Breed', 'breed', 'text', identity.breed));
-    root.append(field('Purpose', 'purpose', 'select', identity.purpose || 'Mixed', ['Dairy', 'Meat', 'Breeding', 'Eggs', 'Honey', 'Fiber', 'Draft', 'Companion', 'Mixed']));
+    const purposeOptions = window.RegulaRusticaTasks.animalPurposeOptions(identity.species);
+    const purposeField = field('Purpose', 'purpose', 'select', purposeOptions.includes(identity.purpose) ? identity.purpose : 'Mixed', purposeOptions);
+    root.append(purposeField);
+    if (identity.purpose && !purposeOptions.includes(identity.purpose)) {
+      const notice = document.createElement('small');
+      notice.textContent = `The previous purpose (${identity.purpose}) does not fit this species. Choose an appropriate purpose before saving.`;
+      purposeField.append(notice);
+    }
+    const speciesInput = root.querySelector('[name=species]');
+    const purposeSelect = purposeField.querySelector('select');
+    const refreshPurpose = () => {
+      const options = window.RegulaRusticaTasks.animalPurposeOptions(speciesInput.value);
+      const selected = options.includes(purposeSelect.value) ? purposeSelect.value : 'Mixed';
+      purposeSelect.replaceChildren(...options.map(option => new Option(option, option)));
+      purposeSelect.value = selected;
+      purposeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    speciesInput.addEventListener('input', refreshPurpose);
     root.append(formSection('Details'));
     root.append(field('Sex (individual, optional)', 'sex', 'text', identity.sex));
     root.append(field('Birth date (optional)', 'birthDate', 'date', identity.birthDate));
@@ -2355,7 +2381,7 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     root.append(formSection('Task'));
     root.append(field('Task', 'title', 'text', task.title));
     const taskPeople = formRow();
-    addRecordSelect(taskPeople, 'Linked record (optional)', 'recordId', recordId || task.recordId);
+    addRecordSelect(taskPeople, 'Linked record (optional)', 'recordId', recordId || task.recordId, '', true);
     addPersonSelect(taskPeople, assignment?.personId || personForAssignment(assignment)?.id);
     root.append(taskPeople, formSection('Schedule'));
     const availableFromField = field('Start date (optional)', 'availableFrom', 'date', task.availableFrom);
@@ -2367,10 +2393,34 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
     addRecurrenceFields(scheduleFields, task.recurrenceRule);
     root.append(scheduleFields, formSection('Details'));
     root.append(field('Notes (optional)', 'description', 'textarea', task.description));
-    root.append(formRow(
+    const detailRow = formRow(
       field('Priority', 'priority', 'select', task.priority || 'normal', ['low', 'normal', 'high', 'urgent']),
-      field('On completion', 'yieldType', 'select', task.yieldType || '', ['', ...Object.keys(window.RegulaRusticaTasks.YIELD_TYPES)])
-    ));
+      field('On completion', 'yieldType', 'select', '', [''])
+    );
+    root.append(detailRow);
+    const recordSelect = taskPeople.querySelector('[name=recordId]');
+    const yieldSelect = detailRow.querySelector('[name=yieldType]');
+    const refreshYieldChoices = () => {
+      const record = recordById(recordSelect.value);
+      const allowed = !record?.deletedAt && !INACTIVE_RECORD_STATUSES.has(record?.status)
+        ? window.RegulaRusticaTasks.eligibleYieldTypes(record) : [];
+      const previous = yieldSelect.value;
+      yieldSelect.replaceChildren(new Option(allowed.length ? 'No Yield' : 'No Yield (choose an eligible active Record)', ''));
+      allowed.forEach(type => yieldSelect.add(new Option(window.RegulaRusticaTasks.YIELD_TYPES[type].label, type)));
+      yieldSelect.value = allowed.includes(previous) ? previous : '';
+      yieldSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    recordSelect.addEventListener('change', refreshYieldChoices);
+    refreshYieldChoices();
+    if (task.yieldType && [...yieldSelect.options].some(option => option.value === task.yieldType)) {
+      yieldSelect.value = task.yieldType;
+      yieldSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    else if (task.yieldType) {
+      const notice = document.createElement('small');
+      notice.textContent = 'This task has an incompatible Yield action. Saving it will remove that action; completed history is unchanged.';
+      detailRow.append(notice);
+    }
   }
   if (nextMode === 'note') root.append(field('What should I remember?', 'text', 'textarea'));
   if (nextMode === 'document') {
@@ -2793,6 +2843,9 @@ $('#modalForm').addEventListener('submit', async event => {
     });
     const linkedRecord=recordById(form.recordId);
     const yieldType=form.yieldType||null;
+    if (form.recordId && (!linkedRecord || linkedRecord.deletedAt || (INACTIVE_RECORD_STATUSES.has(linkedRecord.status) && form.recordId !== existing?.recordId))) {
+      alert('Choose an active Record for new Task work.'); return;
+    }
     if (yieldType && !window.RegulaRusticaTasks.eligibleYieldTypes(linkedRecord).includes(yieldType)) {
       alert('That Yield type is not available for the linked Record.'); return;
     }
@@ -2839,12 +2892,16 @@ $('#modalForm').addEventListener('submit', async event => {
     pendingDocumentFiles = [];
   }
   if (modalMode === 'event') {
+    const record = recordById(contextRecordId);
+    if (!record || record.deletedAt || !eventChoices(record).includes(form.eventType)) {
+      alert('Choose an event type available for this Record.');
+      return;
+    }
     if (form.eventType === 'Other' && !form.details.trim()) {
       alert('Please describe what happened.');
       return;
     }
     addEvent(contextRecordId, form.eventType, form.details.trim(), { date: form.date, value: form.value, unit: form.unit });
-    const record = recordById(contextRecordId);
     if (record?.type === 'Work' && form.eventType === 'Completed') {
       record.status = 'Completed';
       record.updatedAt = nowIso();
@@ -2881,8 +2938,15 @@ $('#modalForm').addEventListener('submit', async event => {
       alert('Choose a Record and enter a positive quantity. Unusable Yield cannot exceed the total.');
       return;
     }
-    if (window.RegulaRusticaTasks.YIELD_TYPES[form.yieldType]?.productRequired && !form.product?.trim()) { alert('Enter the crop or product harvested.'); return; }
     const existing = data.yieldEntries.find(item => item.id === editId);
+    const yieldRecord = recordById(form.recordId);
+    const yieldConfig = window.RegulaRusticaTasks.YIELD_TYPES[form.yieldType];
+    if (!yieldRecord || yieldRecord.deletedAt || !yieldConfig || !window.RegulaRusticaTasks.eligibleYieldTypes(yieldRecord).includes(form.yieldType)
+      || (INACTIVE_RECORD_STATUSES.has(yieldRecord.status) && form.recordId !== existing?.recordId)) {
+      alert('Choose an eligible active Record for this Yield type.'); return;
+    }
+    if (!yieldConfig.units.includes(form.unit)) { alert('Choose a valid unit for this Yield type.'); return; }
+    if (window.RegulaRusticaTasks.YIELD_TYPES[form.yieldType]?.productRequired && !form.product?.trim()) { alert('Enter the crop or product harvested.'); return; }
     const values = {
       recordId: form.recordId, type: form.yieldType, occurredAt: new Date(form.occurredAt).toISOString(),
       session: form.session, quantity, unit: form.unit, unusableQuantity, details: form.details.trim(), product:form.product?.trim()||'',
