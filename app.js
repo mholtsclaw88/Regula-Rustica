@@ -941,20 +941,48 @@ function openTaskYield(task) {
   $('#modalCompleteWithoutYield').classList.remove('hidden');
 }
 
+function showTaskActionStatus(message) {
+  const status = $('#taskActionStatus');
+  $('#taskActionStatusText').textContent = message;
+  status.classList.toggle('hidden', !message);
+}
+
+function reopenTaskFromModal(deleteLinkedYield = false) {
+  const task = data.tasks.find(item => item.id === editId && !item.deletedAt);
+  if (!task) {
+    alert('This Task was removed or replaced. Close this dialog and select the Task again.');
+    return;
+  }
+  const linkedYields = window.RegulaRusticaHousekeeping.reopenTask(task, data.yieldEntries, { deleteLinkedYield, timestamp: nowIso() });
+  const date = window.RegulaRusticaHousekeeping.taskWorkDate(task);
+  saveData();
+  $('#modal').close();
+  const yieldMessage = deleteLinkedYield
+    ? `${linkedYields.length} linked Yield record${linkedYields.length === 1 ? '' : 's'} deleted.`
+    : 'Linked Yield kept.';
+  showTaskActionStatus(`${task.title}${date ? ` (${formatDate(date)})` : ''} reopened. ${yieldMessage} Saved on this device.`);
+}
+
 function openTaskReopen(task, linkedYields) {
+  showTaskActionStatus('');
   yieldCompletionTaskId = null;
   modalMode = 'reopen-task';
   editId = task.id;
   contextRecordId = task.recordId || null;
   const count = linkedYields.length;
   $('#modalTitle').textContent = 'Reopen completed Task?';
+  $('#modalSubtitle').textContent = `${task.title}${window.RegulaRusticaHousekeeping.taskWorkDate(task) ? ` · ${formatDate(window.RegulaRusticaHousekeeping.taskWorkDate(task))}` : ''}`;
+  $('#modalSubtitle').classList.remove('hidden');
   $('#modalFields').innerHTML = `<p>This Task has ${count} linked Yield record${count === 1 ? '' : 's'}. Choose whether to keep or delete ${count === 1 ? 'it' : 'them'}.</p>`;
   $('#modalDelete').classList.add('hidden');
   $('#modalForm').classList.remove('yield-task-completion');
+  $('#modalForm').classList.remove('form-modal-long');
+  $('#modalForm').dataset.formMode = 'reopen-task';
   $('#modalCancel').classList.remove('hidden');
   $('#modalCompleteWithoutYield').textContent = `Reopen and delete ${count === 1 ? 'Yield' : `${count} Yield records`}`;
   $('#modalCompleteWithoutYield').classList.remove('hidden');
   $('#modalSubmit').textContent = 'Reopen task only';
+  $('#modalSubmit').classList.remove('hidden');
   $('#modal').showModal();
 }
 
@@ -1156,7 +1184,7 @@ function renderToday() {
     const age = taskDate && taskDate < workDate
       ? Math.max(1, Math.round((Date.parse(`${workDate}T00:00:00Z`) - Date.parse(`${taskDate}T00:00:00Z`)) / 86400000))
       : 0;
-    const row = calendarCompactTaskRow(group.task, { quietPrefix: age ? `${age} day${age === 1 ? '' : 's'} overdue` : 'Chore Window elapsed' });
+    const row = calendarCompactTaskRow(group.task, { quietPrefix: `${taskDate ? `${formatDate(taskDate)} · ` : ''}${age ? `${age} day${age === 1 ? '' : 's'} overdue` : 'Chore Window elapsed'}` });
     if (group.count > 1) {
       const meta = row.querySelector('.calendar-task-meta') || row.querySelector('.calendar-task-copy');
       const history = document.createElement('span');
@@ -2294,6 +2322,7 @@ function appendRecordFields(root, record, type) {
 }
 
 function openModal(nextMode, id = null, recordId = null, defaultType = '', defaultDate = null, completionTask = null) {
+  showTaskActionStatus('');
   yieldCompletionTaskId = completionTask?.id || null;
   modalMode = nextMode;
   editId = id;
@@ -2791,12 +2820,7 @@ $('#modalForm').addEventListener('submit', async event => {
   const form = Object.fromEntries(new FormData(event.target));
 
   if (modalMode === 'reopen-task') {
-    const task = data.tasks.find(item => item.id === editId);
-    if (task) {
-      window.RegulaRusticaHousekeeping.reopenTask(task, data.yieldEntries, { timestamp: nowIso() });
-      saveData();
-    }
-    $('#modal').close();
+    reopenTaskFromModal();
     return;
   }
 
@@ -2953,8 +2977,18 @@ $('#modalForm').addEventListener('submit', async event => {
       taskId: existing?.taskId || yieldCompletionTaskId || null
     };
     const launchedTask = yieldCompletionTaskId ? data.tasks.find(task => task.id === yieldCompletionTaskId) : null;
-    if (launchedTask && !window.RegulaRusticaHousekeeping.matchesYieldTask(launchedTask, values)) {
+    if (yieldCompletionTaskId && (!launchedTask || launchedTask.deletedAt)) {
+      alert('This Task was removed or replaced. Close this dialog and select the Task again.');
+      return;
+    }
+    // Sync can complete the Task while this form is open. That does not change
+    // the Record/type/date relationship of the missing Yield being recorded.
+    if (launchedTask && !window.RegulaRusticaHousekeeping.yieldMatchesTaskContext(launchedTask, values)) {
       alert('The Record, Yield type, and date must match the Task.');
+      return;
+    }
+    if (!existing && launchedTask?.completed && window.RegulaRusticaHousekeeping.linkedYieldsForTask(data.yieldEntries, launchedTask.id).length) {
+      alert('Yield has already been recorded for this Task. Close this dialog and edit the saved Yield, or reopen the Task to correct it.');
       return;
     }
     const matchedTask = !existing && !values.taskId ? chooseMatchingYieldTask(values) : data.tasks.find(task => task.id === values.taskId);
@@ -2999,6 +3033,11 @@ $('#modalForm').addEventListener('submit', async event => {
   }
 
   saveData();
+  if (modalMode === 'yield' && yieldCompletionTaskId) {
+    const task = data.tasks.find(item => item.id === yieldCompletionTaskId);
+    const date = window.RegulaRusticaHousekeeping.taskWorkDate(task);
+    showTaskActionStatus(`Yield saved for ${task.title}${date ? ` (${formatDate(date)})` : ''}. Task complete. Saved on this device.`);
+  }
   $('#modal').close();
 });
 
@@ -3103,16 +3142,12 @@ $('#recordView').addEventListener('click', event => {
 });
 $('#backToList').addEventListener('click', () => showView(priorView));
 const cancelModal = () => { pendingDocumentFiles = []; $('#modal').close(); };
+$('#taskActionDismiss').addEventListener('click', () => showTaskActionStatus(''));
 $('#modalClose').addEventListener('click', cancelModal);
 $('#modalCancel').addEventListener('click', cancelModal);
 $('#modalCompleteWithoutYield').addEventListener('click', () => {
   if (modalMode === 'reopen-task') {
-    const task = data.tasks.find(item => item.id === editId);
-    if (task) {
-      window.RegulaRusticaHousekeeping.reopenTask(task, data.yieldEntries, { deleteLinkedYield: true, timestamp: nowIso() });
-      saveData();
-    }
-    $('#modal').close();
+    reopenTaskFromModal(true);
     return;
   }
   const task = data.tasks.find(item => item.id === yieldCompletionTaskId);

@@ -9,18 +9,18 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=cyril-dialog-copy-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=yield-task-recovery-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=calendar-projections-v1" defer></script>
+  <script src="housekeeping-data.js?v=yield-task-recovery-v1" defer></script>
   <script src="task-foundation.js?v=dropdown-context-v1" defer></script>
   <script src="record-documents.js?v=homestead-identity-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
-  <script src="app.js?v=dropdown-context-v1" defer></script>
+  <script src="app.js?v=yield-task-recovery-v1" defer></script>
   <script src="ledger-allocations.js?v=ledger-api-v2" data-ledger-allocations="true" defer></script>
   <script src="onboarding.js?v=account-cloud-dialogs-v1" defer></script>
   <script src="ui-refinements.js?v=cyril-record-matching-v1" defer></script>
@@ -163,6 +163,7 @@
   </nav>
 
   <main>
+    <div id="taskActionStatus" class="task-action-status hidden" role="status" aria-live="polite" aria-atomic="true"><span id="taskActionStatusText"></span><button id="taskActionDismiss" class="btn ghost" type="button" aria-label="Dismiss Task confirmation">×</button></div>
     <section id="today" class="view active">
       <aside class="onboarding-resume hidden" id="onboardingResume"><div><strong>Continue establishing your Homestead</strong><span>Your work is saved. Return whenever you are ready.</span></div><button class="btn secondary" id="onboardingResumeButton" type="button">Resume</button></aside>
       <section class="homestead-bookplate" aria-labelledby="todayHomesteadName">
@@ -209,7 +210,7 @@
         </summary>
         <div class="daily-section-body">
           <div id="todayAttention" class="calendar-ledger-tasks"></div><p id="todayAttentionEmpty" class="empty">Nothing overdue.</p>
-          <p class="muted hidden" id="todayAttentionHistoryNote">Earlier recurring occurrences remain available in Tasks history.</p>
+          <p class="muted hidden" id="todayAttentionHistoryNote">Record the oldest missed occurrence first. The next missed date appears after saving.</p>
         </div>
       </details>
     </section>

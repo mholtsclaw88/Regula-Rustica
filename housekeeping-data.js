@@ -99,14 +99,18 @@
     return local.toISOString().slice(0, 10);
   }
 
-  function matchesYieldTask(task = {}, yieldEntry = {}) {
+  function yieldMatchesTaskContext(task = {}, yieldEntry = {}) {
     const yieldType = task.yieldType || null;
     return Boolean(
-      !task.deletedAt && !task.completed && task.status !== 'completed'
+      !task.deletedAt
       && yieldType && yieldEntry.type === yieldType
       && task.recordId && task.recordId === yieldEntry.recordId
       && taskWorkDate(task) === localDate(yieldEntry.occurredAt)
     );
+  }
+
+  function matchesYieldTask(task = {}, yieldEntry = {}) {
+    return !task.completed && task.status !== 'completed' && yieldMatchesTaskContext(task, yieldEntry);
   }
 
   function matchingYieldTasks(tasks = [], yieldEntry = {}) {
@@ -263,10 +267,12 @@
       if (!existing) overdueGroups.set(key, { task, count: 1 });
       else {
         existing.count += 1;
-        if (taskWorkDate(task) > taskWorkDate(existing.task)) existing.task = task;
+        // Clear missed work in date order. Choosing the newest occurrence can
+        // keep advancing the series while older work stays hidden in this group.
+        if (taskWorkDate(task) < taskWorkDate(existing.task)) existing.task = task;
       }
     });
-    const needsAttention = [...overdueGroups.values()].sort((a, b) => taskWorkDate(b.task).localeCompare(taskWorkDate(a.task)));
+    const needsAttention = [...overdueGroups.values()].sort((a, b) => taskWorkDate(a.task).localeCompare(taskWorkDate(b.task)));
 
     return {
       schedule,
@@ -414,7 +420,7 @@
   return {
     historicalYieldCandidate, normalizeRecurrenceRule, normalizeCalendarRecurrenceRule, calendarEventOccurrence, nextRecurringDueDate, recurrenceSummary,
     taskWorkDate, choreWindowEndPassed, taskIsOverdue, taskInCurrentChoreWindow, fixedTaskRecurrenceOccurs, calendarTaskOccurrences, dailyPlannerProjection, calendarDaySummary, calendarWorkloadLevel, yieldDefaultsForTask,
-    matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
+    yieldMatchesTaskContext, matchesYieldTask, matchingYieldTasks, matchingYieldForTask,
     linkedYieldsForTask, reopenTask,
     taskCalendarBounds, taskCalendarSegment, taskCalendarBarSegment,
     reportingDateRange, matchesReportingDate

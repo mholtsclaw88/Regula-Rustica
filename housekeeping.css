@@ -1292,6 +1292,27 @@ body.onboarding-open .cellarer-access { display: none; }
   .today-date-block .section-info-popover { bottom: auto; top: 128px; }
 }
 
+.task-action-status {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--forest);
+  box-shadow: var(--shadow);
+  font: .9rem/1.4 Arial, sans-serif;
+}
+.task-action-status .btn { flex: 0 0 auto; margin-left: auto; }
+
 @media (max-width: 370px) {
   .section-head.section-masthead { grid-template-columns: 44px minmax(0,1fr); }
   .section-masthead > .btn { grid-column: 1 / -1; margin-top: -3px; }

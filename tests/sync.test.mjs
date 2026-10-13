@@ -70,6 +70,73 @@ function harness(local = blank(), cloud = new MockCloud(), { normalizeWrite = va
   return { state, cloud, engine, storage, local: () => current, setLocal: value => { current = structuredClone(value); } };
 }
 
+for (const domain of ['tasks', 'yield_entries']) {
+  test(`an unchanged cloud ${domain} row cannot undo a queued reopen or Yield deletion`, async () => {
+    const local = blank();
+    const localId = crypto.randomUUID();
+    const timestamp = '2026-10-12T16:00:00.000Z';
+    const collection = domain === 'tasks' ? 'tasks' : 'yieldEntries';
+    local[collection].push(domain === 'tasks'
+      ? { id: localId, title: 'Morning milking', status: 'completed', completed: true, completedAt: timestamp, dueDate: '2026-10-08', createdAt: timestamp, updatedAt: timestamp, deletedAt: null }
+      : { id: localId, type: 'milk', occurredAt: '2026-10-08T10:00:00.000Z', quantity: 2, unit: 'gal', session: 'morning', createdAt: timestamp, updatedAt: timestamp, deletedAt: null });
+    const h = harness(local);
+    h.state.bind(crypto.randomUUID());
+    h.state.state.initialSyncCompleted = true;
+    const entity = h.state.entity(domain, localId);
+    const cloudRow = { ...toCloud(domain, local[collection][0], h.state), version: 1, created_at: timestamp, updated_at: timestamp };
+    entity.cloudVersion = 1;
+    entity.cloudRow = cloudRow;
+    h.cloud.rows[domain] = [cloudRow];
+    h.cloud.changes = async function* (table) {
+      if (table === domain) yield { rows: [h.cloud.rows[domain][0]], cursor: { updatedAt: timestamp, id: cloudRow.id } };
+    };
+    const after = structuredClone(local);
+    if (domain === 'tasks') housekeepingData.reopenTask(after.tasks[0], [], { timestamp });
+    else { after.yieldEntries[0].deletedAt = timestamp; after.yieldEntries[0].updatedAt = timestamp; }
+    h.engine.queueLocalChanges(local, after);
+    h.setLocal(after);
+
+    // A pull already in progress may deliver the previous version before this
+    // newly queued user action gets its turn to push.
+    await h.engine.pull();
+    assert.deepEqual(h.local()[collection][0], after[collection][0]);
+    assert.equal(h.state.state.outbox.length, 1);
+    assert.equal(h.state.state.conflicts.length, 0);
+    const reloaded = new LocalSyncState(h.storage);
+    assert.equal(reloaded.state.outbox.length, 1);
+    assert.deepEqual(reloaded.state.outbox[0].payload, h.state.state.outbox[0].payload);
+    await h.engine.sync();
+    assert.equal(h.state.state.outbox.length, 0);
+    if (domain === 'tasks') {
+      assert.equal(h.cloud.rows.tasks[0].status, 'open');
+      assert.equal(h.cloud.rows.tasks[0].completed_at, null);
+    } else assert.equal(h.cloud.rows.yield_entries[0].deleted_at, timestamp);
+  });
+}
+
+test('a newer cloud Task edit still creates a conflict while preserving the queued reopen', async () => {
+  const local = blank();
+  const id = crypto.randomUUID();
+  local.tasks.push({ id, title: 'Morning milking', status: 'completed', completed: true, dueDate: '2026-10-08', completedAt: '2026-10-08T10:00:00Z' });
+  const h = harness(local);
+  h.state.bind(crypto.randomUUID());
+  h.state.state.initialSyncCompleted = true;
+  h.state.entity('tasks', id).cloudVersion = 1;
+  const cloudRow = { ...toCloud('tasks', local.tasks[0], h.state), version: 2, title: 'Changed on another device' };
+  h.cloud.changes = async function* (table) {
+    if (table === 'tasks') yield { rows: [cloudRow], cursor: { updatedAt: '2026-10-12T16:00:00Z', id } };
+  };
+  const after = structuredClone(local);
+  housekeepingData.reopenTask(after.tasks[0], [], { timestamp: '2026-10-12T16:00:00Z' });
+  h.engine.queueLocalChanges(local, after);
+  h.setLocal(after);
+  await h.engine.pull();
+  assert.deepEqual(h.local().tasks[0], after.tasks[0]);
+  assert.equal(h.state.state.conflicts.length, 1);
+  assert.equal(h.state.state.conflicts[0].localPayload.status, 'open');
+  assert.equal(h.state.state.conflicts[0].cloudRow.version, 2);
+});
+
 test('sync diagnostics count domains and queue states without exposing payloads', () => {
   const summary = syncDiagnosticSummary({
     outbox: [
