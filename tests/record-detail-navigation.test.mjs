@@ -39,11 +39,11 @@ test('mobile uses the real sticky text tab list without a generated dropdown', (
 });
 
 test('updated Record detail assets share one offline cache version', () => {
-  assert.match(worker, /regula-rustica-dropdown-context-v1/);
-  assert.match(worker, /housekeeping\.css\?v=cyril-dialog-copy-v1/);
-  assert.match(html, /housekeeping\.css\?v=cyril-dialog-copy-v1/);
-  assert.match(worker, /app\.js\?v=dropdown-context-v1/);
-  assert.match(html, /app\.js\?v=dropdown-context-v1/);
+  assert.match(worker, /regula-rustica-yield-task-recovery-v1/);
+  assert.match(worker, /housekeeping\.css\?v=yield-task-recovery-v1/);
+  assert.match(html, /housekeeping\.css\?v=yield-task-recovery-v1/);
+  assert.match(worker, /app\.js\?v=yield-task-recovery-v1/);
+  assert.match(html, /app\.js\?v=yield-task-recovery-v1/);
   assert.match(worker, /ui-refinements\.js\?v=cyril-record-matching-v1/);
   assert.match(html, /ui-refinements\.js\?v=cyril-record-matching-v1/);
 });

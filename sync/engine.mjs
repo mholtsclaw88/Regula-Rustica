@@ -454,8 +454,11 @@ export class SyncEngine {
           const localId = this.state.localIdForCloud(table, row.id);
           const entity = this.state.entity(table, localId);
           const pending = this.state.state.outbox.find(item => item.table === table && item.localId === localId);
-          if (pending && entity.cloudVersion != null && row.version !== entity.cloudVersion) {
-            this.state.addConflict(pending, row);
+          if (pending && entity.cloudVersion != null) {
+            // The known cloud version is the base of this queued local edit,
+            // not a replacement for it. In-flight pulls must not undo a
+            // reopen, Yield deletion, or other change that has yet to push.
+            if (row.version !== entity.cloudVersion) this.state.addConflict(pending, row);
             continue;
           }
           const converted = fromCloud(table, row, this.state);
