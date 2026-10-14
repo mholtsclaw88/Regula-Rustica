@@ -1195,6 +1195,25 @@ test('an edit arriving during the resumed download stays local and never uploads
   assert.equal(h.cloud.calls.length, 0);
 });
 
+test('recovery cannot overwrite an in-flight local edit even before its cloud version is known', async () => {
+  const h = await interruptedRecovery();
+  const changes = h.cloud.changes.bind(h.cloud);
+  h.cloud.changes = async function* (table) {
+    if (table === 'records') {
+      const before = structuredClone(h.local());
+      const after = structuredClone(before);
+      after.records.push({ ...record(h.cloud.rows.records[0].id), name: 'In-flight local edit' });
+      h.engine.queueLocalChanges(before, after); h.setLocal(after);
+    }
+    yield* changes(table);
+  };
+  await assert.rejects(h.engine.resumeCloudRecovery(h.homestead), /baseline could not be accepted/);
+  assert.equal(h.local().records[0].name, 'In-flight local edit');
+  assert.ok(h.state.state.conflicts.some(item => item.status === 'unresolved' && item.localPayload.name === 'In-flight local edit'));
+  assert.equal(h.state.state.initialSyncCompleted, false);
+  assert.equal(h.cloud.calls.length, 0);
+});
+
 test('automatic cloud recovery requires the same Homestead and its readable original backup', async () => {
   const h = await interruptedRecovery();
   assert.equal(h.engine.canResumeCloudRecovery(crypto.randomUUID()), false);

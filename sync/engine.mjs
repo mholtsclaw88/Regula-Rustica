@@ -533,10 +533,12 @@ export class SyncEngine {
           const localId = this.state.localIdForCloud(table, row.id);
           const entity = this.state.entity(table, localId);
           const pending = this.state.state.outbox.find(item => item.table === table && item.localId === localId);
-          if (pending && entity.cloudVersion != null) {
+          if (pending && (entity.cloudVersion != null || this.hasPendingCloudRecovery(this.state.state.homesteadId))) {
             // The known cloud version is the base of this queued local edit,
             // not a replacement for it. In-flight pulls must not undo a
             // reopen, Yield deletion, or other change that has yet to push.
+            // Recovery may receive an edit before that row's first cloud
+            // version is known; retain it for review instead of overwriting it.
             if (row.version !== entity.cloudVersion) this.state.addConflict(pending, row);
             continue;
           }
