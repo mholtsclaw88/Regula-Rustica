@@ -1,7 +1,7 @@
 import { SupabaseSyncAdapter } from './cloud-adapter.mjs';
-import { SyncEngine } from './engine.mjs?v=device-storage-v1';
+import { SyncEngine } from './engine.mjs?v=sync-recovery-v1';
 import { conflictPresentation } from './entities.mjs';
-import { LocalSyncState, syncDiagnosticSummary } from './local-state.mjs?v=device-storage-v1';
+import { LocalSyncState, syncDiagnosticSummary } from './local-state.mjs?v=sync-recovery-v1';
 import { premiumSyncAvailable } from './premium-access.mjs';
 
 const state = new LocalSyncState();
@@ -12,6 +12,9 @@ const conflictList = document.querySelector('#syncConflicts');
 const syncNow = document.querySelector('#syncNow');
 const syncRecovery = document.querySelector('#syncRecovery');
 const syncResetFromCloud = document.querySelector('#syncResetFromCloud');
+const recoveryActions = document.querySelector('#syncRecoveryActions');
+const recoveryDescription = document.querySelector('#syncRecoveryDescription');
+const retryCloudRecovery = document.querySelector('#syncRetryCloudRecovery');
 const syncDiagnostics = document.querySelector('#syncDiagnostics');
 const syncDiagnosticsSummary = document.querySelector('#syncDiagnosticsSummary');
 const syncDiagnosticsBody = document.querySelector('#syncDiagnosticsBody');
@@ -32,6 +35,11 @@ let attachmentRun = null;
 let syncTimer = null;
 let connectPromise = Promise.resolve();
 let lastStatusKind = 'ready';
+let actionInProgress = false;
+
+function recoveryPending() {
+  return engine.hasPendingCloudRecovery(context?.homesteadId);
+}
 
 const DOMAIN_LABELS = Object.freeze({
   homestead_people: 'People', records: 'Records', record_documents: 'Documents', record_attachments: 'Attachments',
@@ -67,6 +75,14 @@ function message(kind, error) {
   const waiting = state.state.outbox.length;
   const conflicts = state.state.conflicts.filter(item => item.status === 'unresolved').length;
   const blocked = state.state.outbox.filter(item => ['blocked', 'dependency'].includes(item.status));
+  if (recoveryPending()) {
+    if (kind === 'syncing') return 'Continuing this device’s cloud download…';
+    if (kind === 'offline' || !navigator.onLine) return 'Cloud recovery paused while offline. Reconnect to continue the download; local work remains on this device.';
+    const failure = error?.message || state.state.initialSyncState?.error;
+    const preserved = state.readBackup(state.state.initialSyncState?.backupId)
+      ? 'Your original safety backup is preserved.' : 'Your current work remains on this device.';
+    return `Cloud recovery paused${failure ? ` — ${failure}` : ''}. ${preserved}`;
+  }
   if (conflicts) return `${conflicts} change${conflicts === 1 ? '' : 's'} need review`;
   if (kind === 'syncing') return 'Syncing…';
   if (kind === 'offline' || !navigator.onLine) return `Offline — changes saved locally${waiting ? ` · ${waiting} waiting` : ''}`;
@@ -86,6 +102,11 @@ function headerStatusSnapshot(kind) {
   const conflicts = state.state.conflicts.some(item => item.status === 'unresolved');
   const blocked = state.state.outbox.some(item => ['blocked', 'dependency'].includes(item.status));
   if (!context?.homesteadId) return { state: 'local', label: 'Local only', detail: 'Saved on this device' };
+  if (recoveryPending()) {
+    if (kind === 'syncing') return { state: 'syncing', label: 'Recovering cloud copy', detail: 'Continuing this device’s download', recovery: true };
+    if (kind === 'offline' || !navigator.onLine) return { state: 'offline', label: 'Sync recovery', detail: 'Reconnect to continue the cloud download', recovery: true };
+    return { state: 'issue', label: 'Sync recovery', detail: 'Cloud download paused · local work preserved', recovery: true };
+  }
   if (!state.state.enabled || !state.state.initialSyncCompleted) return { state: 'issue', label: 'Sync setup', detail: 'Finish connecting this device' };
   if (kind === 'offline' || !navigator.onLine) return { state: 'offline', label: 'Offline', detail: 'Cloud sync unavailable' };
   if (conflicts || blocked || kind === 'problem' || kind === 'attention') return { state: 'issue', label: 'Sync issue', detail: 'Some changes could not sync' };
@@ -110,12 +131,17 @@ function render(kind = 'ready', error = null) {
   lastStatusKind = kind;
   status.textContent = message(kind, error);
   renderHeaderStatus(kind);
-  status.classList.toggle('error', kind === 'problem' || kind === 'attention' || state.state.outbox.some(item => item.status === 'blocked'));
-  syncNow.classList.toggle('hidden', !premiumSyncAvailable(context) || !state.state.initialSyncCompleted);
-  const recoveryInProgress = state.state.initialSyncState?.case === 'device-cloud-recovery'
-    && state.state.initialSyncState.status !== 'complete';
+  const recoveryInProgress = recoveryPending();
+  status.classList.toggle('error', kind === 'problem' || kind === 'attention' || (recoveryInProgress && kind !== 'syncing') || state.state.outbox.some(item => item.status === 'blocked'));
+  syncNow.classList.toggle('hidden', !premiumSyncAvailable(context) || !state.state.initialSyncCompleted || recoveryInProgress);
   syncRecovery.classList.toggle('hidden', !premiumSyncAvailable(context) || (!state.state.initialSyncCompleted && !recoveryInProgress));
-  actions.classList.toggle('hidden', !premiumSyncAvailable(context) || !firstCase || state.state.initialSyncCompleted);
+  recoveryActions.classList.toggle('hidden', !premiumSyncAvailable(context) || !recoveryInProgress);
+  const canContinue = engine.canResumeCloudRecovery(context?.homesteadId);
+  recoveryDescription.textContent = canContinue
+    ? 'This device already chose the cloud Homestead. Continue its interrupted download using the original safety backup. Cloud data is not changed.'
+    : 'Local changes or an unavailable safety backup prevent automatic recovery. Download a backup and confirm replacing this device’s copy with the cloud Homestead. Nothing is uploaded or merged automatically.';
+  retryCloudRecovery.textContent = canContinue ? 'Retry cloud download' : 'Back up and retry cloud download';
+  actions.classList.toggle('hidden', !premiumSyncAvailable(context) || !firstCase || state.state.initialSyncCompleted || recoveryInProgress);
   const firstDescriptions = {
     A: 'This device has saved work and the cloud Homestead is empty. Move this device’s work to the cloud to begin syncing.',
     B: 'The cloud Homestead has saved work and this device has no meaningful work. Download the cloud copy to this device.',
@@ -125,6 +151,9 @@ function render(kind = 'ready', error = null) {
   firstDescription.textContent = firstDescriptions[firstCase] || 'Choose how this device should begin. Nothing is merged automatically.';
   actions.querySelectorAll('[data-cases]').forEach(button => {
     button.classList.toggle('hidden', !button.dataset.cases.includes(firstCase));
+  });
+  [syncNow, syncResetFromCloud, retryCloudRecovery, ...actions.querySelectorAll('[data-cases]')].forEach(button => {
+    button.disabled = !premiumSyncAvailable(context) || actionInProgress || kind === 'syncing' || !navigator.onLine;
   });
   const diagnostics = syncDiagnosticSummary(state.state);
   syncDiagnostics.classList.toggle('hidden', diagnostics.total === 0);
@@ -169,7 +198,7 @@ function render(kind = 'ready', error = null) {
       button.className = `btn ${style}`;
       button.dataset.choice = choice;
       button.textContent = label;
-      button.disabled = !premiumSyncAvailable(context);
+      button.disabled = !premiumSyncAvailable(context) || actionInProgress;
       button.addEventListener('click', () => run(() => engine.resolveConflict(conflict.id, choice)));
       choices.appendChild(button);
     });
@@ -192,14 +221,18 @@ function render(kind = 'ready', error = null) {
 }
 
 async function run(action) {
-  if (!premiumSyncAvailable(context)) return render('ready');
+  if (actionInProgress || !premiumSyncAvailable(context)) return;
+  actionInProgress = true;
   render('syncing');
-  try { await action(); render('ready'); }
-  catch (error) { render(navigator.onLine ? 'problem' : 'offline', error); }
+  let kind = 'ready';
+  let failure = null;
+  try { await action(); }
+  catch (error) { kind = navigator.onLine ? 'problem' : 'offline'; failure = error; }
+  finally { actionInProgress = false; render(kind, failure); }
 }
 
 function canSync() {
-  return navigator.onLine && premiumSyncAvailable(context) && state.state.initialSyncCompleted;
+  return navigator.onLine && premiumSyncAvailable(context) && state.state.initialSyncCompleted && !recoveryPending();
 }
 
 function startAttachmentSync() {
@@ -214,9 +247,15 @@ function startAttachmentSync() {
 }
 
 function scheduleSync({ retryBlocked = false } = {}) {
-  if (!canSync()) return;
+  const canContinueRecovery = () => navigator.onLine && premiumSyncAvailable(context) && engine.canResumeCloudRecovery(context?.homesteadId);
+  if (!canSync() && !canContinueRecovery()) return;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
+    if (recoveryPending()) {
+      if (canContinueRecovery()) run(() => engine.resumeCloudRecovery(context.homesteadId));
+      return;
+    }
+    if (!canSync()) return;
     run(() => engine.sync({ retryBlocked }));
     startAttachmentSync();
   }, 500);
@@ -247,10 +286,14 @@ async function connect(nextContext) {
     writeLocal: (data, source) => window.RegulaRusticaLocal.write(data, source),
     onStatus: render
   });
-  if (state.state.initialSyncCompleted) scheduleSync();
+  if (recoveryPending()) {
+    if (navigator.onLine && engine.canResumeCloudRecovery(context.homesteadId)) {
+      await run(() => engine.resumeCloudRecovery(context.homesteadId));
+    } else render('ready');
+  } else if (state.state.initialSyncCompleted) scheduleSync();
   else if (engine.canResumeQueuedSync(context.homesteadId)) {
-    run(() => engine.resumeQueuedSync(context.homesteadId));
-  } else run(async () => {
+    await run(() => engine.resumeQueuedSync(context.homesteadId));
+  } else await run(async () => {
     const inspection = await engine.inspectFirstSync(context.homesteadId);
     firstCase = inspection.case;
     render('ready');
@@ -289,12 +332,17 @@ syncNow.addEventListener('click', () => {
   run(() => engine.sync({ retryBlocked: true }));
   startAttachmentSync();
 });
-syncResetFromCloud.addEventListener('click', () => {
-  if (!context?.homesteadId) return;
+function confirmCloudReplacement() {
+  if (actionInProgress || !premiumSyncAvailable(context) || !context?.homesteadId || !navigator.onLine) return;
   const confirmed = window.confirm('Are you sure? This will discard this device\'s queued changes, conflicts, retry history, sync mappings, and local working copy, then establish the current cloud Homestead as its clean baseline. Cloud data will not be deleted. A safety backup will be saved first.');
   if (!confirmed) return;
   window.RegulaRusticaLocal.exportBackup();
   run(() => engine.resetDeviceFromCloud(context.homesteadId));
+}
+syncResetFromCloud.addEventListener('click', confirmCloudReplacement);
+retryCloudRecovery.addEventListener('click', () => {
+  if (engine.canResumeCloudRecovery(context?.homesteadId)) run(() => engine.resumeCloudRecovery(context.homesteadId));
+  else confirmCloudReplacement();
 });
 headerStatus?.addEventListener('click', () => {
   document.querySelector('.nav button[data-view="settings"]')?.click();

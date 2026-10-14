@@ -755,6 +755,7 @@ function settingsOperatingMode() {
       return 'Cloud Sync paused · Premium needed';
     if (!window.RegulaRusticaSync) return 'Checking Cloud Sync';
     const sync = window.RegulaRusticaSync?.getStatus?.();
+    if (sync?.recovery) return sync.state === 'syncing' ? 'Recovering cloud copy' : 'Cloud recovery paused';
     if (sync?.label === 'Sync setup' || window.RegulaRusticaSync?.isInitialized() === false) return 'Cloud setup needed on this device';
     if (sync?.state === 'issue') return 'Sync needs attention';
     if (sync?.state === 'offline') return 'Offline · local work safe';
@@ -797,6 +798,7 @@ function renderAccountCloudOverview() {
   else if (signedIn && !joined) { title = 'Connect your Homestead'; detail = 'Create one or accept a private invitation before activating Cloud Sync.'; action = 'Continue'; }
   else if (premiumError) { title = 'Premium status could not be checked'; detail = 'Cloud Sync is paused; your changes remain saved on this device.'; action = 'Review plan'; target = 'accountCloudPremiumDetails'; }
   else if (joined && !premiumActive) { title = 'Premium is needed for Cloud Sync'; detail = 'Your changes remain saved on this device.'; action = 'View plan'; target = 'accountCloudPremiumDetails'; }
+  else if (sync?.recovery) { title = sync.state === 'syncing' ? 'Continuing this device’s cloud download' : 'Cloud recovery needs attention'; detail = sync.detail; action = sync.state === 'syncing' ? '' : 'Review recovery'; target = 'accountCloudDeviceDetails'; }
   else if (sync?.label === 'Sync setup') { title = 'Finish syncing this device'; detail = 'Premium is active; choose how this device should begin. Nothing is merged automatically.'; action = 'Finish setup'; target = 'accountCloudDeviceDetails'; }
   else if (sync?.state === 'issue') { title = 'Sync needs attention'; detail = 'Review this device’s sync details before retrying.'; action = 'Review issue'; target = 'accountCloudDeviceDetails'; }
   else if (sync?.state === 'offline') { title = 'You are offline'; detail = 'Your work remains on this device until Cloud Sync can resume.'; action = ''; }

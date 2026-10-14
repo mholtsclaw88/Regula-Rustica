@@ -32,6 +32,14 @@ run `npx playwright install --with-deps chromium --only-shell`, and run
 Browser tests run in Chromium and WebKit using a temporary localhost server and isolated synthetic devices;
 they do not connect to a live Supabase Homestead.
 
+A failed Reset from Cloud remains a recovery, not first-time setup. Reopening or
+reconnecting continues the previously chosen download only when the original
+backup is readable and the working copy contains only backed-up or downloaded
+rows. Pending edits, conflicts, or untracked newer work pause recovery and expose
+a backup-and-confirm retry action. That action retains both the original backup
+and the newer working copy. Recovery never uses the queued-upload fallback and
+cannot send normal sync writes until its clean cloud baseline is accepted.
+
 WebKit's offline case stops the origin server and confirms the navigation is
 served by the service worker; a fresh context without a worker must fail to
 connect. This avoids Playwright's documented WebKit offline-emulation defect

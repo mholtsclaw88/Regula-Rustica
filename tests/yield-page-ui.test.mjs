@@ -46,9 +46,9 @@ test('Record Yield keeps a recent summary while listing complete linked history'
 });
 
 test('Yield page assets use the current offline cache version', () => {
-  assert.match(worker, /regula-rustica-device-storage-v1/);
+  assert.match(worker, /regula-rustica-sync-recovery-v1/);
   assert.match(worker, /housekeeping\.css\?v=device-storage-v1/);
   assert.match(html, /housekeeping\.css\?v=device-storage-v1/);
-  assert.match(worker, /app\.js\?v=device-storage-v1/);
-  assert.match(bootstrap, /app\.js\?v=device-storage-v1/);
+  assert.match(worker, /app\.js\?v=sync-recovery-v1/);
+  assert.match(bootstrap, /app\.js\?v=sync-recovery-v1/);
 });

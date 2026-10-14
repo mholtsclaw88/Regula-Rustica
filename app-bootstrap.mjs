@@ -64,14 +64,14 @@ try {
   // mistake an asynchronously loaded device for a new, empty Homestead.
   window.RegulaRusticaStorage = await openDeviceStorage({ onError: showSaveError });
   previousCopy = window.RegulaRusticaStorage.getItem('regulaRusticaV5') || window.RegulaRusticaStorage.getItem('regulaRusticaV4') || window.RegulaRusticaStorage.getItem('regulaRusticaV3');
-  await loadScript('app.js?v=device-storage-v1');
+  await loadScript('app.js?v=sync-recovery-v1');
   if (!window.RegulaRustica) throw new Error('Your saved Farm Book could not be opened. Existing saved data has been kept.');
   await window.RegulaRusticaStorage.flush();
   await loadScript('ledger-allocations.js?v=ledger-api-v2', 'data-ledger-allocations');
   await loadScript('onboarding.js?v=account-cloud-dialogs-v1');
   await loadScript('ui-refinements.js?v=cyril-record-matching-v1');
   // Register sync listeners before authentication can publish a cloud context.
-  await import('./sync/runtime.mjs?v=device-storage-v1');
+  await import('./sync/runtime.mjs?v=sync-recovery-v1');
   await import('./cloud-auth.js?v=account-cloud-dialogs-v1');
   await Promise.all([
     import('./cellarer-assisted-entry.mjs?v=cyril-dialog-copy-v1'),
