@@ -7,6 +7,8 @@ const [html, app, css, worker] = await Promise.all([
   read('index.html'), read('app.js'), read('housekeeping.css'), read('service-worker.js')
 ]);
 
+const bootstrap = await readFile(new URL('../app-bootstrap.mjs', import.meta.url), 'utf8');
+
 test('Yield uses the reporting-first masthead and contextual type menu', () => {
   assert.match(html, /id="yieldAdd"/);
   for (const id of ['addMilkYield', 'addEggYield', 'addMeatYield', 'addHarvestYield', 'addForageYield']) {
@@ -44,9 +46,9 @@ test('Record Yield keeps a recent summary while listing complete linked history'
 });
 
 test('Yield page assets use the current offline cache version', () => {
-  assert.match(worker, /regula-rustica-yield-task-recovery-v1/);
-  assert.match(worker, /housekeeping\.css\?v=yield-task-recovery-v1/);
-  assert.match(html, /housekeeping\.css\?v=yield-task-recovery-v1/);
-  assert.match(worker, /app\.js\?v=yield-task-recovery-v1/);
-  assert.match(html, /app\.js\?v=yield-task-recovery-v1/);
+  assert.match(worker, /regula-rustica-device-storage-v1/);
+  assert.match(worker, /housekeeping\.css\?v=device-storage-v1/);
+  assert.match(html, /housekeeping\.css\?v=device-storage-v1/);
+  assert.match(worker, /app\.js\?v=device-storage-v1/);
+  assert.match(bootstrap, /app\.js\?v=device-storage-v1/);
 });

@@ -1457,3 +1457,7 @@ html:has(#calendar.active) { scrollbar-gutter: stable; }
   .cellarer-desk-toggle { padding: 8px 11px; font-size: .8rem; }
   .cellarer-desk { width: calc(100vw - 24px); }
 }
+/* Device storage errors must stay visible while the working copy is exported. */
+.device-storage-startup { max-width: 32rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: 1rem; color: var(--forest); background: var(--cream); }
+.device-storage-error { position: sticky; top: 0; z-index: 1000; padding: 1rem; color: #834b43; background: #fff6df; border: 2px solid #834b43; }
+.device-storage-error .btn, .device-storage-startup .btn { margin: .5rem .5rem 0 0; }

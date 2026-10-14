@@ -4,6 +4,7 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
 const STORAGE_KEY = 'regulaRusticaV5';
+const appStorage = window.RegulaRusticaStorage || localStorage;
 const LEGACY_KEYS = ['regulaRusticaV4', 'regulaRusticaV3'];
 const MIGRATION_BACKUP_KEY = 'regulaRusticaPreV5Backup';
 const IMPORT_BACKUP_KEY = 'regulaRusticaBeforeImport';
@@ -458,15 +459,11 @@ function prepareImportedData(value, sourceName = 'backup') {
 }
 
 function safelyStoreBackup(key, rawValue) {
-  try {
-    localStorage.setItem(key, JSON.stringify({ savedAt: nowIso(), rawValue }));
-  } catch (error) {
-    console.warn(`Could not save ${key}. The source data remains untouched.`, error);
-  }
+  return appStorage.setItem(key, JSON.stringify({ savedAt: nowIso(), rawValue }));
 }
 
 function loadData() {
-  const currentRaw = localStorage.getItem(STORAGE_KEY);
+  const currentRaw = appStorage.getItem(STORAGE_KEY);
   if (currentRaw) {
     try {
       const current = JSON.parse(currentRaw);
@@ -475,25 +472,27 @@ function loadData() {
       if (current.schemaVersion !== CURRENT_SCHEMA_VERSION) {
         safelyStoreBackup(MIGRATION_BACKUP_KEY, currentRaw);
         startupMigrationBefore = beforeMigration;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        appStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       }
       return normalized;
     } catch (error) {
       console.warn('The v5 data could not be read; it has not been overwritten.', error);
+      throw error;
     }
   }
 
   for (const key of LEGACY_KEYS) {
-    const legacyRaw = localStorage.getItem(key);
+    const legacyRaw = appStorage.getItem(key);
     if (!legacyRaw) continue;
     try {
       const legacyData = JSON.parse(legacyRaw);
       safelyStoreBackup(MIGRATION_BACKUP_KEY, legacyRaw);
       const migrated = migrateData(legacyData, key);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      appStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       return migrated;
     } catch (error) {
       console.warn(`Legacy data in ${key} could not be migrated and remains untouched.`, error);
+      throw error;
     }
   }
 
@@ -501,14 +500,21 @@ function loadData() {
 }
 
 function saveData(nextData = data, source = 'user') {
-  const before = persistedData ? structuredClone(persistedData) : null;
   // A cloud replacement deliberately writes empty collections before pulling.
   // Do not turn that empty Chore Window collection back into local defaults.
   data = normalizeData(nextData, { ensureDefaultChoreWindows: source !== 'sync' });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  persistedData = structuredClone(data);
-  renderAll();
-  window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', { detail: { before, after: structuredClone(data), source } }));
+  const after = structuredClone(data);
+  const saving = Promise.resolve(appStorage.setItem(STORAGE_KEY, JSON.stringify(after))).then(() => {
+    // Read the preceding committed snapshot here: several saves can share a
+    // transaction, and failed saves must be included in the next successful diff.
+    const before = persistedData ? structuredClone(persistedData) : null;
+    persistedData = structuredClone(after);
+    renderAll();
+    window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', { detail: { before, after, source } }));
+    return after;
+  });
+  saving.catch(error => console.warn('The Farm Book save did not finish.', error));
+  return saving;
 }
 
 function materializeRecurringTasks(source = 'recurrence') {
@@ -570,7 +576,7 @@ async function syncLocalAttachments({ requireAll = false } = {}) {
       }
       changed = true;
     }
-    if (changed) saveData(data, 'attachment-sync');
+    if (changed) await saveData(data, 'attachment-sync');
     if (requireAll && failed) throw new Error(`${failed} attachment${failed === 1 ? '' : 's'} could not be synchronized. Local copies are still available.`);
     return { synced, failed };
   })().finally(() => { attachmentSyncPromise = null; });
@@ -598,8 +604,9 @@ window.RegulaRusticaLocal = {
 async function importData(file) {
   if (!file) return;
   const parsed = JSON.parse(await file.text());
-  safelyStoreBackup(IMPORT_BACKUP_KEY, JSON.stringify(data));
-  saveData(prepareImportedData(parsed, file.name || 'backup'));
+  const imported = prepareImportedData(parsed, file.name || 'backup');
+  await safelyStoreBackup(IMPORT_BACKUP_KEY, JSON.stringify(data));
+  await saveData(imported);
 }
 
 const seedTimestamp = nowIso();
@@ -955,12 +962,13 @@ function reopenTaskFromModal(deleteLinkedYield = false) {
   }
   const linkedYields = window.RegulaRusticaHousekeeping.reopenTask(task, data.yieldEntries, { deleteLinkedYield, timestamp: nowIso() });
   const date = window.RegulaRusticaHousekeeping.taskWorkDate(task);
-  saveData();
-  $('#modal').close();
-  const yieldMessage = deleteLinkedYield
-    ? `${linkedYields.length} linked Yield record${linkedYields.length === 1 ? '' : 's'} deleted.`
-    : 'Linked Yield kept.';
-  showTaskActionStatus(`${task.title}${date ? ` (${formatDate(date)})` : ''} reopened. ${yieldMessage} Saved on this device.`);
+  return Promise.resolve(saveData()).then(() => {
+    $('#modal').close();
+    const yieldMessage = deleteLinkedYield
+      ? `${linkedYields.length} linked Yield record${linkedYields.length === 1 ? '' : 's'} deleted.`
+      : 'Linked Yield kept.';
+    showTaskActionStatus(`${task.title}${date ? ` (${formatDate(date)})` : ''} reopened. ${yieldMessage} Saved on this device.`);
+  });
 }
 
 function openTaskReopen(task, linkedYields) {
@@ -2817,10 +2825,15 @@ function recordStewardshipFromForm(type, form) {
 
 $('#modalForm').addEventListener('submit', async event => {
   event.preventDefault();
+  const modalForm = $('#modalForm');
+  if (modalForm.dataset.saving === 'true') return;
+  modalForm.dataset.saving = 'true';
+  $('#modalSubmit').disabled = true;
+  try {
   const form = Object.fromEntries(new FormData(event.target));
 
   if (modalMode === 'reopen-task') {
-    reopenTaskFromModal();
+    await reopenTaskFromModal();
     return;
   }
 
@@ -2847,7 +2860,7 @@ $('#modalForm').addEventListener('submit', async event => {
       const nextOrder = Math.max(0, ...data.choreWindows.map(item => Number(item.displayOrder || 0))) + 10;
       data.choreWindows.push(window.RegulaRusticaTasks.normalizeWindow({ id: uid(), name, startTime, endTime, displayOrder: nextOrder, enabled: true, createdAt: nowIso() }));
     }
-    saveData();
+    await saveData();
     $('#modal').close();
     return;
   }
@@ -3032,13 +3045,19 @@ $('#modalForm').addEventListener('submit', async event => {
     }
   }
 
-  saveData();
+  await saveData();
   if (modalMode === 'yield' && yieldCompletionTaskId) {
     const task = data.tasks.find(item => item.id === yieldCompletionTaskId);
     const date = window.RegulaRusticaHousekeeping.taskWorkDate(task);
     showTaskActionStatus(`Yield saved for ${task.title}${date ? ` (${formatDate(date)})` : ''}. Task complete. Saved on this device.`);
   }
   $('#modal').close();
+  } catch (error) {
+    console.warn('The form could not be saved.', error);
+  } finally {
+    modalForm.dataset.saving = 'false';
+    $('#modalSubmit').disabled = false;
+  }
 });
 
 $$('.nav button').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
@@ -3145,15 +3164,17 @@ const cancelModal = () => { pendingDocumentFiles = []; $('#modal').close(); };
 $('#taskActionDismiss').addEventListener('click', () => showTaskActionStatus(''));
 $('#modalClose').addEventListener('click', cancelModal);
 $('#modalCancel').addEventListener('click', cancelModal);
-$('#modalCompleteWithoutYield').addEventListener('click', () => {
+$('#modalCompleteWithoutYield').addEventListener('click', async () => {
   if (modalMode === 'reopen-task') {
-    reopenTaskFromModal(true);
+    try { await reopenTaskFromModal(true); }
+    catch (error) { console.warn('The Task could not be reopened.', error); }
     return;
   }
   const task = data.tasks.find(item => item.id === yieldCompletionTaskId);
   if (task) {
     completeTask(task);
-    saveData();
+    try { await saveData(); }
+    catch (error) { console.warn('The Task could not be saved.', error); return; }
   }
   $('#modal').close();
 });
@@ -3287,12 +3308,12 @@ $('#homesteadForm').addEventListener('submit', async event => {
       next.homesteadLogo = await window.RegulaRusticaDocuments.saveHomesteadLogo(pendingHomesteadLogoFile);
     }
     data.settings = next;
-    saveData(data, 'homestead-identity');
+    await saveData(data, 'homestead-identity');
     savedLocally = true;
     if (cloudIdentityEnabled) {
       if (pendingHomesteadLogoFile) {
         next.homesteadLogo = await window.RegulaRusticaDocuments.uploadHomesteadLogo(next.homesteadLogo);
-        saveData(data, 'homestead-identity-logo-upload');
+        await saveData(data, 'homestead-identity-logo-upload');
       }
       const result = await context.client.from('homesteads').update({
         name: next.homesteadName,
@@ -3343,7 +3364,7 @@ $('#importData').addEventListener('change', async event => {
     alert('Backup restored.');
   } catch (error) {
     console.warn(error);
-    alert('Invalid backup file. No data was changed.');
+    alert(`Backup could not be restored. ${error.message || ''}`.trim());
   }
   event.target.value = '';
 });
@@ -3351,7 +3372,7 @@ $('#resetData').addEventListener('click', () => {
   if (confirm('Reset all records to sample data? Download a backup first if needed.')) saveData(structuredClone(SEED_DATA));
 });
 
-if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(error => console.warn('Offline support could not start.', error)));
+if ('serviceWorker' in navigator) window.addEventListener('regula-rustica:app-ready', () => navigator.serviceWorker.register('service-worker.js').catch(error => console.warn('Offline support could not start.', error)), { once: true });
 window.addEventListener('regula-rustica:cloud-context', () => {
   applyCloudHomesteadContext(window.REGULA_RUSTICA_CLOUD_CONTEXT);
   renderRecords();
@@ -3363,7 +3384,7 @@ window.addEventListener('regula-rustica:cloud-status', renderSettingsSummary);
 
 window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, cellarerConsultContext, openCellarerDraft };
 renderAll();
-window.addEventListener('load', () => materializeRecurringTasks());
-if (startupMigrationBefore) setTimeout(() => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {
-  detail: { before: startupMigrationBefore, after: structuredClone(data), source: 'migration' }
-})), 0);
+window.addEventListener('regula-rustica:app-ready', () => materializeRecurringTasks(), { once: true });
+if (startupMigrationBefore) window.addEventListener('regula-rustica:app-ready', () => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {
+  detail: { before: startupMigrationBefore, after: structuredClone(persistedData), source: 'migration' }
+})), { once: true });

@@ -111,10 +111,10 @@ test('Ledger display installer preserves an already installed draft action', asy
 });
 
 test('Ledger API assets have matching fresh URLs in page and offline cache', async () => {
-  const [html, worker] = await Promise.all(['index.html', 'service-worker.js'].map(file => readFile(new URL(`../${file}`, import.meta.url), 'utf8')));
+  const [html, worker, bootstrap] = await Promise.all(['index.html', 'service-worker.js', 'app-bootstrap.mjs'].map(file => readFile(new URL(`../${file}`, import.meta.url), 'utf8')));
   for (const asset of ['ledger-allocation-display.js', 'ledger-allocations.js']) {
     const url = `${asset}?v=ledger-api-v2`;
-    assert.ok(html.includes(url), `page must load ${url}`);
+    assert.ok((html + bootstrap).includes(url), `page must load ${url}`);
     assert.ok(worker.includes(url), `offline cache must store ${url}`);
   }
 });

@@ -7,6 +7,8 @@ const [html, app, css, loader, refinements, worker] = await Promise.all([
   read('index.html'), read('app.js'), read('housekeeping.css'), read('ui-refinements.js'), read('ui-refinements-core.js'), read('service-worker.js')
 ]);
 
+const bootstrap = await readFile(new URL('../app-bootstrap.mjs', import.meta.url), 'utf8');
+
 test('Ledger mirrors the reporting hierarchy used by Yield', () => {
   assert.match(html, /id="ledgerSummaryRange"/);
   assert.match(html, /<span class="label">Selected period<\/span><h3>At a Glance<\/h3>/);
@@ -33,14 +35,14 @@ test('Ledger mobile masthead does not reserve a hidden seal column', () => {
 });
 
 test('Ledger page assets use the current offline cache version', () => {
-  assert.match(worker, /regula-rustica-yield-task-recovery-v1/);
-  assert.match(worker, /housekeeping\.css\?v=yield-task-recovery-v1/);
-  assert.match(worker, /app\.js\?v=yield-task-recovery-v1/);
+  assert.match(worker, /regula-rustica-device-storage-v1/);
+  assert.match(worker, /housekeeping\.css\?v=device-storage-v1/);
+  assert.match(worker, /app\.js\?v=device-storage-v1/);
   for (const asset of ['ui-refinements.js', 'ui-refinements-core.js']) {
     assert.match(worker, new RegExp(`${asset.replace('.', '\\.')}\\?v=${asset === 'ui-refinements.js' ? 'cyril-record-matching-v1' : 'ledger-page-v1'}`));
   }
-  assert.match(html, /housekeeping\.css\?v=yield-task-recovery-v1/);
-  assert.match(html, /app\.js\?v=yield-task-recovery-v1/);
-  assert.match(html, /ui-refinements\.js\?v=cyril-record-matching-v1/);
+  assert.match(html, /housekeeping\.css\?v=device-storage-v1/);
+  assert.match(bootstrap, /app\.js\?v=device-storage-v1/);
+  assert.match(bootstrap, /ui-refinements\.js\?v=cyril-record-matching-v1/);
   assert.match(loader, /ui-refinements-core\.js\?v=ledger-page-v1/);
 });

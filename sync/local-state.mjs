@@ -75,7 +75,7 @@ function normalizeState(value) {
 }
 
 export class LocalSyncState {
-  constructor(storage = localStorage) {
+  constructor(storage = globalThis.RegulaRusticaStorage || localStorage) {
     this.storage = storage;
     this.state = this.load();
   }
@@ -92,6 +92,8 @@ export class LocalSyncState {
     this.storage.setItem(STATE_KEY, JSON.stringify(this.state));
     return this.state;
   }
+
+  async flush() { await this.storage.flush?.(); }
 
   entityKey(table, localId) { return `${table}:${localId}`; }
 
@@ -244,13 +246,13 @@ export class LocalSyncState {
     return conflict;
   }
 
-  createVerifiedBackup(data, reason) {
+  async createVerifiedBackup(data, reason) {
     const backup = { id: uuid(), createdAt: new Date().toISOString(), reason, data };
     const existing = (() => {
       try { return JSON.parse(this.storage.getItem(BACKUP_KEY)) || []; } catch { return []; }
     })();
     existing.unshift(backup);
-    this.storage.setItem(BACKUP_KEY, JSON.stringify(existing.slice(0, 3)));
+    await this.storage.setItem(BACKUP_KEY, JSON.stringify(existing.slice(0, 3)));
     const verified = JSON.parse(this.storage.getItem(BACKUP_KEY));
     if (!verified.some(item => item.id === backup.id && JSON.stringify(item.data) === JSON.stringify(data))) {
       throw new Error('The safety backup could not be verified. Migration was not started.');
@@ -258,13 +260,13 @@ export class LocalSyncState {
     return backup;
   }
 
-  prepareCloudRecovery(data, homesteadId) {
+  async prepareCloudRecovery(data, homesteadId) {
     const previousRecovery = this.state.initialSyncState?.case === 'device-cloud-recovery'
       ? this.state.initialSyncState
       : null;
     const backup = previousRecovery?.backupId
       ? null
-      : this.createVerifiedBackup(data, 'before-device-cloud-recovery');
+      : await this.createVerifiedBackup(data, 'before-device-cloud-recovery');
     const deviceId = this.state.deviceId;
     this.state = {
       ...emptySyncState(),
