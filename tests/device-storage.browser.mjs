@@ -88,6 +88,7 @@ async function recoveryFixture({ pending = false } = {}) {
   await fixture.page.evaluate(async pending => {
     const storage = window.RegulaRusticaStorage;
     const state = JSON.parse(storage.getItem('regulaRusticaSyncV1'));
+    await storage.setItem('regulaRusticaSyncBackupsV1', JSON.stringify([{ id: 'preserved-backup', reason: 'before-device-cloud-recovery', data: window.RegulaRusticaLocal.read() }]));
     state.outbox = [];
     state.initialSyncState = { case: 'device-cloud-recovery', status: 'failed', backupId: 'preserved-backup', error: "Failed to execute 'setItem' on 'Storage': setting regulaRusticaV5 exceeded the quota." };
     if (pending) {
@@ -309,7 +310,8 @@ try {
   const paused = await recoveryFixture({ pending: true });
   await connectFixtureCloud(paused.page);
   await paused.page.waitForFunction(() => window.RegulaRusticaSync.getStatus().label === 'Sync recovery');
-  await paused.page.evaluate(() => document.querySelector('#accountCloudDeviceDetails').showModal());
+  await paused.page.locator('#headerSyncStatus').click();
+  await paused.page.locator('#accountCloudNextAction').click();
   assert.ok(!(await paused.page.locator('#syncFirstActions').isVisible()));
   assert.ok(await paused.page.getByRole('button', { name: 'Back up and retry cloud download', exact: true }).isVisible());
   assert.equal(await paused.page.locator('#accountCloudNextAction').textContent(), 'Review recovery');

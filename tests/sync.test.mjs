@@ -1143,6 +1143,58 @@ test('a local edit while the recovery checks cloud counts stops automatic replac
   assert.equal(h.cloud.calls.length, 0);
 });
 
+test('an untracked working-copy commit cannot be discarded by automatic recovery', async () => {
+  const h = await interruptedRecovery();
+  const local = structuredClone(h.local()); local.records.push(record('committed-before-outbox'));
+  h.setLocal(local);
+  const stateBefore = structuredClone(h.state.state);
+  assert.equal(h.engine.canResumeCloudRecovery(h.homestead), false);
+  assert.deepEqual(h.state.state, stateBefore, 'inspection must not create or change sync mappings');
+  await assert.rejects(h.engine.resumeCloudRecovery(h.homestead), /local changes|backup/i);
+  assert.equal(h.local().records[0].id, 'committed-before-outbox');
+  await h.engine.resetDeviceFromCloud(h.homestead);
+  const backups = JSON.parse(h.storage.getItem(SYNC_STORAGE_KEYS.backups));
+  assert.ok(backups.some(backup => backup.data.records.some(row => row.id === 'committed-before-outbox')));
+  assert.ok(backups.some(backup => backup.data.records.some(row => row.id === 'original-local')));
+  assert.equal(h.cloud.calls.length, 0);
+});
+
+test('a backed-up working copy or verified partial cloud page can safely resume', async () => {
+  for (const kind of ['original', 'partial']) {
+    const h = await interruptedRecovery();
+    if (kind === 'original') h.setLocal(h.state.readBackup(h.state.state.initialSyncState.backupId).data);
+    else {
+      await h.engine.pull(); // A page committed, but completion did not.
+    }
+    const before = structuredClone(h.state.state);
+    assert.equal(h.engine.canResumeCloudRecovery(h.homestead), true, kind);
+    assert.deepEqual(h.state.state, before);
+    await h.engine.resumeCloudRecovery(h.homestead);
+    assert.equal(h.state.state.initialSyncCompleted, true);
+    assert.equal(h.cloud.calls.length, 0);
+  }
+});
+
+test('an edit arriving during the resumed download stays local and never uploads', async () => {
+  const h = await interruptedRecovery();
+  const changes = h.cloud.changes.bind(h.cloud);
+  h.cloud.changes = async function* (table) {
+    if (table === 'records') {
+      const before = structuredClone(h.local());
+      const after = structuredClone(before); after.records.push(record('edit-during-download'));
+      h.engine.queueLocalChanges(before, after); h.setLocal(after);
+    }
+    yield* changes(table);
+  };
+  await assert.rejects(h.engine.resumeCloudRecovery(h.homestead), /baseline could not be accepted/);
+  assert.ok(h.local().records.some(row => row.id === 'edit-during-download'));
+  assert.equal(h.state.state.initialSyncCompleted, false);
+  assert.equal(h.engine.canResumeQueuedSync(h.homestead), false);
+  assert.equal(h.engine.canResumeCloudRecovery(h.homestead), false);
+  await assert.rejects(h.engine.sync(), /cloud recovery/i);
+  assert.equal(h.cloud.calls.length, 0);
+});
+
 test('automatic cloud recovery requires the same Homestead and its readable original backup', async () => {
   const h = await interruptedRecovery();
   assert.equal(h.engine.canResumeCloudRecovery(crypto.randomUUID()), false);

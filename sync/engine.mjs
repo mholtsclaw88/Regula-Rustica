@@ -233,10 +233,38 @@ export class SyncEngine {
   }
 
   canResumeCloudRecovery(homesteadId) {
-    return Boolean(this.cloud && this.state.state.enabled && this.hasPendingCloudRecovery(homesteadId)
-      && !this.state.state.outbox.length
-      && !this.state.state.conflicts.some(item => item.status === 'unresolved')
-      && this.state.readBackup(this.state.state.initialSyncState.backupId));
+    if (!this.cloud || !this.state.state.enabled || !this.hasPendingCloudRecovery(homesteadId)
+      || this.state.state.outbox.length
+      || this.state.state.conflicts.some(item => item.status === 'unresolved')) return false;
+    const backup = this.state.readBackup(this.state.state.initialSyncState?.backupId);
+    return Boolean(backup && !this.hasUnbackedRecoveryWork(backup));
+  }
+
+  hasUnbackedRecoveryWork(backup) {
+    // A working-copy commit can survive a close before its outbox commit. An
+    // empty queue alone is therefore not proof that there are no newer edits.
+    // Compare using isolated mappings so this inspection cannot mutate state.
+    const comparison = Object.create(this.state);
+    comparison.state = structuredClone(this.state.state);
+    comparison.save = () => comparison.state;
+    const local = this.readLocal();
+    const payload = (table, row) => ({ ...comparablePayload(toCloud(table, row, comparison)), deleted: row.deletedAt || row.removedAt || null });
+    const same = (table, a, b) => JSON.stringify(payload(table, a)) === JSON.stringify(payload(table, b));
+    try {
+      for (const table of DOMAIN_ORDER) {
+        const collection = COLLECTIONS[table];
+        const rows = local[collection] || [];
+        const original = new Map((backup?.data[collection] || []).map(row => [row.id, row]));
+        for (const row of rows) {
+          if (original.has(row.id) && same(table, row, original.get(row.id))) continue;
+          const entity = this.state.state.entities[this.state.entityKey(table, row.id)];
+          if (!entity?.cloudRow || !same(table, row, fromCloud(table, entity.cloudRow, comparison))) return true;
+        }
+        if (Object.entries(this.state.state.entities).some(([key, entity]) => key.startsWith(`${table}:`)
+          && entity.cloudRow && !rows.some(row => row.id === entity.localId))) return true;
+      }
+      return false;
+    } catch { return true; } // Unknown or malformed work requires an explicit choice.
   }
 
   async resumeCloudRecovery(homesteadId) {
@@ -258,10 +286,15 @@ export class SyncEngine {
     if (resume && !this.canResumeCloudRecovery(homesteadId)) {
       throw new Error('Cloud recovery is paused. Preserve local changes in a backup before choosing cloud replacement.');
     }
-    await this.state.prepareCloudRecovery(this.readLocal(), homesteadId);
+    const recoveryCopy = this.readLocal();
+    const preserveWorkingCopy = this.hasPendingCloudRecovery(homesteadId)
+      && this.hasUnbackedRecoveryWork(this.state.readBackup(this.state.state.initialSyncState?.backupId));
+    await this.state.prepareCloudRecovery(recoveryCopy, homesteadId, { preserveWorkingCopy });
     try {
       await this.state.flush();
-      if (resume && !this.canResumeCloudRecovery(homesteadId)) {
+      if (resume && (this.state.state.outbox.length
+        || this.state.state.conflicts.some(item => item.status === 'unresolved')
+        || JSON.stringify(this.readLocal()) !== JSON.stringify(recoveryCopy))) {
         throw new Error('Cloud recovery is paused. Preserve local changes in a backup before choosing cloud replacement.');
       }
       await this.downloadInitial();

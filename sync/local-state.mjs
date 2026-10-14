@@ -270,14 +270,14 @@ export class LocalSyncState {
     return backup;
   }
 
-  async prepareCloudRecovery(data, homesteadId) {
+  async prepareCloudRecovery(data, homesteadId, { preserveWorkingCopy = false } = {}) {
     const previousRecovery = this.state.homesteadId === homesteadId
       && this.state.initialSyncState?.case === 'device-cloud-recovery'
       && this.state.initialSyncState.status !== 'complete'
       ? this.state.initialSyncState
       : null;
     const originalBackup = this.readBackup(previousRecovery?.backupId);
-    const newerWork = this.state.outbox.length || this.state.conflicts.some(item => item.status === 'unresolved');
+    const newerWork = preserveWorkingCopy || this.state.outbox.length || this.state.conflicts.some(item => item.status === 'unresolved');
     const backup = originalBackup && !newerWork
       ? originalBackup
       : await this.createVerifiedBackup(data, 'before-device-cloud-recovery', { preserveIds: originalBackup ? [originalBackup.id] : [] });
