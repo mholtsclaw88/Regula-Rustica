@@ -797,12 +797,74 @@ test('matching an existing yield ignores deleted entries and does not require ti
   assert.equal(housekeepingData.matchingYieldForTask([deleted, active], task).id, 'active');
 });
 
-test('a verified pre-migration backup is readable', () => {
-  const state = new LocalSyncState(new MemoryStorage()); const data = { records: [{ id: 'one' }] };
-  assert.equal(state.createVerifiedBackup(data, 'test').data.records[0].id, 'one');
+test('pull does not advance its cursor until the asynchronous local write has committed', async () => {
+  const h = harness();
+  const row = { ...toCloud('records', record(), h.state), version: 1 };
+  const cursor = { updatedAt: '2026-10-14T16:00:00Z', id: row.id };
+  h.cloud.changes = async function* (table) { if (table === 'records') yield { rows: [row], cursor }; };
+  const originalWrite = h.engine.writeLocal;
+  let release, reached;
+  const started = new Promise(resolve => { reached = resolve; });
+  const committed = new Promise(resolve => { release = resolve; });
+  h.engine.writeLocal = async value => {
+    if (value.records.length) { reached(); await committed; }
+    originalWrite(value);
+  };
+  const pulling = h.engine.pull();
+  await started;
+  assert.equal(h.state.state.cursors.records, undefined);
+  release(); await pulling;
+  assert.deepEqual(h.state.state.cursors.records, cursor);
+  assert.equal(h.local().records.length, 1);
 });
 
-test('device cloud recovery preserves its backup and identity while clearing stale sync metadata', () => {
+test('a rejected asynchronous local write leaves the previous pull cursor intact', async () => {
+  const h = harness();
+  const row = { ...toCloud('records', record(), h.state), version: 1 };
+  const cursor = { updatedAt: '2026-10-14T16:00:00Z', id: row.id };
+  h.cloud.changes = async function* (table) { if (table === 'records') yield { rows: [row], cursor }; };
+  const originalWrite = h.engine.writeLocal;
+  h.engine.writeLocal = async value => {
+    if (value.records.length) throw new Error('device storage full');
+    originalWrite(value);
+  };
+  await assert.rejects(h.engine.pull(), /device storage full/);
+  assert.equal(h.state.state.cursors.records, undefined);
+  assert.equal(new LocalSyncState(h.storage).state.cursors.records, undefined);
+  assert.equal(h.local().records.length, 0);
+});
+
+test('push cannot mutate the cloud until the outbox has persisted', async () => {
+  const h = harness();
+  h.state.bind(crypto.randomUUID());
+  h.state.enqueue({ table: 'records', localId: 'maple', type: 'create', payload: { name: 'Maple' } });
+  h.storage.flush = async () => { throw new Error('device storage full'); };
+  await assert.rejects(h.engine.push(), /device storage full/);
+  assert.equal(h.cloud.calls.length, 0);
+  assert.equal(h.state.state.outbox.length, 1);
+});
+
+test('a failed asynchronous safety backup stops first upload and cloud recovery before replacement', async () => {
+  const local = blank(); local.records.push(record('local-maple'));
+  for (const mode of ['upload', 'recovery']) {
+    const h = harness(local, new MockCloud(mode === 'recovery' ? { records: [record('cloud-maple')] } : {}));
+    const originalSet = h.storage.setItem.bind(h.storage);
+    h.storage.setItem = (key, value) => key === SYNC_STORAGE_KEYS.backups
+      ? Promise.reject(new Error('backup could not be committed')) : originalSet(key, value);
+    const resetting = mode === 'upload' ? h.engine.initialize('upload', crypto.randomUUID()) : h.engine.resetDeviceFromCloud(crypto.randomUUID());
+    await assert.rejects(resetting, /backup could not be committed/);
+    assert.equal(h.cloud.calls.length, 0);
+    assert.equal(h.local().records[0].id, 'local-maple');
+    assert.equal(h.state.state.initialSyncCompleted, false);
+  }
+});
+
+test('a verified pre-migration backup is readable', async () => {
+  const state = new LocalSyncState(new MemoryStorage()); const data = { records: [{ id: 'one' }] };
+  assert.equal((await state.createVerifiedBackup(data, 'test')).data.records[0].id, 'one');
+});
+
+test('device cloud recovery preserves its backup and identity while clearing stale sync metadata', async () => {
   const storage = new MemoryStorage();
   const state = new LocalSyncState(storage); const homestead = crypto.randomUUID();
   state.bind(homestead); state.state.initialSyncCompleted = true;
@@ -814,7 +876,7 @@ test('device cloud recovery preserves its backup and identity while clearing sta
   state.save();
   const deviceId = state.state.deviceId;
 
-  const recovery = state.prepareCloudRecovery({ records: [record('daisy')] }, homestead);
+  const recovery = await state.prepareCloudRecovery({ records: [record('daisy')] }, homestead);
 
   assert.equal(state.state.deviceId, deviceId);
   assert.equal(state.state.homesteadId, homestead);
@@ -830,7 +892,7 @@ test('device cloud recovery preserves its backup and identity while clearing sta
   assert.equal(backups[0].data.records[0].name, 'Daisy');
 });
 
-test('device cloud recovery changes only the selected device state', () => {
+test('device cloud recovery changes only the selected device state', async () => {
   const homestead = crypto.randomUUID();
   const first = new LocalSyncState(new MemoryStorage());
   const second = new LocalSyncState(new MemoryStorage());
@@ -838,7 +900,7 @@ test('device cloud recovery changes only the selected device state', () => {
   first.state.outbox.push({ id: 'first-device-change' }); first.save();
   second.state.outbox.push({ id: 'second-device-change' }); second.save();
 
-  first.prepareCloudRecovery({ records: [record('first-local')] }, homestead);
+  await first.prepareCloudRecovery({ records: [record('first-local')] }, homestead);
 
   assert.deepEqual(first.state.outbox, []);
   assert.equal(second.state.outbox[0].id, 'second-device-change');

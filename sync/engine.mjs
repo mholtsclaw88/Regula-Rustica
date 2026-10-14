@@ -172,7 +172,7 @@ export class SyncEngine {
     try {
       if (inspection.case === 'A' && choice === 'upload') await this.uploadInitial();
       else if ((inspection.case === 'B' && choice === 'download') || (inspection.case === 'C' && choice === 'cloud')) {
-        if (inspection.case === 'C') this.state.createVerifiedBackup(this.readLocal(), 'before-cloud-replacement');
+        if (inspection.case === 'C') await this.state.createVerifiedBackup(this.readLocal(), 'before-cloud-replacement');
         await this.downloadInitial();
       } else if (inspection.case !== 'D') throw new Error('Choose the safe first-sync action shown.');
       this.state.state.initialSyncCompleted = true;
@@ -189,7 +189,7 @@ export class SyncEngine {
   async uploadInitial() {
     const local = this.readLocal();
     const expected = Object.fromEntries(DOMAIN_ORDER.map(table => [table, []]));
-    this.state.createVerifiedBackup(local, 'before-first-cloud-migration');
+    await this.state.createVerifiedBackup(local, 'before-first-cloud-migration');
     for (const table of DOMAIN_ORDER) {
       const rows = table === 'record_attachments' ? (local[COLLECTIONS[table]] || []).filter(attachmentCloudReady) : (local[COLLECTIONS[table]] || []);
       for (const row of rows) {
@@ -218,7 +218,7 @@ export class SyncEngine {
   async downloadInitial() {
     const empty = { ...this.readLocal() };
     DOMAIN_ORDER.forEach(table => { empty[COLLECTIONS[table]] = []; });
-    this.writeLocal(empty, 'sync');
+    await this.writeLocal(empty, 'sync');
     this.state.state.cursors = {};
     this.state.save();
     await this.pull();
@@ -228,7 +228,7 @@ export class SyncEngine {
     if (!this.cloud || !homesteadId) throw new Error('Sign in to a cloud Homestead before resetting this device.');
     const cloudCounts = await this.cloud.counts();
     if (totals(cloudCounts) === 0) throw new Error('The cloud Homestead is empty. This device was not reset.');
-    this.state.prepareCloudRecovery(this.readLocal(), homesteadId);
+    await this.state.prepareCloudRecovery(this.readLocal(), homesteadId);
     try {
       await this.downloadInitial();
       this.state.state.initialSyncCompleted = true;
@@ -248,6 +248,7 @@ export class SyncEngine {
       }
       this.state.state.lastSuccessfulSyncAt = new Date().toISOString();
       this.state.save();
+      await this.state.flush();
       this.onStatus('synced');
     } catch (error) {
       this.state.state.initialSyncCompleted = false;
@@ -325,6 +326,7 @@ export class SyncEngine {
           || this.state.state.conflicts.some(item => item.status === 'unresolved');
         if (!waiting) this.state.state.lastSuccessfulSyncAt = new Date().toISOString();
         this.state.save();
+        await this.state.flush();
         this.onStatus(waiting ? 'attention' : 'synced');
       } catch (error) {
         this.onStatus(navigator.onLine ? 'problem' : 'offline', error);
@@ -365,12 +367,15 @@ export class SyncEngine {
       }
       operation.status = 'pending';
       operation.blockedBy = [];
+      // An operation's identity and idempotency key must be durable before any
+      // cloud mutation can run. A local storage failure pauses the push.
+      await this.state.flush();
       try {
         if (operation.table === 'chore_windows' && operation.type === 'create'
           && operation.payload?.system_key && typeof this.cloud.inspectLegacy === 'function') {
           const inspection = await this.cloud.inspectLegacy(operation);
           if (inspection.supported && inspection.row?.system_key === operation.payload.system_key) {
-            this.adoptSystemChoreWindow(operation, inspection.row);
+            await this.adoptSystemChoreWindow(operation, inspection.row);
             continue;
           }
         }
@@ -403,9 +408,10 @@ export class SyncEngine {
         this.state.fail(operation, error, { retryable: isRetryableSyncError(error) });
       }
     }
+    await this.state.flush();
   }
 
-  adoptSystemChoreWindow(operation, cloudRow) {
+  async adoptSystemChoreWindow(operation, cloudRow) {
     const next = structuredClone(this.readLocal());
     const duplicateIds = new Set(
       (next.choreWindows || [])
@@ -425,11 +431,12 @@ export class SyncEngine {
     for (const routine of next.routines || []) {
       if (duplicateIds.has(routine.choreWindowId)) routine.choreWindowId = operation.localId;
     }
-    this.writeLocal(next, 'sync');
+    await this.writeLocal(next, 'sync');
     this.state.complete(operation, cloudRow);
   }
 
   async pull() {
+    await this.state.flush();
     if (typeof this.cloud.memberDirectory === 'function') {
       const rows = await this.cloud.memberDirectory();
       const next = structuredClone(this.readLocal());
@@ -442,8 +449,9 @@ export class SyncEngine {
         entity.cloudVersion = row.version ?? entity.cloudVersion;
         entity.cloudRow = row;
       }
-      this.writeLocal(next, 'sync');
+      await this.writeLocal(next, 'sync');
       this.state.save();
+      await this.state.flush();
     }
     for (const table of DOMAIN_ORDER) {
       for await (const page of this.cloud.changes(table, this.state.state.cursors[table])) {
@@ -467,9 +475,10 @@ export class SyncEngine {
           entity.cloudVersion = row.version ?? entity.cloudVersion;
           entity.cloudRow = row;
         }
-        this.writeLocal(next, 'sync');
+        await this.writeLocal(next, 'sync');
         this.state.state.cursors[table] = page.cursor;
         this.state.save();
+        await this.state.flush();
       }
     }
   }
@@ -488,7 +497,7 @@ export class SyncEngine {
       if (choice === 'cloud' || localDeleted) {
         const next = structuredClone(this.readLocal());
         next[collection] = (next[collection] || []).filter(item => ![conflict.localId, conflict.rowId].includes(item.id));
-        this.writeLocal(next, 'sync');
+        await this.writeLocal(next, 'sync');
         conflict.status = choice === 'cloud' ? 'kept_cloud_absent' : 'local_delete_already_applied';
         conflict.resolvedAt = new Date().toISOString();
         this.state.save();
@@ -519,7 +528,7 @@ export class SyncEngine {
       let index = next[collection].findIndex(item => item.id === conflict.localId || item.id === conflict.cloudRow.id);
       if (index < 0) { next[collection].push(resolved); index = next[collection].length - 1; } else next[collection][index] = resolved;
       next[collection] = next[collection].filter((item, itemIndex) => itemIndex === index || ![conflict.localId, conflict.cloudRow.id].includes(item.id));
-      this.writeLocal(next, 'sync');
+      await this.writeLocal(next, 'sync');
       conflict.status = 'kept_cloud';
     } else if (choice === 'local') {
       const payload = { ...conflict.localPayload, id: conflict.cloudRow.id };

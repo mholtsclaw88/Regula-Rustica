@@ -1,7 +1,7 @@
 import { SupabaseSyncAdapter } from './cloud-adapter.mjs';
-import { SyncEngine } from './engine.mjs';
+import { SyncEngine } from './engine.mjs?v=device-storage-v1';
 import { conflictPresentation } from './entities.mjs';
-import { LocalSyncState, syncDiagnosticSummary } from './local-state.mjs?v=clean-cloud-baseline-v1';
+import { LocalSyncState, syncDiagnosticSummary } from './local-state.mjs?v=device-storage-v1';
 import { premiumSyncAvailable } from './premium-access.mjs';
 
 const state = new LocalSyncState();
@@ -267,6 +267,7 @@ window.addEventListener('regula-rustica:data-saved', event => {
   scheduleSync();
   if (event.detail.source !== 'attachment-sync') startAttachmentSync();
 });
+window.addEventListener('regula-rustica:storage-error', event => render('problem', event.detail));
 window.addEventListener('online', () => scheduleSync());
 window.addEventListener('offline', () => render('offline'));
 window.addEventListener('focus', () => scheduleSync());

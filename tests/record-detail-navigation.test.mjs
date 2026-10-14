@@ -7,6 +7,8 @@ const [html, app, css, refinements, worker] = await Promise.all([
   read('index.html'), read('app.js'), read('housekeeping.css'), read('ui-refinements.js'), read('service-worker.js')
 ]);
 
+const bootstrap = await readFile(new URL('../app-bootstrap.mjs', import.meta.url), 'utf8');
+
 test('Record header is quiet while every section owns its creation action', () => {
   assert.doesNotMatch(html, /id="recordAdd"/);
   assert.match(html, /id="recordEdit"/);
@@ -39,11 +41,11 @@ test('mobile uses the real sticky text tab list without a generated dropdown', (
 });
 
 test('updated Record detail assets share one offline cache version', () => {
-  assert.match(worker, /regula-rustica-yield-task-recovery-v1/);
-  assert.match(worker, /housekeeping\.css\?v=yield-task-recovery-v1/);
-  assert.match(html, /housekeeping\.css\?v=yield-task-recovery-v1/);
-  assert.match(worker, /app\.js\?v=yield-task-recovery-v1/);
-  assert.match(html, /app\.js\?v=yield-task-recovery-v1/);
+  assert.match(worker, /regula-rustica-device-storage-v1/);
+  assert.match(worker, /housekeeping\.css\?v=device-storage-v1/);
+  assert.match(html, /housekeeping\.css\?v=device-storage-v1/);
+  assert.match(worker, /app\.js\?v=device-storage-v1/);
+  assert.match(bootstrap, /app\.js\?v=device-storage-v1/);
   assert.match(worker, /ui-refinements\.js\?v=cyril-record-matching-v1/);
-  assert.match(html, /ui-refinements\.js\?v=cyril-record-matching-v1/);
+  assert.match(bootstrap, /ui-refinements\.js\?v=cyril-record-matching-v1/);
 });
