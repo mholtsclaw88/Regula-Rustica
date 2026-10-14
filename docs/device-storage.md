@@ -31,3 +31,9 @@ run `npx playwright install --with-deps chromium --only-shell`, and run
 `npm run test:browser`. The GitHub validation workflow runs all three checks.
 Browser tests run in Chromium and WebKit using a temporary localhost server and isolated synthetic devices;
 they do not connect to a live Supabase Homestead.
+
+WebKit's offline case stops the origin server and confirms the navigation is
+served by the service worker; a fresh context without a worker must fail to
+connect. This avoids Playwright's documented WebKit offline-emulation defect
+([microsoft/playwright#42775](https://github.com/microsoft/playwright/issues/42775))
+while still verifying actual network-failure cache recovery.

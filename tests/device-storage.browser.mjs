@@ -23,7 +23,8 @@ const server = createServer(async (request, response) => {
   } catch { response.writeHead(404); response.end('Not found'); }
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const url = `http://127.0.0.1:${server.address().port}`;
+const port = server.address().port;
+const url = `http://127.0.0.1:${port}`;
 let browser;
 
 async function pageWithFixture({ failMigration = false } = {}) {
@@ -151,12 +152,24 @@ try {
 
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForFunction(() => navigator.serviceWorker.controller);
-  await context.setOffline(true);
-  await page.reload(); await ready(page);
+  // Playwright WebKit's offline flag rejects even literal service-worker
+  // responses (microsoft/playwright#42775). Stop the origin instead so the
+  // real network failure and the app's cache fallback are still exercised.
+  if (engineName === 'webkit') await new Promise(resolve => server.close(resolve));
+  else await context.setOffline(true);
+  const offlineResponse = await page.reload(); await ready(page);
+  assert.ok(offlineResponse.fromServiceWorker());
   assert.equal(await page.evaluate(() => window.RegulaRusticaLocal.read().records[0].name), 'Maple');
   assert.equal(await page.evaluate(() => window.RegulaRusticaLocal.read().ledger.length), 2);
+  if (engineName === 'webkit') {
+    const negative = await browser.newContext();
+    const noWorker = await negative.newPage();
+    await assert.rejects(noWorker.goto(url));
+    await negative.close();
+  }
   console.log('PASS offline reload hydrates the saved Farm Book and all new bootstrap modules');
-  await context.setOffline(false);
+  if (engineName === 'webkit') await new Promise(resolve => server.listen(port, '127.0.0.1', resolve));
+  else await context.setOffline(false);
 
   await page.evaluate(async () => {
     const storage = window.RegulaRusticaStorage;
