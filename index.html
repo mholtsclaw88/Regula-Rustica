@@ -21,7 +21,7 @@
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="app-bootstrap.mjs?v=device-storage-v1" type="module"></script>
+  <script src="app-bootstrap.mjs?v=sync-recovery-v1" type="module"></script>
 </head>
 <body>
   <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
@@ -621,6 +621,10 @@
           <header class="account-cloud-dialog-head"><h3 id="accountCloudDeviceTitle">This device &amp; synchronization</h3><button class="btn secondary" type="button" data-account-cloud-close>Close</button></header>
           <div id="syncControls" class="form-grid">
             <p id="syncStatus" class="cloud-status" role="status">Cloud synchronization is not connected.</p>
+            <div id="syncRecoveryActions" class="form-grid hidden">
+              <p class="muted" id="syncRecoveryDescription"></p>
+              <button class="btn primary" id="syncRetryCloudRecovery" type="button">Retry cloud download</button>
+            </div>
             <div id="syncFirstActions" class="form-grid hidden">
               <p class="muted" id="syncFirstDescription">Choose how this device should begin. Regula Rustica will never merge two populated Homesteads automatically.</p>
               <button class="btn primary hidden" id="syncUpload" data-cases="A" type="button">Move this Homestead to the cloud</button>

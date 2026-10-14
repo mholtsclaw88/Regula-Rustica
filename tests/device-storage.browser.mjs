@@ -82,6 +82,69 @@ async function ready(page) {
   await page.waitForFunction(() => window.RegulaRustica && window.RegulaRusticaSync && !document.querySelector('.device-storage-startup'), undefined, { timeout: 15_000 });
 }
 
+async function recoveryFixture({ pending = false } = {}) {
+  const fixture = await pageWithFixture();
+  await fixture.page.goto(url); await ready(fixture.page);
+  await fixture.page.evaluate(async pending => {
+    const storage = window.RegulaRusticaStorage;
+    const state = JSON.parse(storage.getItem('regulaRusticaSyncV1'));
+    state.outbox = [];
+    state.initialSyncState = { case: 'device-cloud-recovery', status: 'failed', backupId: 'preserved-backup', error: "Failed to execute 'setItem' on 'Storage': setting regulaRusticaV5 exceeded the quota." };
+    if (pending) {
+      const data = window.RegulaRusticaLocal.read();
+      data.records[0].name = 'Newer local Maple';
+      await window.RegulaRusticaLocal.write(data, 'sync');
+      state.outbox.push({ id: 'new-local-operation', idempotencyKey: 'new-local-key', homesteadId: state.homesteadId, deviceId: state.deviceId, table: 'records', type: 'update', localId: data.records[0].id, rowId: data.records[0].id, payload: { name: 'Newer local Maple' }, status: 'pending' });
+    }
+    await storage.setItem('regulaRusticaSyncV1', JSON.stringify(state));
+    await storage.flush();
+  }, pending);
+  await fixture.page.reload(); await ready(fixture.page);
+  return fixture;
+}
+
+async function connectFixtureCloud(page, { failDownload = false } = {}) {
+  await page.evaluate(async failDownload => {
+    const stamp = '2026-10-14T16:00:00.000Z';
+    const rows = { records: [{ id: '00000000-0000-4000-8000-000000000011', version: 3, name: 'Cloud Maple', type: 'animal', status: 'Active', identity: { species: 'Cattle', purpose: 'Dairy', managedAs: 'Individual' }, stewardship: {}, created_at: stamp, updated_at: stamp, deleted_at: null }] };
+    window.recoveryFixture = { writes: [], failDownload };
+    const client = {
+      from(table) {
+        let head = false;
+        const filters = [];
+        const query = {
+          select(fields, options) { head = options?.head; return this; },
+          eq(key, value) { filters.push(row => row[key] === value); return this; },
+          is(key, value) { filters.push(row => (row[key] ?? null) === value); return this; },
+          or(value) {
+            const match = value.match(/^updated_at\.gt\.(.*),and\(updated_at\.eq\..*,id\.gt\.(.*)\)$/);
+            if (!match) throw new Error('Unexpected fixture cursor');
+            filters.push(row => row.updated_at > match[1] || (row.updated_at === match[1] && row.id > match[2]));
+            return this;
+          },
+          order() { return this; }, limit() { return this; },
+          then(resolve, reject) {
+            if (!head && table === 'records' && window.recoveryFixture.failDownload) {
+              return Promise.resolve({ error: { message: 'Fixture cloud download interrupted', code: 'FETCH' } }).then(resolve, reject);
+            }
+            const data = (rows[table] || []).filter(row => filters.every(filter => filter(row)));
+            return Promise.resolve({ data, count: data.length, error: null }).then(resolve, reject);
+          }
+        };
+        return query;
+      },
+      async rpc(name, args) {
+        window.recoveryFixture.writes.push({ name, args });
+        throw new Error('Cloud recovery must never write to the cloud');
+      }
+    };
+    window.REGULA_RUSTICA_CLOUD = { url: 'https://fixture.invalid', publishableKey: 'fixture-key' };
+    const context = { client, session: { access_token: 'fixture-session', user: { id: 'fixture-user' } }, homesteadId: '00000000-0000-4000-8000-000000000003', role: 'steward', homesteadIdentity: { name: 'Recovery test Homestead' }, premium: { plan_key: 'premium', status: 'active', ends_at: null } };
+    window.REGULA_RUSTICA_CLOUD_CONTEXT = context;
+    window.dispatchEvent(new CustomEvent('regula-rustica:cloud-context', { detail: context }));
+  }, failDownload);
+}
+
 try {
   browser = await engines[engineName].launch({ headless: true });
   console.log(`Testing ${engineName}`);
@@ -212,6 +275,74 @@ try {
   assert.ok(await newPage.locator('#onboarding').isVisible());
   console.log('PASS a truly new device still opens the empty onboarding flow');
   await blank.close();
+
+  const recovery = await recoveryFixture();
+  await connectFixtureCloud(recovery.page);
+  await recovery.page.waitForFunction(() => window.RegulaRusticaSync.getStatus().label === 'Synced');
+  const recovered = await recovery.page.evaluate(() => ({
+    data: window.RegulaRusticaLocal.read(),
+    state: JSON.parse(window.RegulaRusticaStorage.getItem('regulaRusticaSyncV1')),
+    backups: JSON.parse(window.RegulaRusticaStorage.getItem('regulaRusticaSyncBackupsV1')),
+    writes: window.recoveryFixture.writes,
+    premium: document.querySelector('#accountCloudPremiumState').textContent,
+    device: document.querySelector('#accountCloudDeviceState').textContent,
+    action: document.querySelector('#accountCloudNextAction').textContent
+  }));
+  assert.equal(recovered.data.records[0].name, 'Cloud Maple');
+  assert.equal(recovered.data.legacy.receiptPhotos.preserved.dataUrl.length, 350_023);
+  assert.equal(recovered.state.deviceId, '00000000-0000-4000-8000-000000000002');
+  assert.equal(recovered.state.initialSyncCompleted, true);
+  assert.equal(recovered.state.initialSyncState.status, 'complete');
+  assert.equal(recovered.state.initialSyncState.backupId, 'preserved-backup');
+  assert.equal(recovered.backups[0].data.records[0].name, 'Maple');
+  assert.deepEqual(recovered.writes, []);
+  assert.equal(recovered.premium, 'Active');
+  assert.equal(recovered.device, 'Synced');
+  assert.notEqual(recovered.action, 'Finish setup');
+  await recovery.page.reload(); await ready(recovery.page);
+  await connectFixtureCloud(recovery.page);
+  await recovery.page.waitForFunction(() => window.RegulaRusticaSync.getStatus().label === 'Synced');
+  assert.deepEqual(await recovery.page.evaluate(() => window.recoveryFixture.writes), []);
+  console.log('PASS Premium device reopens from failed recovery, finishes the cloud download, and stays initialized without any cloud writes');
+  await recovery.context.close();
+
+  const paused = await recoveryFixture({ pending: true });
+  await connectFixtureCloud(paused.page);
+  await paused.page.waitForFunction(() => window.RegulaRusticaSync.getStatus().label === 'Sync recovery');
+  await paused.page.evaluate(() => document.querySelector('#accountCloudDeviceDetails').showModal());
+  assert.ok(!(await paused.page.locator('#syncFirstActions').isVisible()));
+  assert.ok(await paused.page.getByRole('button', { name: 'Back up and retry cloud download', exact: true }).isVisible());
+  assert.equal(await paused.page.locator('#accountCloudNextAction').textContent(), 'Review recovery');
+  paused.page.once('dialog', dialog => dialog.dismiss());
+  await paused.page.locator('#syncRetryCloudRecovery').click();
+  assert.equal(await paused.page.evaluate(() => window.RegulaRusticaLocal.read().records[0].name), 'Newer local Maple');
+  assert.equal(await paused.page.evaluate(() => JSON.parse(window.RegulaRusticaStorage.getItem('regulaRusticaSyncV1')).outbox.length), 1);
+  const backupDownload = paused.page.waitForEvent('download');
+  paused.page.once('dialog', dialog => dialog.accept());
+  await paused.page.locator('#syncRetryCloudRecovery').click();
+  await backupDownload;
+  await paused.page.waitForFunction(() => window.RegulaRusticaSync.getStatus().label === 'Synced');
+  const safeRetry = await paused.page.evaluate(() => ({
+    backups: JSON.parse(window.RegulaRusticaStorage.getItem('regulaRusticaSyncBackupsV1')),
+    writes: window.recoveryFixture.writes
+  }));
+  assert.ok(safeRetry.backups.some(backup => backup.data.records.some(row => row.name === 'Maple')));
+  assert.ok(safeRetry.backups.some(backup => backup.data.records.some(row => row.name === 'Newer local Maple')));
+  assert.deepEqual(safeRetry.writes, []);
+  console.log('PASS newer local work pauses cloud recovery; cancel preserves it and confirmed retry keeps both backups');
+  await paused.context.close();
+
+  const retry = await recoveryFixture();
+  await connectFixtureCloud(retry.page, { failDownload: true });
+  await retry.page.waitForFunction(() => document.querySelector('#syncStatus').textContent.includes('Fixture cloud download interrupted'));
+  await retry.page.evaluate(() => {
+    window.recoveryFixture.failDownload = false;
+    window.dispatchEvent(new Event('online'));
+  });
+  await retry.page.waitForFunction(() => window.RegulaRusticaSync.getStatus().label === 'Synced');
+  assert.deepEqual(await retry.page.evaluate(() => window.recoveryFixture.writes), []);
+  console.log('PASS a failed recovery retains an actionable error and automatically continues on reconnect');
+  await retry.context.close();
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));

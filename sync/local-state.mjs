@@ -246,13 +246,23 @@ export class LocalSyncState {
     return conflict;
   }
 
-  async createVerifiedBackup(data, reason) {
+  readBackup(id) {
+    if (!id) return null;
+    try {
+      const backups = JSON.parse(this.storage.getItem(BACKUP_KEY));
+      return backups?.find(item => item.id === id && item.data && typeof item.data === 'object') || null;
+    } catch { return null; }
+  }
+
+  async createVerifiedBackup(data, reason, { preserveIds = [] } = {}) {
     const backup = { id: uuid(), createdAt: new Date().toISOString(), reason, data };
     const existing = (() => {
       try { return JSON.parse(this.storage.getItem(BACKUP_KEY)) || []; } catch { return []; }
     })();
-    existing.unshift(backup);
-    await this.storage.setItem(BACKUP_KEY, JSON.stringify(existing.slice(0, 3)));
+    // A retry must retain the original pre-recovery copy as well as newer work.
+    const preserved = existing.filter(item => preserveIds.includes(item.id));
+    const recent = existing.filter(item => !preserveIds.includes(item.id));
+    await this.storage.setItem(BACKUP_KEY, JSON.stringify([backup, ...preserved, ...recent].slice(0, 3)));
     const verified = JSON.parse(this.storage.getItem(BACKUP_KEY));
     if (!verified.some(item => item.id === backup.id && JSON.stringify(item.data) === JSON.stringify(data))) {
       throw new Error('The safety backup could not be verified. Migration was not started.');
@@ -261,12 +271,16 @@ export class LocalSyncState {
   }
 
   async prepareCloudRecovery(data, homesteadId) {
-    const previousRecovery = this.state.initialSyncState?.case === 'device-cloud-recovery'
+    const previousRecovery = this.state.homesteadId === homesteadId
+      && this.state.initialSyncState?.case === 'device-cloud-recovery'
+      && this.state.initialSyncState.status !== 'complete'
       ? this.state.initialSyncState
       : null;
-    const backup = previousRecovery?.backupId
-      ? null
-      : await this.createVerifiedBackup(data, 'before-device-cloud-recovery');
+    const originalBackup = this.readBackup(previousRecovery?.backupId);
+    const newerWork = this.state.outbox.length || this.state.conflicts.some(item => item.status === 'unresolved');
+    const backup = originalBackup && !newerWork
+      ? originalBackup
+      : await this.createVerifiedBackup(data, 'before-device-cloud-recovery', { preserveIds: originalBackup ? [originalBackup.id] : [] });
     const deviceId = this.state.deviceId;
     this.state = {
       ...emptySyncState(),
@@ -276,7 +290,7 @@ export class LocalSyncState {
       initialSyncState: {
         case: 'device-cloud-recovery',
         status: 'running',
-        backupId: previousRecovery?.backupId || backup.id,
+        backupId: originalBackup?.id || backup.id,
         startedAt: previousRecovery?.startedAt || new Date().toISOString()
       }
     };

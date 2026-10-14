@@ -163,6 +163,7 @@ export class SyncEngine {
   }
 
   async initialize(choice, homesteadId) {
+    if (this.hasPendingCloudRecovery(homesteadId)) throw new Error('Continue this device’s cloud recovery before starting another setup.');
     const inspection = await this.inspectFirstSync(homesteadId);
     if (inspection.case === 'boundary') throw new Error('This device contains a different Homestead. Synchronization was stopped.');
     if (inspection.case === 'C' && choice !== 'cloud') throw new Error('Two populated Homesteads cannot be merged automatically.');
@@ -224,12 +225,45 @@ export class SyncEngine {
     await this.pull();
   }
 
-  async resetDeviceFromCloud(homesteadId) {
+  hasPendingCloudRecovery(homesteadId) {
+    const value = this.state.state;
+    return Boolean(homesteadId && value.homesteadId === homesteadId
+      && value.initialSyncState?.case === 'device-cloud-recovery'
+      && (!value.initialSyncCompleted || value.initialSyncState.status !== 'complete'));
+  }
+
+  canResumeCloudRecovery(homesteadId) {
+    return Boolean(this.cloud && this.state.state.enabled && this.hasPendingCloudRecovery(homesteadId)
+      && !this.state.state.outbox.length
+      && !this.state.state.conflicts.some(item => item.status === 'unresolved')
+      && this.state.readBackup(this.state.state.initialSyncState.backupId));
+  }
+
+  async resumeCloudRecovery(homesteadId) {
+    if (!this.canResumeCloudRecovery(homesteadId)) {
+      throw new Error('Cloud recovery is paused. Preserve local changes in a backup before choosing cloud replacement.');
+    }
+    return this.resetDeviceFromCloud(homesteadId, { resume: true });
+  }
+
+  async resetDeviceFromCloud(homesteadId, { resume = false } = {}) {
     if (!this.cloud || !homesteadId) throw new Error('Sign in to a cloud Homestead before resetting this device.');
+    if (this.state.state.homesteadId && this.state.state.homesteadId !== homesteadId) {
+      throw new Error('This device contains a different Homestead. Cloud recovery was stopped.');
+    }
     const cloudCounts = await this.cloud.counts();
     if (totals(cloudCounts) === 0) throw new Error('The cloud Homestead is empty. This device was not reset.');
+    // Cloud counts can take time. Recheck after awaiting them so work entered
+    // during that request never becomes permission to replace the local copy.
+    if (resume && !this.canResumeCloudRecovery(homesteadId)) {
+      throw new Error('Cloud recovery is paused. Preserve local changes in a backup before choosing cloud replacement.');
+    }
     await this.state.prepareCloudRecovery(this.readLocal(), homesteadId);
     try {
+      await this.state.flush();
+      if (resume && !this.canResumeCloudRecovery(homesteadId)) {
+        throw new Error('Cloud recovery is paused. Preserve local changes in a backup before choosing cloud replacement.');
+      }
       await this.downloadInitial();
       this.state.state.initialSyncCompleted = true;
       this.state.state.initialSyncState = {
@@ -269,6 +303,7 @@ export class SyncEngine {
       && this.state.state.enabled
       && this.state.state.homesteadId === homesteadId
       && !this.state.state.initialSyncCompleted
+      && !this.hasPendingCloudRecovery(homesteadId)
       && this.state.state.outbox.length
     );
   }
@@ -309,6 +344,9 @@ export class SyncEngine {
   }
 
   async sync({ retryBlocked = false } = {}) {
+    if (this.hasPendingCloudRecovery(this.state.state.homesteadId)) {
+      throw new Error('Cloud recovery must finish before uploading changes.');
+    }
     if (this.running) return this.running;
     this.running = (async () => {
       this.onStatus('syncing');

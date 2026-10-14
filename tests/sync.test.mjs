@@ -1064,6 +1064,108 @@ test('retrying an interrupted device recovery retains the original safety backup
   assert.equal(h.state.state.initialSyncState.status, 'failed');
 });
 
+async function interruptedRecovery() {
+  const cloudRow = { id: crypto.randomUUID(), version: 3, type: 'animal', name: 'Cloud Daisy', status: 'Active', identity: {}, stewardship: {}, created_at: '2026-10-14T12:00:00.000Z', updated_at: '2026-10-14T12:00:00.000Z', deleted_at: null };
+  const cloud = new MockCloud({ records: [cloudRow] });
+  cloud.changes = async function* () { throw new Error('local quota exceeded during download'); };
+  const local = blank(); local.records.push(record('original-local'));
+  const h = harness(local, cloud);
+  const homestead = crypto.randomUUID();
+  h.state.bind(homestead); h.state.state.initialSyncCompleted = true; h.state.save();
+  await assert.rejects(h.engine.resetDeviceFromCloud(homestead), /quota exceeded/);
+  cloud.changes = async function* (table) {
+    const rows = this.rows[table];
+    if (rows.length) yield { rows, cursor: { updatedAt: rows.at(-1).updated_at, id: rows.at(-1).id } };
+  };
+  // Reopen from the persisted state, as on the device in the report.
+  h.state = new LocalSyncState(h.storage);
+  h.engine = new SyncEngine({ state: h.state, cloud, readLocal: h.local, writeLocal: h.setLocal });
+  return { ...h, homestead };
+}
+
+test('reopening an interrupted cloud recovery continues its chosen download without uploading', async () => {
+  const h = await interruptedRecovery();
+  const deviceId = h.state.state.deviceId;
+  const backupId = h.state.state.initialSyncState.backupId;
+  assert.equal(h.engine.canResumeCloudRecovery(h.homestead), true);
+  await h.engine.resumeCloudRecovery(h.homestead);
+  assert.equal(h.local().records[0].name, 'Cloud Daisy');
+  assert.equal(h.state.state.deviceId, deviceId);
+  assert.equal(h.state.state.initialSyncState.backupId, backupId);
+  assert.equal(h.state.state.initialSyncCompleted, true);
+  assert.equal(h.state.state.initialSyncState.status, 'complete');
+  assert.deepEqual(h.state.state.outbox, []);
+  assert.equal(h.cloud.calls.length, 0);
+  const backups = JSON.parse(h.storage.getItem(SYNC_STORAGE_KEYS.backups));
+  assert.equal(backups.length, 1);
+  assert.equal(backups[0].data.records[0].id, 'original-local');
+  const reopened = new LocalSyncState(h.storage);
+  assert.equal(reopened.state.initialSyncCompleted, true);
+});
+
+test('cloud recovery with new local work cannot become an upload or restart automatically', async () => {
+  const h = await interruptedRecovery();
+  const before = structuredClone(h.local());
+  const after = structuredClone(before); after.records.push(record('new-local-work'));
+  h.engine.queueLocalChanges(before, after); h.setLocal(after);
+  const operation = structuredClone(h.state.state.outbox[0]);
+  assert.equal(h.engine.canResumeQueuedSync(h.homestead), false);
+  assert.equal(h.engine.canResumeCloudRecovery(h.homestead), false);
+  await assert.rejects(h.engine.resumeCloudRecovery(h.homestead), /local changes|backup/i);
+  await assert.rejects(h.engine.resumeQueuedSync(h.homestead), /does not have a resumable/);
+  await assert.rejects(h.engine.sync(), /cloud recovery/i);
+  await assert.rejects(h.engine.initialize('cloud', h.homestead), /cloud recovery/i);
+  assert.deepEqual(h.state.state.outbox, [operation]);
+  assert.equal(h.local().records[0].id, 'new-local-work');
+  assert.equal(h.cloud.calls.length, 0);
+
+  // Explicitly choosing replacement keeps both the original and the newer work.
+  await h.engine.resetDeviceFromCloud(h.homestead);
+  const backups = JSON.parse(h.storage.getItem(SYNC_STORAGE_KEYS.backups));
+  assert.ok(backups.some(backup => backup.data.records.some(row => row.id === 'original-local')));
+  assert.ok(backups.some(backup => backup.data.records.some(row => row.id === 'new-local-work')));
+  assert.equal(h.local().records[0].name, 'Cloud Daisy');
+  assert.equal(h.cloud.calls.length, 0);
+});
+
+test('a local edit while the recovery checks cloud counts stops automatic replacement', async () => {
+  const h = await interruptedRecovery();
+  const counts = h.cloud.counts.bind(h.cloud);
+  h.cloud.counts = async () => {
+    const before = structuredClone(h.local());
+    const after = structuredClone(before); after.records.push(record('edited-during-check'));
+    h.engine.queueLocalChanges(before, after); h.setLocal(after);
+    return counts();
+  };
+  await assert.rejects(h.engine.resumeCloudRecovery(h.homestead), /local changes|backup/i);
+  assert.equal(h.local().records[0].id, 'edited-during-check');
+  assert.equal(h.state.state.outbox.length, 1);
+  assert.equal(h.cloud.calls.length, 0);
+});
+
+test('automatic cloud recovery requires the same Homestead and its readable original backup', async () => {
+  const h = await interruptedRecovery();
+  assert.equal(h.engine.canResumeCloudRecovery(crypto.randomUUID()), false);
+  await assert.rejects(h.engine.resumeCloudRecovery(crypto.randomUUID()), /cloud recovery|Homestead/i);
+  h.storage.setItem(SYNC_STORAGE_KEYS.backups, '[]');
+  assert.equal(h.engine.canResumeCloudRecovery(h.homestead), false);
+  await assert.rejects(h.engine.resumeCloudRecovery(h.homestead), /local changes|backup/i);
+  assert.equal(h.cloud.calls.length, 0);
+});
+
+test('a separate reset after a completed recovery makes a fresh safety backup', async () => {
+  const h = await interruptedRecovery();
+  await h.engine.resetDeviceFromCloud(h.homestead);
+  const before = structuredClone(h.local());
+  const after = structuredClone(before); after.records[0].name = 'Later local work';
+  h.engine.queueLocalChanges(before, after); h.setLocal(after);
+  await h.engine.resetDeviceFromCloud(h.homestead);
+  const backups = JSON.parse(h.storage.getItem(SYNC_STORAGE_KEYS.backups));
+  assert.equal(backups[0].data.records[0].name, 'Later local work');
+  assert.equal(h.state.state.initialSyncState.backupId, backups[0].id);
+  assert.equal(h.cloud.calls.length, 0);
+});
+
 test('first sync identifies populated local and empty cloud as A', async () => {
   const data = blank(); data.records.push(record('legacy'));
   assert.equal((await harness(data).engine.inspectFirstSync(crypto.randomUUID())).case, 'A');
