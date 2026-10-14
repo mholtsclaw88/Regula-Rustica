@@ -14,6 +14,13 @@ const root = new URL('../', import.meta.url);
 const mime = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url, 'http://localhost').pathname;
+  if (pathname === '/cloud-runtime-config.js') {
+    // Netlify generates this asset on every deploy. Keep the browser fixture
+    // complete and offline-cacheable, without connecting to a real backend.
+    response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-cache' });
+    response.end('window.REGULA_RUSTICA_CLOUD_CONFIG = {};');
+    return;
+  }
   try {
     const file = new URL(`.${pathname === '/' ? '/index.html' : pathname}`, root);
     if (!file.href.startsWith(root.href)) throw new Error('Invalid path');
