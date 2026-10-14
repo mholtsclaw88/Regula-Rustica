@@ -7,7 +7,9 @@ import { extname } from 'node:path';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { chromium } = require('playwright');
+const engines = require('playwright');
+const engineName = process.env.STORAGE_TEST_BROWSER || 'chromium';
+assert.ok(['chromium', 'webkit'].includes(engineName));
 const root = new URL('../', import.meta.url);
 const mime = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const server = createServer(async (request, response) => {
@@ -73,7 +75,8 @@ async function ready(page) {
 }
 
 try {
-  browser = await chromium.launch({ headless: true });
+  browser = await engines[engineName].launch({ headless: true });
+  console.log(`Testing ${engineName}`);
   const { context, page } = await pageWithFixture();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -110,18 +113,48 @@ try {
   await page.evaluate(() => window.openModal('ledger'));
   await page.locator('#modalForm [name="description"]').fill('Browser regression ledger entry');
   await page.locator('#modalForm [name="amount"]').fill('3.50');
-  await page.locator('#modalSubmit').click();
+  await page.evaluate(() => {
+    const storage = window.RegulaRusticaStorage;
+    const commit = storage.backend.commit.bind(storage.backend);
+    storage.backend.commit = async batch => {
+      await new Promise(resolve => { window.releaseLedgerSave = resolve; });
+      storage.backend.commit = commit;
+      await commit(batch);
+    };
+    document.querySelector('#modalForm').requestSubmit();
+    document.querySelector('#modalForm').requestSubmit();
+  });
+  await page.waitForFunction(() => typeof window.releaseLedgerSave === 'function');
+  assert.ok(!(await page.locator('#modalSubmit').isEnabled()));
+  await page.evaluate(() => window.releaseLedgerSave());
   await page.waitForFunction(() => !document.querySelector('#modal').open);
   await page.evaluate(() => window.RegulaRusticaStorage.flush());
   assert.equal(await page.evaluate(() => window.RegulaRusticaLocal.read().ledger.filter(entry => entry.description === 'Browser regression ledger entry').length), 1);
-  console.log('PASS the original Ledger editor and global extension API still save once');
+  console.log('PASS repeated Ledger submissions during persistence save only one entry');
+
+  await page.evaluate(() => {
+    const storage = window.RegulaRusticaStorage;
+    window.restoreLedgerCommit = storage.backend.commit.bind(storage.backend);
+    storage.backend.commit = async () => { throw new Error('simulated Ledger disk full'); };
+    window.openModal('ledger');
+  });
+  await page.locator('#modalForm [name="description"]').fill('Retried Ledger entry');
+  await page.locator('#modalForm [name="amount"]').fill('7');
+  await page.locator('#modalSubmit').click();
+  await page.waitForFunction(() => document.querySelector('.device-storage-error') && document.querySelector('#modalForm').dataset.saving === 'false');
+  await page.evaluate(() => { window.RegulaRusticaStorage.backend.commit = window.restoreLedgerCommit; });
+  await page.locator('#modalSubmit').click();
+  await page.waitForFunction(() => !document.querySelector('#modal').open);
+  await page.evaluate(() => window.RegulaRusticaStorage.flush());
+  assert.equal(await page.evaluate(() => window.RegulaRusticaLocal.read().ledger.filter(entry => entry.description === 'Retried Ledger entry').length), 1);
+  console.log('PASS retrying a failed Ledger form preserves its draft identity without duplication');
 
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForFunction(() => navigator.serviceWorker.controller);
   await context.setOffline(true);
   await page.reload(); await ready(page);
   assert.equal(await page.evaluate(() => window.RegulaRusticaLocal.read().records[0].name), 'Maple');
-  assert.equal(await page.evaluate(() => window.RegulaRusticaLocal.read().ledger.length), 1);
+  assert.equal(await page.evaluate(() => window.RegulaRusticaLocal.read().ledger.length), 2);
   console.log('PASS offline reload hydrates the saved Farm Book and all new bootstrap modules');
   await context.setOffline(false);
 

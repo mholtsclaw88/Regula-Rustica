@@ -43,6 +43,11 @@ function showSaveError(error) {
   window.dispatchEvent(new CustomEvent('regula-rustica:storage-error', { detail: error }));
 }
 
+window.addEventListener('regula-rustica:data-saved', () => {
+  // Wait until synchronous sync listeners have also staged their outbox edits.
+  queueMicrotask(() => window.RegulaRusticaStorage.flush().then(() => notice?.remove()).catch(() => {}));
+});
+
 function loadScript(src, marker) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -80,4 +85,16 @@ try {
   startup.setAttribute('role', 'alert');
   startup.replaceChildren(`${error.message} Your saved records have not been replaced. `,
     action('Download previous copy', downloadPreviousCopy), action('Reopen', () => location.reload()));
+  if (error.code === 'DEVICE_COPY_CONFLICT') {
+    const choose = async choice => {
+      try { await error.storage.resolveLegacyConflict(choice); location.reload(); }
+      catch (failure) {
+        const detail = document.createElement('p');
+        detail.textContent = failure.message;
+        startup.append(detail);
+      }
+    };
+    startup.append(action('Open current saved copy', () => choose('device')),
+      action('Use previous browser copy', () => choose('browser')));
+  }
 }

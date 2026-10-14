@@ -68,11 +68,15 @@ export class DeviceStorage {
     for (const key of DEVICE_STORAGE_KEYS) {
       const value = this.legacyStorage.getItem(key);
       if (value === null) continue;
-      // A still-open older app must not silently replace the new device copy.
-      if (this.values.has(key) && this.values.get(key) !== value) {
-        throw new Error('Another app copy changed saved data. Download the previous browser copy below, then close other Regula Rustica tabs before reopening.');
-      }
       legacy.set(key, value);
+    }
+    // A still-open older app must not silently replace the new device copy.
+    if ([...legacy].some(([key, value]) => this.values.has(key) && this.values.get(key) !== value)) {
+      this.conflictingLegacy = legacy;
+      const error = new Error('Two saved browser copies differ. Close other Regula Rustica tabs, download the previous copy if needed, then choose which copy to open.');
+      error.code = 'DEVICE_COPY_CONFLICT';
+      error.storage = this;
+      throw error;
     }
     if (legacy.size) {
       await this.backend.commit(legacy);
@@ -85,6 +89,37 @@ export class DeviceStorage {
       // Free quota only after the entire migration committed and was read back.
       for (const key of legacy.keys()) this.legacyStorage.removeItem(key);
     }
+    return this;
+  }
+
+  async resolveLegacyConflict(choice) {
+    if (!['device', 'browser'].includes(choice) || !this.conflictingLegacy) throw new Error('Choose which saved copy to open.');
+    const legacy = this.conflictingLegacy;
+    for (const [key, value] of legacy) {
+      if (this.legacyStorage.getItem(key) !== value) throw new Error('The previous copy changed again. Close other tabs and reopen before choosing.');
+    }
+    const current = await this.backend.readAll();
+    const archiveKey = `preserved-device-copies:${crypto.randomUUID()}`;
+    const archive = JSON.stringify({ createdAt: new Date().toISOString(),
+      device: Object.fromEntries(DEVICE_STORAGE_KEYS.map(key => [key, current.get(key) ?? null])),
+      browser: Object.fromEntries(legacy) });
+    const batch = new Map([[archiveKey, archive]]);
+    if (choice === 'browser') {
+      // Replace the complete replica, including its matching sync metadata.
+      // Missing keys must not inherit the other copy's outbox or Homestead.
+      for (const key of DEVICE_STORAGE_KEYS) batch.set(key, legacy.get(key) ?? null);
+    }
+    await this.backend.commit(batch);
+    const verified = await this.backend.readAll();
+    for (const [key, value] of batch) {
+      if (verified.get(key) !== value) throw new Error('The preserved copies could not be verified. The previous browser copy has been kept.');
+    }
+    for (const [key, value] of legacy) {
+      if (this.legacyStorage.getItem(key) !== value) throw new Error('The previous copy changed again and has been kept. Reopen before choosing.');
+    }
+    for (const key of legacy.keys()) this.legacyStorage.removeItem(key);
+    this.values = verified;
+    this.conflictingLegacy = null;
     return this;
   }
 

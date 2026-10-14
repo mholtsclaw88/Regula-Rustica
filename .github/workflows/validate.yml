@@ -12,6 +12,9 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      matrix:
+        browser: [chromium, webkit]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -25,7 +28,9 @@ jobs:
         run: npm test
       - name: Install pinned browser test tooling
         run: npm install --no-save --package-lock=false playwright@1.58.2
-      - name: Install Chromium and its system dependencies
-        run: npx playwright install --with-deps chromium --only-shell
+      - name: Install browser and its system dependencies
+        run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Verify native storage, startup, Ledger, and offline reload
         run: npm run test:browser
+        env:
+          STORAGE_TEST_BROWSER: ${{ matrix.browser }}

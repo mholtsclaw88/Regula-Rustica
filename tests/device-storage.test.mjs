@@ -108,7 +108,47 @@ test('a previously committed migration resumes after cleanup was interrupted', a
 test('a competing older tab is preserved rather than silently overwriting either copy', async () => {
   const legacy = new LegacyStorage(); legacy.setItem(MAIN, 'older-tab-edit');
   const backend = new Backend(); backend.values.set(MAIN, 'new-device-copy');
-  await assert.rejects(open(backend, legacy), /Another app copy/);
+  await assert.rejects(open(backend, legacy), /Two saved browser copies differ/);
+  assert.equal(legacy.getItem(MAIN), 'older-tab-edit');
+  assert.equal(backend.values.get(MAIN), 'new-device-copy');
+});
+
+test('explicitly keeping the current device copy verifies an archive of the older tab before freeing its keys', async () => {
+  const legacy = new LegacyStorage(); legacy.setItem(MAIN, 'older-tab-edit');
+  const backend = new Backend(); backend.values.set(MAIN, 'new-device-copy');
+  const storage = new DeviceStorage({ backend, legacyStorage: legacy });
+  await assert.rejects(storage.initialize(), { code: 'DEVICE_COPY_CONFLICT' });
+  await storage.resolveLegacyConflict('device');
+  assert.equal(storage.getItem(MAIN), 'new-device-copy');
+  assert.equal(legacy.getItem(MAIN), null);
+  const archive = JSON.parse([...backend.values].find(([key]) => key.startsWith('preserved-device-copies:'))[1]);
+  assert.equal(archive.device[MAIN], 'new-device-copy');
+  assert.equal(archive.browser[MAIN], 'older-tab-edit');
+});
+
+test('explicitly choosing the previous browser copy replaces the complete replica while preserving both originals', async () => {
+  const legacy = new LegacyStorage(); legacy.setItem(MAIN, 'older-tab-edit');
+  legacy.setItem('regression-session', 'kept');
+  const backend = new Backend(); backend.values.set(MAIN, 'new-device-copy');
+  backend.values.set('regulaRusticaSyncV1', 'different-homestead-outbox');
+  const storage = new DeviceStorage({ backend, legacyStorage: legacy });
+  await assert.rejects(storage.initialize(), { code: 'DEVICE_COPY_CONFLICT' });
+  await storage.resolveLegacyConflict('browser');
+  assert.equal(storage.getItem(MAIN), 'older-tab-edit');
+  assert.equal(storage.getItem('regulaRusticaSyncV1'), null);
+  assert.equal(legacy.getItem('regression-session'), 'kept');
+  const archive = JSON.parse([...backend.values].find(([key]) => key.startsWith('preserved-device-copies:'))[1]);
+  assert.equal(archive.device['regulaRusticaSyncV1'], 'different-homestead-outbox');
+  assert.equal(archive.browser[MAIN], 'older-tab-edit');
+});
+
+test('failed archive persistence cannot replace either differing device copy', async () => {
+  const legacy = new LegacyStorage(); legacy.setItem(MAIN, 'older-tab-edit');
+  const backend = new Backend(); backend.values.set(MAIN, 'new-device-copy');
+  const storage = new DeviceStorage({ backend, legacyStorage: legacy });
+  await assert.rejects(storage.initialize(), { code: 'DEVICE_COPY_CONFLICT' });
+  backend.beforeCommit = async () => { throw new Error('disk full'); };
+  await assert.rejects(storage.resolveLegacyConflict('browser'), /disk full/);
   assert.equal(legacy.getItem(MAIN), 'older-tab-edit');
   assert.equal(backend.values.get(MAIN), 'new-device-copy');
 });

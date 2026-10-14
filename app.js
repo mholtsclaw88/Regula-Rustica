@@ -2829,6 +2829,8 @@ $('#modalForm').addEventListener('submit', async event => {
   if (modalForm.dataset.saving === 'true') return;
   modalForm.dataset.saving = 'true';
   $('#modalSubmit').disabled = true;
+  $('#modalClose').disabled = true;
+  $('#modalCancel').disabled = true;
   try {
   const form = Object.fromEntries(new FormData(event.target));
 
@@ -2859,6 +2861,7 @@ $('#modalForm').addEventListener('submit', async event => {
     else {
       const nextOrder = Math.max(0, ...data.choreWindows.map(item => Number(item.displayOrder || 0))) + 10;
       data.choreWindows.push(window.RegulaRusticaTasks.normalizeWindow({ id: uid(), name, startTime, endTime, displayOrder: nextOrder, enabled: true, createdAt: nowIso() }));
+      editId = data.choreWindows.at(-1).id;
     }
     await saveData();
     $('#modal').close();
@@ -2895,6 +2898,7 @@ $('#modalForm').addEventListener('submit', async event => {
       const created = { id: uid(), ...values, completed: false, status: 'open', createdAt: nowIso(), updatedAt: nowIso(), completedAt: null, deletedAt: null };
       data.tasks.push(created);
       taskId = created.id;
+      editId = created.id;
     }
     setTaskAssignee(taskId, form.personId || '');
   }
@@ -2920,10 +2924,8 @@ $('#modalForm').addEventListener('submit', async event => {
     } catch (error) {
       try { await window.RegulaRusticaDocuments.removeLocal(stored.map(attachment => attachment.id)); } catch (cleanupError) { console.warn('Local attachment cleanup failed.', cleanupError); }
       alert(error.message || 'The attachment could not be saved on this device. No document entry was created.');
-      $('#modalSubmit').disabled = false;
       return;
     }
-    $('#modalSubmit').disabled = false;
     data.documents.unshift(documentEntry);
     data.attachments.push(...stored);
     pendingDocumentFiles = [];
@@ -2966,7 +2968,11 @@ $('#modalForm').addEventListener('submit', async event => {
       location: form.location.trim(), notes: form.notes.trim(), recordId: form.recordId || null, recurrenceRule
     };
     if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
-    else data.calendarEvents.push(normalizeCalendarEvent({ id: uid(), ...values, createdAt: nowIso() }));
+    else {
+      const created = normalizeCalendarEvent({ id: uid(), ...values, createdAt: nowIso() });
+      data.calendarEvents.push(created);
+      editId = created.id;
+    }
   }
   if (modalMode === 'yield') {
     const quantity = Number(form.quantity);
@@ -3007,7 +3013,11 @@ $('#modalForm').addEventListener('submit', async event => {
     const matchedTask = !existing && !values.taskId ? chooseMatchingYieldTask(values) : data.tasks.find(task => task.id === values.taskId);
     if (matchedTask) values.taskId = matchedTask.id;
     if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
-    else data.yieldEntries.unshift(normalizeYieldEntry({ id: uid(), ...values, createdAt: nowIso() }));
+    else {
+      const created = normalizeYieldEntry({ id: uid(), ...values, createdAt: nowIso() });
+      data.yieldEntries.unshift(created);
+      editId = created.id;
+    }
     if (matchedTask) completeTask(matchedTask);
   }
   if (modalMode === 'ledger') {
@@ -3015,7 +3025,13 @@ $('#modalForm').addEventListener('submit', async event => {
     const existing = data.ledger.find(entry => entry.id === editId);
     const values = { type: form.type, date: form.date, amount: Number(form.amount || 0), description: form.description.trim(), recordId: form.recordId || null, vendorOrSource: form.vendorOrSource?.trim() || '', category: form.category?.trim() || '' };
     if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
-    else data.ledger.unshift({ id: uid(), ...values, createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null });
+    else {
+      const created = { id: uid(), ...values, createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null };
+      data.ledger.unshift(created);
+      // Keep the draft identity if persistence fails, so pressing Save again
+      // updates the retained draft rather than creating a duplicate entry.
+      editId = created.id;
+    }
   }
   if (modalMode === 'record') {
     if (!form.name.trim()) return;
@@ -3041,6 +3057,7 @@ $('#modalForm').addEventListener('submit', async event => {
     } else {
       const created = { id: uid(), ...values, createdAt: timestamp };
       data.records.push(created);
+      editId = created.id;
       addEvent(created.id, 'Record created', `${created.type} record created`);
     }
   }
@@ -3057,6 +3074,8 @@ $('#modalForm').addEventListener('submit', async event => {
   } finally {
     modalForm.dataset.saving = 'false';
     $('#modalSubmit').disabled = false;
+    $('#modalClose').disabled = false;
+    $('#modalCancel').disabled = false;
   }
 });
 
@@ -3160,11 +3179,18 @@ $('#recordView').addEventListener('click', event => {
   activateRecordSection(jump.dataset.recordJump, { scroll: true });
 });
 $('#backToList').addEventListener('click', () => showView(priorView));
-const cancelModal = () => { pendingDocumentFiles = []; $('#modal').close(); };
+const cancelModal = () => {
+  if ($('#modalForm').dataset.saving === 'true') return;
+  pendingDocumentFiles = []; $('#modal').close();
+};
+$('#modal').addEventListener('cancel', event => {
+  if ($('#modalForm').dataset.saving === 'true') event.preventDefault();
+});
 $('#taskActionDismiss').addEventListener('click', () => showTaskActionStatus(''));
 $('#modalClose').addEventListener('click', cancelModal);
 $('#modalCancel').addEventListener('click', cancelModal);
 $('#modalCompleteWithoutYield').addEventListener('click', async () => {
+  if ($('#modalForm').dataset.saving === 'true') return;
   if (modalMode === 'reopen-task') {
     try { await reopenTaskFromModal(true); }
     catch (error) { console.warn('The Task could not be reopened.', error); }
@@ -3179,6 +3205,7 @@ $('#modalCompleteWithoutYield').addEventListener('click', async () => {
   $('#modal').close();
 });
 $('#modalDelete').addEventListener('click', () => {
+  if ($('#modalForm').dataset.saving === 'true') return;
   if (modalMode === 'calendar' && editId && confirm('Delete this calendar event?')) {
     const calendarEvent = data.calendarEvents.find(item => item.id === editId);
     if (calendarEvent) {

@@ -10,7 +10,8 @@ historical Farm Book and backup keys are copied in one transaction and read back
 byte for byte. Only verified copies are removed from localStorage. Migration
 failure leaves the original keys intact and blocks startup; it cannot create a
 new empty Homestead. A competing older tab's different copy also blocks startup
-and remains available for export.
+and remains available for export. An explicit choice can open either copy only
+after both original replicas, including sync metadata, are archived and verified.
 
 `DeviceStorage` stages synchronous JSON snapshots and coalesces them into
 transactions. `flush()` waits until every staged snapshot is committed; an
@@ -28,5 +29,5 @@ Run `npm test` and `npm run check` for all unit regressions and source checks.
 For native browser regressions, install `playwright@1.58.2` without saving it,
 run `npx playwright install --with-deps chromium --only-shell`, and run
 `npm run test:browser`. The GitHub validation workflow runs all three checks.
-Browser tests use a temporary localhost server and isolated synthetic devices;
+Browser tests run in Chromium and WebKit using a temporary localhost server and isolated synthetic devices;
 they do not connect to a live Supabase Homestead.
