@@ -476,6 +476,23 @@ export class SyncEngine {
         else if (result.status === 'conflict') this.state.addConflict(operation, result.row);
         else this.state.complete(operation, result.row);
       } catch (error) {
+        // A recurring Task may have acquired its one allowed successor on
+        // another device. Do not discard this device's changes or retry an
+        // impossible update indefinitely: present the existing cloud row as
+        // a conflict that the steward can explicitly resolve.
+        if (operation.table === 'tasks' && operation.type === 'update'
+          && String(error?.code || '') === '23505'
+          && typeof this.cloud.getRow === 'function') {
+          try {
+            const cloudRow = await this.cloud.getRow('tasks', operation.rowId);
+            if (cloudRow?.id && cloudRow.version != null) {
+              this.state.addConflict(operation, cloudRow);
+              continue;
+            }
+          } catch (_) {
+            // Preserve the original error if the conflict lookup fails.
+          }
+        }
         this.state.fail(operation, error, { retryable: isRetryableSyncError(error) });
       }
     }
