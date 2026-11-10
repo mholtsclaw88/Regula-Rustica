@@ -97,6 +97,32 @@ test('Today retains completed work from today without showing completed historic
   assert.deepEqual(projection.otherWork.map(item => item.id), ['today-done']);
 });
 
+test('Today separates due, focused, overdue, and available tasks without moving due dates', () => {
+  const taskList = [
+    task('due', { dueDate: workDate }),
+    task('focused', { focusDate: workDate }),
+    task('early', { dueDate: '2026-09-02', focusDate: workDate }),
+    task('available', { availableFrom: '2026-08-20' }),
+    task('overdue', { dueDate: '2026-08-29', focusDate: workDate }),
+    task('future', { availableFrom: '2026-09-01' })
+  ];
+  const projection = housekeeping.dailyPlannerProjection({ workDate, now, tasks: taskList });
+  assert.deepEqual(projection.forToday.map(item => item.id).sort(), ['due', 'early', 'focused']);
+  assert.deepEqual(projection.availableWork.map(item => item.id), ['available']);
+  assert.deepEqual(projection.needsAttention.map(item => item.task.id), ['overdue']);
+  assert.equal(taskList[1].dueDate, undefined);
+});
+
+test('Focus expires the next day and completed focused work stays visible only today', () => {
+  const focused = task('focused', { focusDate: workDate });
+  const completed = task('completed', { focusDate: workDate, completed: true, status: 'completed' });
+  const onDate = housekeeping.dailyPlannerProjection({ workDate, now, tasks: [focused, completed], includeCompleted: true });
+  assert.deepEqual(onDate.forToday.map(item => item.id).sort(), ['completed', 'focused']);
+  const tomorrow = housekeeping.dailyPlannerProjection({ workDate: '2026-08-31', now: new Date(2026, 7, 31, 11), tasks: [focused, completed], includeCompleted: true });
+  assert.deepEqual(tomorrow.forToday, []);
+  assert.deepEqual(tomorrow.availableWork.map(item => item.id), ['focused']);
+});
+
 test('undated Chore Window work appears today without repeating across other dates', () => {
   const undated = task('custom-task-2', { choreWindowId: 'evening' });
   const todayProjection = housekeeping.dailyPlannerProjection({ workDate, now, choreWindows: windows, tasks: [undated] });

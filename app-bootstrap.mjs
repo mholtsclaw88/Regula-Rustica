@@ -64,7 +64,7 @@ try {
   // mistake an asynchronously loaded device for a new, empty Homestead.
   window.RegulaRusticaStorage = await openDeviceStorage({ onError: showSaveError });
   previousCopy = window.RegulaRusticaStorage.getItem('regulaRusticaV5') || window.RegulaRusticaStorage.getItem('regulaRusticaV4') || window.RegulaRusticaStorage.getItem('regulaRusticaV3');
-  await loadScript('app.js?v=sync-recovery-v1');
+  await loadScript('app.js?v=today-focus-v1');
   if (!window.RegulaRustica) throw new Error('Your saved Farm Book could not be opened. Existing saved data has been kept.');
   await window.RegulaRusticaStorage.flush();
   await loadScript('ledger-allocations.js?v=ledger-api-v2', 'data-ledger-allocations');
