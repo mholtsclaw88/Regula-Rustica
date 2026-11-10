@@ -13,6 +13,7 @@ const INACTIVE_RECORD_STATUSES = new Set(['Sold', 'Deceased', 'Processed', 'Arch
 const CURRENT_SCHEMA_VERSION = 14;
 const SUPPORTED_SCHEMA_VERSIONS = [5, 6, 7, 8, 9, 10, 11, 12, 13, CURRENT_SCHEMA_VERSION];
 let startupMigrationBefore = null;
+let todayAvailableExpanded = false;
 
 const RECORD_CONFIG = {
   Animal: {
@@ -98,6 +99,7 @@ function normalizeTask(task = {}) {
     title: task.title || 'Untitled task',
     availableFrom: task.availableFrom ?? task.startDate ?? '',
     dueDate: task.dueDate ?? task.due ?? '',
+    focusDate: task.focusDate || '',
     recordId: task.recordId || null,
     completed: Boolean(task.completed ?? task.done),
     description: task.description || '',
@@ -181,6 +183,7 @@ function createNextLocalOccurrence(task) {
     title: task.title,
     description: task.description,
     dueDate,
+    focusDate: '',
     recordId: task.recordId,
     priority: task.priority,
     recurrenceRule: { ...task.recurrenceRule },
@@ -1085,9 +1088,12 @@ function sharedTaskRow(task, { suggestionActions = false } = {}) {
       : window.RegulaRusticaTasks.isBuiltInSuggestedTask(task)
         ? ''
         : '<button class="del" type="button">Delete</button>';
-  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${disabledSeries ? 'disabled' : ''} aria-label="${disabledSeries ? 'Disabled' : 'Complete'} ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${recurringActions}</div></details>`;
+  const focusAction = !task.completed && !disabledSeries && !task.deletedAt && !task.choreWindowId && !taskIsOverdue(task) && task.dueDate !== today() && (!task.availableFrom || task.availableFrom <= today())
+    ? `<button class="focus-action" type="button">${task.focusDate === today() ? 'Remove from Today' : 'Focus today'}</button>` : '';
+  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${disabledSeries ? 'disabled' : ''} aria-label="${disabledSeries ? 'Disabled' : 'Complete'} ${escapeHtml(task.title)}"><div class="task-body"><div class="task-title">${escapeHtml(task.title)}</div>${metadataHtml ? `<div class="record-task-meta">${metadataHtml}</div>` : ''}${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}</div><details class="task-more"><summary aria-label="Actions for ${escapeHtml(task.title)}">…</summary><div class="task-more-menu"><button class="edit" type="button">Edit</button>${focusAction}${recurringActions}</div></details>`;
   wireTaskCheckbox(row.querySelector('.shared-task-check'), task);
   row.querySelector('.edit').addEventListener('click', () => openModal('task', task.id, task.recordId));
+  row.querySelector('.focus-action')?.addEventListener('click', () => setTaskFocus(task, task.focusDate === today() ? '' : today()));
   row.querySelector('.reenable')?.addEventListener('click', () => {
     const timestamp = nowIso();
     const dueDate = task.dueDate && task.dueDate >= today() ? task.dueDate : today();
@@ -1106,6 +1112,13 @@ function sharedTaskRow(task, { suggestionActions = false } = {}) {
 
 function taskRow(task) { return sharedTaskRow(task); }
 function recordTaskRow(task) { return sharedTaskRow(task, { suggestionActions: true }); }
+
+function setTaskFocus(task, focusDate) {
+  if (task.completed || task.deletedAt || task.choreWindowId || taskIsOverdue(task)) return;
+  task.focusDate = focusDate;
+  task.updatedAt = nowIso();
+  saveData();
+}
 
 function renderToday() {
   const workDate = today();
@@ -1183,9 +1196,22 @@ function renderToday() {
 
   const root = $('#todayTasks');
   root.innerHTML = '';
-  projection.otherWork.forEach(task => root.appendChild(calendarCompactTaskRow(task)));
-  $('#todayEmpty').classList.toggle('hidden', projection.otherWork.length > 0);
-  $('#todayTaskCount').textContent = projection.otherWork.length;
+  projection.forToday.forEach(task => root.appendChild(calendarCompactTaskRow(task, { focusAction: task.focusDate === workDate && task.dueDate !== workDate ? 'remove' : '' })));
+  $('#todayEmpty').classList.toggle('hidden', projection.forToday.length > 0);
+  $('#todayTaskCount').textContent = projection.forToday.length;
+
+  const availableRoot = $('#todayAvailableTasks');
+  availableRoot.innerHTML = '';
+  projection.availableWork.forEach((task, index) => {
+    const row = calendarCompactTaskRow(task, { focusAction: task.completed ? '' : 'add' });
+    if (index >= 3 && !todayAvailableExpanded) row.classList.add('hidden');
+    availableRoot.append(row);
+  });
+  $('#todayAvailableEmpty').classList.toggle('hidden', projection.availableWork.length > 0);
+  $('#todayAvailableCount').textContent = projection.availableWork.length;
+  const showAll = $('#todayAvailableShowAll');
+  showAll.classList.toggle('hidden', projection.availableWork.length <= 3);
+  showAll.textContent = todayAvailableExpanded ? 'Show less' : `Show all ${projection.availableWork.length}`;
 
   const attentionRoot = $('#todayAttention');
   attentionRoot.innerHTML = '';
@@ -1215,9 +1241,9 @@ function renderToday() {
   const choreCount = projection.windowItems.reduce((sum, item) => sum + item.tasks.length, 0);
   const completedChores = projection.windowItems.reduce((sum, item) => sum + item.completed, 0);
   $('#todayChoreProgress').textContent = choreCount ? `${completedChores} of ${choreCount} chores complete` : 'No chores scheduled';
-  $('#todayTotals').textContent = choreCount || projection.otherWork.length || projection.eventCount ? `${projection.otherWork.length} other task${projection.otherWork.length === 1 ? '' : 's'} · ${projection.eventCount} event${projection.eventCount === 1 ? '' : 's'}` : 'A quiet day';
+  $('#todayTotals').textContent = choreCount || projection.otherWork.length || projection.eventCount ? `${projection.forToday.length} for today · ${projection.availableWork.length} available · ${projection.eventCount} event${projection.eventCount === 1 ? '' : 's'}` : 'A quiet day';
 
-  ['todayWorkSection', 'todayAttentionSection'].forEach(id => {
+  ['todayWorkSection', 'todayAttentionSection', 'todayAvailableSection'].forEach(id => {
     const section = $(`#${id}`);
     const storageKey = `regula-rustica:${id}:open`;
     if (section.dataset.collapseReady) return;
@@ -1707,7 +1733,7 @@ function openCalendarDay(date) {
   renderCalendar();
 }
 
-function calendarCompactTaskRow(task, { quietPrefix = '' } = {}) {
+function calendarCompactTaskRow(task, { quietPrefix = '', focusAction = '' } = {}) {
   const row = document.createElement('div');
   const projected = Boolean(task.calendarProjection);
   row.className = `calendar-task-row${task.completed ? ' done' : ''}${projected ? ' projected' : ''}`;
@@ -1718,9 +1744,10 @@ function calendarCompactTaskRow(task, { quietPrefix = '' } = {}) {
   if (yieldIndicator) quietMeta.push(yieldIndicator);
   const expandedMeta = [taskDateText(task), window.RegulaRusticaHousekeeping.recurrenceSummary(task.recurrenceRule), choreWindowForTask(task)?.name || '', record, assigned]
     .filter(Boolean).map(value => `<span>${escapeHtml(value)}</span>`).join('<span aria-hidden="true">·</span>');
-  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${projected ? 'disabled' : ''} aria-label="${projected ? 'Scheduled' : 'Complete'} ${escapeHtml(task.title)}"><details class="calendar-task-disclosure"><summary><span class="calendar-task-copy"><strong>${escapeHtml(task.title)}</strong>${quietMeta.length ? `<span class="calendar-task-meta">${quietMeta.join('<span aria-hidden="true">·</span>')}</span>` : ''}</span><span class="caret" aria-hidden="true">⌄</span></summary><div class="calendar-task-detail">${expandedMeta ? `<span class="calendar-task-detail-meta">${expandedMeta}</span>` : ''}${task.description ? `<p>${escapeHtml(task.description)}</p>` : ''}<button class="btn secondary edit" type="button">Edit task</button></div></details>`;
+  row.innerHTML = `<input class="shared-task-check" type="checkbox" ${task.completed ? 'checked' : ''} ${projected ? 'disabled' : ''} aria-label="${projected ? 'Scheduled' : 'Complete'} ${escapeHtml(task.title)}"><details class="calendar-task-disclosure"><summary><span class="calendar-task-copy"><strong>${escapeHtml(task.title)}</strong>${quietMeta.length ? `<span class="calendar-task-meta">${quietMeta.join('<span aria-hidden="true">·</span>')}</span>` : ''}</span><span class="caret" aria-hidden="true">⌄</span></summary><div class="calendar-task-detail">${expandedMeta ? `<span class="calendar-task-detail-meta">${expandedMeta}</span>` : ''}${task.description ? `<p>${escapeHtml(task.description)}</p>` : ''}${focusAction ? `<button class="btn secondary focus-action" type="button">${focusAction === 'remove' ? 'Remove from Today' : 'Focus today'}</button>` : ''}<button class="btn secondary edit" type="button">Edit task</button></div></details>`;
   const checkbox = row.querySelector('.shared-task-check');
   if (!projected) wireTaskCheckbox(checkbox, task);
+  row.querySelector('.focus-action')?.addEventListener('click', () => setTaskFocus(task, focusAction === 'remove' ? '' : today()));
   row.querySelector('.edit').addEventListener('click', event => {
     event.preventDefault();
     openModal('task', task.projectionSourceId || task.id, task.recordId);
@@ -3181,6 +3208,10 @@ $('#recordView').addEventListener('click', event => {
   activateRecordSection(jump.dataset.recordJump, { scroll: true });
 });
 $('#backToList').addEventListener('click', () => showView(priorView));
+$('#todayAvailableShowAll').addEventListener('click', () => {
+  todayAvailableExpanded = !todayAvailableExpanded;
+  renderToday();
+});
 const cancelModal = () => {
   if ($('#modalForm').dataset.saving === 'true') return;
   pendingDocumentFiles = []; $('#modal').close();

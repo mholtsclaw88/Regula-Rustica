@@ -245,6 +245,7 @@
 
     const openTasks = tasks.filter(task => visibleTask(task) && !task.completed);
     const isActionable = task => {
+      if (task.focusDate === workDate && (!task.availableFrom || task.availableFrom <= workDate)) return true;
       if (!task.availableFrom && !task.dueDate) return true;
       if (task.availableFrom && task.availableFrom <= workDate) return true;
       return Boolean(!task.availableFrom && task.dueDate && task.dueDate <= workDate);
@@ -252,7 +253,7 @@
     const overdue = openTasks.filter(task => taskIsOverdue(task, windowById.get(task.choreWindowId) || null, now));
     const otherWork = tasks
       .filter(task => visibleTask(task) && !task.choreWindowId && (includeCompleted || !task.completed)
-        && (calendarRange ? occursOnDate(task) : task.completed ? occursOnDate(task) : isActionable(task) && !overdue.includes(task)))
+        && (calendarRange ? occursOnDate(task) : task.completed ? (occursOnDate(task) || task.focusDate === workDate) : isActionable(task) && !overdue.includes(task)))
       .sort((a, b) => {
         const priority = { urgent: 0, high: 1, normal: 2, low: 3 };
         return (priority[a.priority] ?? 2) - (priority[b.priority] ?? 2)
@@ -273,11 +274,17 @@
       }
     });
     const needsAttention = [...overdueGroups.values()].sort((a, b) => taskWorkDate(a.task).localeCompare(taskWorkDate(b.task)));
+    // Focus is a one-day commitment, not a due date or a recurring-series setting.
+    // Keep the Calendar's existing projection unchanged.
+    const forToday = calendarRange ? [] : otherWork.filter(task => task.dueDate === workDate || task.focusDate === workDate || (task.completed && taskWorkDate(task) === workDate));
+    const availableWork = calendarRange ? [] : otherWork.filter(task => !forToday.includes(task));
 
     return {
       schedule,
       allDayEvents,
       otherWork,
+      forToday,
+      availableWork,
       needsAttention,
       overdueOccurrenceCount: overdue.length,
       currentId: current?.id || null,

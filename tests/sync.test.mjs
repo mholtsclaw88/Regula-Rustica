@@ -1312,13 +1312,16 @@ test('task date windows and recurrence survive cloud conversion', () => {
   const state = new LocalSyncState(new MemoryStorage());
   const task = {
     id: crypto.randomUUID(), title: 'Move hens', description: 'Use the north coop',
-    availableFrom: '2026-08-10', dueDate: '2026-08-12', priority: 'high',
+    availableFrom: '2026-08-10', dueDate: '2026-08-12', focusDate: '2026-08-11', priority: 'high',
     completed: false, recurrenceRule: { mode: 'after_completion', frequency: 'weekly', interval: 1 },
     createdAt: '2026-08-09T12:00:00.000Z', updatedAt: '2026-08-09T12:00:00.000Z'
   };
   const payload = toCloud('tasks', task, state);
   assert.equal(payload.available_from, '2026-08-10');
   assert.equal(payload.due_date, '2026-08-12');
+  assert.equal(payload.focus_date, '2026-08-11');
+  state.entity('tasks', task.id).cloudId = payload.id;
+  assert.equal(fromCloud('tasks', { ...payload, created_at: task.createdAt, updated_at: task.updatedAt }, state).focusDate, '2026-08-11');
   assert.deepEqual(payload.recurrence_rule, task.recurrenceRule);
 });
 
@@ -1936,9 +1939,10 @@ test('two devices exchange Record, Task, Yield, Ledger, edits, and soft deletion
 
   let before = first.local();
   let after = structuredClone(before);
-  after.tasks.push({ id: 'milk-task', recordId: 'daisy', title: 'Morning milking', status: 'open', completed: false, dueDate: '2026-08-29', createdAt: '2026-08-29T12:01:00Z', updatedAt: '2026-08-29T12:01:00Z' });
+  after.tasks.push({ id: 'milk-task', recordId: 'daisy', title: 'Morning milking', status: 'open', completed: false, dueDate: '2026-08-29', focusDate: '2026-08-30', createdAt: '2026-08-29T12:01:00Z', updatedAt: '2026-08-29T12:01:00Z' });
   first.engine.queueLocalChanges(before, after); first.setLocal(after); await first.engine.sync(); await second.engine.pull();
   assert.equal(second.local().tasks[0].title, 'Morning milking');
+  assert.equal(second.local().tasks[0].focusDate, '2026-08-30');
 
   before = first.local(); after = structuredClone(before);
   Object.assign(after.tasks[0], { status: 'completed', completed: true, completedAt: taskCompleteAt, updatedAt: taskCompleteAt });

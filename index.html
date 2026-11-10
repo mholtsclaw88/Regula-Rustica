@@ -13,15 +13,15 @@
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
-  <script src="housekeeping-data.js?v=yield-task-recovery-v1" defer></script>
-  <script src="task-foundation.js?v=dropdown-context-v1" defer></script>
+  <script src="housekeeping-data.js?v=today-focus-v1" defer></script>
+  <script src="task-foundation.js?v=today-focus-v1" defer></script>
   <script src="record-documents.js?v=homestead-identity-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="app-bootstrap.mjs?v=sync-recovery-v1" type="module"></script>
+  <script src="app-bootstrap.mjs?v=today-focus-v1" type="module"></script>
 </head>
 <body>
   <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
@@ -187,12 +187,12 @@
       </section>
       <details class="card today-section daily-section" id="todayWorkSection" open>
         <summary>
-          <span><span class="label">Work without a set time</span><strong>Other Work</strong></span>
+          <span><span class="label">Today's commitments</span><strong>For Today</strong></span>
           <span class="today-section-summary"><span id="todayTaskCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
         </summary>
         <div class="daily-section-body">
           <div id="todayTasks" class="calendar-ledger-tasks"></div>
-          <p id="todayEmpty" class="empty">No other work needs attention today.</p>
+          <p id="todayEmpty" class="empty">No tasks due or focused today.</p>
         </div>
       </details>
       <details class="card today-section daily-section needs-attention" id="todayAttentionSection">
@@ -203,6 +203,17 @@
         <div class="daily-section-body">
           <div id="todayAttention" class="calendar-ledger-tasks"></div><p id="todayAttentionEmpty" class="empty">Nothing overdue.</p>
           <p class="muted hidden" id="todayAttentionHistoryNote">Record the oldest missed occurrence first. The next missed date appears after saving.</p>
+        </div>
+      </details>
+      <details class="card today-section daily-section" id="todayAvailableSection" open>
+        <summary>
+          <span><span class="label">Work you can choose</span><strong>Available Work</strong></span>
+          <span class="today-section-summary"><span id="todayAvailableCount" class="pill">0</span><span class="caret" aria-hidden="true">⌄</span></span>
+        </summary>
+        <div class="daily-section-body">
+          <div id="todayAvailableTasks" class="calendar-ledger-tasks"></div>
+          <p id="todayAvailableEmpty" class="empty">No additional work available.</p>
+          <button id="todayAvailableShowAll" class="btn secondary hidden" type="button">Show all</button>
         </div>
       </details>
     </section>

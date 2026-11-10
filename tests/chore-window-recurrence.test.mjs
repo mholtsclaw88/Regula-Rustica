@@ -30,7 +30,7 @@ test('Morning, Evening, and Egg suggestions remain enabled after completion', ()
 });
 
 test('fixed recurrence materializes today without moving an overdue occurrence', () => {
-  const list = [occurrence()];
+  const list = [occurrence({ focusDate: '2026-08-18' })];
   const result = tasks.stabilizeRecurringTasks(list, {
     targetDate: '2026-08-19',
     nextDueDate: housekeeping.nextRecurringDueDate,
@@ -41,6 +41,7 @@ test('fixed recurrence materializes today without moving an overdue occurrence',
   assert.deepEqual(list.map(task => task.dueDate), ['2026-08-18', '2026-08-19']);
   assert.equal(list[0].completed, false);
   assert.equal(list[1].parentTaskId, 'task-1');
+  assert.equal(list[1].focusDate, '');
 });
 
 test('fixed recurrence skips an accumulated backlog and creates only the current scheduled occurrence', () => {
