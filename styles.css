@@ -140,3 +140,13 @@
  .premium-status-card .cloud-status{text-align:left}
  .premium-feature-list > div{grid-template-columns:1fr;gap:4px;padding:12px}
 }
+.chore-reminders {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line, #cbb991);
+  border-radius: 1rem;
+  background: var(--surface, #fff9ea);
+}
+.chore-reminders h3 { margin: .35rem 0; }
+.chore-reminders p { max-width: 42rem; }
+.chore-reminders .btn { margin: .25rem .5rem .25rem 0; }
