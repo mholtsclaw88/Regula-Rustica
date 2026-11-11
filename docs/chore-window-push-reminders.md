@@ -4,17 +4,17 @@ This feature is opt-in **on each device** under Settings → Chore Windows. It r
 
 At the end of an enabled Chore Window, a Netlify scheduled function checks cloud-synced Tasks using the same recurring projection as the Calendar. It sends at most one reminder per window/date/device when work remains. The schedule runs every five minutes in the Homestead's timezone, with a 30-minute catch-up window. It does not send task titles to the phone's lock screen. The device's “Send a test reminder” button checks browser permission and display; it does **not** test the scheduled cloud sender.
 
-## One-time operator setup
+## Operator setup and verification
 
-The database migration `20261110022317_chore_window_push_reminders.sql` has been applied to the Supabase project. The function remains inactive until all three Netlify Function environment variables below are configured **and the site is rebuilt**. Never commit these values or put them in a client-side build variable.
+The database migration `20261110022317_chore_window_push_reminders.sql` has been applied to the Supabase project. The three variables below are configured in Netlify for production and Deploy Previews, and the matching sender-token hash is stored in the private database table. The preview has been rebuilt; the scheduled sender will not run until this PR is merged and production is rebuilt. Never commit the values or put them in a client-side build variable. Do not generate new keys for routine deploys: rotating VAPID keys invalidates existing device subscriptions.
 
-1. Generate one VAPID key pair and a separate 256-bit sender token. From the repository, run this locally and store the results in a password manager:
+1. For a fresh installation or deliberate credential rotation only, generate one VAPID key pair and a separate 256-bit sender token. From the repository, run this locally and store the results in a password manager:
 
    ```powershell
    node -e "const c=require('node:crypto');const w=require('web-push');const k=w.generateVAPIDKeys();const token=c.randomBytes(32).toString('hex');console.log(JSON.stringify({VAPID_PUBLIC_KEY:k.publicKey,VAPID_PRIVATE_KEY:k.privateKey,CHORE_PUSH_SENDER_TOKEN:token,token_hash:c.createHash('sha256').update(token).digest('hex')},null,2))"
    ```
 
-2. In Netlify site `regula-rustica`, set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `CHORE_PUSH_SENDER_TOKEN` for **Functions**, in the production context (and Deploy Previews if preview enrollment is desired). Mark the latter two secret. The existing `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` must remain available to Functions.
+2. In Netlify site `regula-rustica`, set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `CHORE_PUSH_SENDER_TOKEN` in the production context (and Deploy Previews if preview enrollment is desired). Mark the latter two secret. The free Netlify plan rejected Function-only scope during setup; leave scope at the supported default, which includes Functions. Secret variables then exclude post-processing automatically. The existing `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` must remain available to Functions.
 3. In the Supabase SQL editor, insert **only the hash** from step 1:
 
    ```sql
