@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=cyril-assisted-entry-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=device-storage-v1">
+  <link rel="stylesheet" href="styles.css?v=notifications-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=notifications-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
@@ -21,7 +21,7 @@
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="app-bootstrap.mjs?v=today-focus-v1" type="module"></script>
+  <script src="app-bootstrap.mjs?v=notifications-v1" type="module"></script>
 </head>
 <body>
   <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
@@ -470,8 +470,12 @@
             </div>
           </section>
           <section class="settings-category-group" aria-labelledby="settingsDeviceGroup">
-            <h3 class="settings-category-group-title" id="settingsDeviceGroup">Account &amp; Storage</h3>
+            <h3 class="settings-category-group-title" id="settingsDeviceGroup">Device &amp; Account</h3>
             <div class="settings-category-list">
+              <button class="settings-category-card" type="button" data-settings-category="notifications">
+                <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg></span>
+                <span><strong>Notifications</strong><small>Reminders on this device</small></span><span class="settings-chevron" aria-hidden="true">›</span>
+              </button>
               <button class="settings-category-card" type="button" data-settings-category="cloud">
                 <span class="settings-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/><path d="m9 12 2 2 4-4"/></svg></span>
                 <span><strong>Account &amp; Storage</strong><small>Sign in, Premium, sync, and backups</small></span><span class="settings-chevron" aria-hidden="true">›</span>
@@ -534,6 +538,19 @@
           <p class="muted">Group recurring Tasks into practical parts of the day. These are not appointments.</p>
           <button class="btn primary" id="addChoreWindow" type="button">+ Add Chore Window</button>
           <div id="choreWindowList" class="stack"></div>
+        </article>
+        <article class="card settings-section hidden" id="settingNotifications" data-settings-panel="notifications">
+          <button class="settings-back" type="button">← Settings</button>
+          <header class="settings-section-head"><span class="label">Your device</span><h2 tabindex="-1">Notifications</h2><p class="muted">Choose which reminders to receive on this device.</p></header>
+          <section class="notification-option" aria-labelledby="choreRemindersTitle">
+            <div class="notification-option-copy">
+              <h3 id="choreRemindersTitle">Chore Window reminders</h3>
+              <p class="muted">A gentle reminder when a Chore Window ends with tasks still open.</p>
+              <p id="choreReminderStatus" role="status" aria-live="polite">Checking this device…</p>
+            </div>
+            <button class="notification-switch" id="choreReminderToggle" type="button" role="switch" aria-checked="false" aria-labelledby="choreRemindersTitle choreReminderToggleState" disabled><span class="notification-switch-track" aria-hidden="true"><span class="notification-switch-thumb"></span></span><span id="choreReminderToggleState">Off</span></button>
+          </section>
+          <button class="btn ghost hidden" id="choreReminderTest" type="button">Send a test reminder</button>
         </article>
         <article class="card cloud-card settings-section hidden" id="settingCloud" data-settings-panel="cloud">
           <button class="settings-back" type="button">← Settings</button>

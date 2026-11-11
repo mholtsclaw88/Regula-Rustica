@@ -280,7 +280,10 @@ async function initializeCloud() {
       redirectTo: `${location.origin}${location.pathname}`
     }), 'If that account exists, a password-reset email has been sent.'));
 
-  document.querySelector('#cloudSignOut').addEventListener('click', () => run(() => client.auth.signOut()));
+  document.querySelector('#cloudSignOut').addEventListener('click', () => run(async () => {
+    await window.RegulaRusticaChorePushDisable?.();
+    await client.auth.signOut();
+  }));
 
   document.querySelector('#cloudCreateHomestead').addEventListener('click', () => run(async () => {
     return createHomestead(document.querySelector('#cloudHomesteadName').value.trim());

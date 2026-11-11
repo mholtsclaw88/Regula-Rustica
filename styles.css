@@ -140,3 +140,17 @@
  .premium-status-card .cloud-status{text-align:left}
  .premium-feature-list > div{grid-template-columns:1fr;gap:4px;padding:12px}
 }
+.notification-option { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--paper); }
+.notification-option-copy { min-width:0; }
+.notification-option h3 { margin:0 0 5px;color:var(--forest); }
+.notification-option p { max-width:34rem;margin:0;line-height:1.45; }
+.notification-option #choreReminderStatus { margin-top:10px;color:var(--muted);font:700 .76rem/1.4 Arial,sans-serif; }
+.notification-switch { display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;gap:8px;min-width:86px;min-height:44px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--raised);color:var(--forest);cursor:pointer;font:700 .78rem Arial,sans-serif; }
+.notification-switch[aria-checked="true"] { border-color:var(--forest);background:var(--forest);color:#fff8e9; }
+.notification-switch:focus-visible { outline:3px solid var(--gold);outline-offset:3px; }
+.notification-switch:disabled { opacity:.55;cursor:not-allowed; }
+.notification-switch-track { position:relative;display:block;width:37px;height:22px;border:1px solid currentColor;border-radius:999px; }
+.notification-switch-thumb { position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:currentColor;transition:transform .15s ease; }
+.notification-switch[aria-checked="true"] .notification-switch-thumb { transform:translateX(15px); }
+#choreReminderTest { margin-top:14px; }
+@media(max-width:520px){.notification-option{align-items:flex-start;gap:12px;padding:14px}.notification-switch{margin-top:2px}}

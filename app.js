@@ -3444,6 +3444,7 @@ window.addEventListener('regula-rustica:cloud-status', renderSettingsSummary);
 
 window.RegulaRustica = { normalizeData, migrateData, prepareImportedData, syncLocalAttachments, materializeRecurringTasks, openRecordEditor: type => openModal('record', null, null, type), cellarerContext, cellarerConsultContext, openCellarerDraft };
 renderAll();
+if (new URLSearchParams(location.search).get('view') === 'today') showView('today');
 window.addEventListener('regula-rustica:app-ready', () => materializeRecurringTasks(), { once: true });
 if (startupMigrationBefore) window.addEventListener('regula-rustica:app-ready', () => window.dispatchEvent(new CustomEvent('regula-rustica:data-saved', {
   detail: { before: startupMigrationBefore, after: structuredClone(persistedData), source: 'migration' }
