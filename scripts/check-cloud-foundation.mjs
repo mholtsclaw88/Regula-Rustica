@@ -102,7 +102,7 @@ assert(/select plan\(21\)/.test(invitationTests), 'Invitation pgTAP plan must ma
 assert(/select plan\(41\)/.test(housekeepingTests), 'Housekeeping pgTAP plan must match the test suite.');
 assert(/select plan\(37\)/.test(peopleTests), 'Homestead people pgTAP plan must match the test suite.');
 assert(/select plan\(35\)/.test(routineTests), 'Routine pgTAP plan must match the test suite.');
-assert(/select plan\(18\)/.test(premiumTests), 'Premium pgTAP plan must match the test suite.');
+assert(/select plan\(21\)/.test(premiumTests), 'Premium pgTAP plan must match the test suite.');
 assert(/drop constraint if exists invitations_role_check/i.test(invitationMigration), 'Steward invitations must be permitted.');
 assert(/revoke select, insert, update on public\.invitations from authenticated/i.test(invitationMigration), 'Direct invitation table access must be revoked.');
 assert(/id="cloudMemberManagement"/.test(html) && /id="cloudInvitationForm"/.test(html), 'Steward invitation UI is incomplete.');
