@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(18);
+select plan(21);
 
 select has_table('public', 'premium_entitlements', 'Premium entitlement ledger exists');
 select has_table('private', 'premium_gift_codes', 'gift material remains in the private schema');
@@ -45,6 +45,24 @@ select ok(public.has_premium_feature('cellarer_assisted_entry'), 'Assisted Entry
 select ok(public.has_premium_feature('cellarer_receipt_reader'), 'Receipt Reader is enabled');
 select ok(public.has_premium_feature('cellarer_ask_farm_book'), 'Ask the Farm Book is enabled');
 select ok(not public.has_premium_feature('unknown_feature'), 'unknown features are not enabled');
+select lives_ok(
+  $$select public.register_chore_push_subscription(
+    '91000000-0000-0000-0000-000000000099',
+    'https://fcm.googleapis.com/fcm/send/test-fixture',
+    repeat('A', 87), repeat('B', 22)
+  )$$,
+  'Premium member can register a device push subscription');
+select lives_ok(
+  $$select public.register_chore_push_subscription(
+    '91000000-0000-0000-0000-000000000099',
+    'https://fcm.googleapis.com/fcm/send/test-fixture',
+    repeat('A', 87), repeat('B', 22)
+  )$$,
+  're-registering the same device does not hit ambiguous column references');
+select is(
+  (select count(*)::integer from public.chore_push_subscriptions
+   where device_id = '91000000-0000-0000-0000-000000000099'),
+  1, 're-registration leaves one device subscription');
 select throws_ok(
   format('select public.redeem_premium_gift(%L)', :'gift_code'),
   '22023', 'Premium gift code is invalid or unavailable',
