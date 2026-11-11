@@ -1,7 +1,7 @@
 import { SupabaseSyncAdapter } from './cloud-adapter.mjs';
-import { SyncEngine } from './engine.mjs?v=chore-push-v1';
+import { SyncEngine } from './engine.mjs?v=notifications-v1';
 import { conflictPresentation } from './entities.mjs';
-import { LocalSyncState, syncDiagnosticSummary } from './local-state.mjs?v=chore-push-v1';
+import { LocalSyncState, syncDiagnosticSummary } from './local-state.mjs?v=notifications-v1';
 import { premiumSyncAvailable } from './premium-access.mjs';
 
 const state = new LocalSyncState();
