@@ -38,7 +38,12 @@ test('worker and settings expose a per-device opt-in and notification action', (
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const worker = readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
   const client = readFileSync(new URL('../chore-push-client.mjs', import.meta.url), 'utf8');
-  assert.match(html, /id="choreReminderToggle"/);
+  assert.match(html, /data-settings-category="notifications"/);
+  assert.match(html, /data-settings-panel="notifications"[\s\S]*id="choreReminderToggle"/);
+  assert.doesNotMatch(html, /data-settings-panel="rhythm"[\s\S]*id="choreReminderToggle"[\s\S]*data-settings-panel="notifications"/);
+  assert.match(html, /id="choreReminderToggle"[^>]*role="switch"[^>]*aria-checked="false"/);
+  assert.match(client, /toggle\.setAttribute\('aria-checked', String\(enabled\)\)/);
+  assert.match(client, /toggleState\.textContent = enabled \? 'On' : 'Off'/);
   assert.match(client, /Notification\.requestPermission\(\)/);
   assert.match(client, /register_chore_push_subscription/);
   assert.match(worker, /addEventListener\('push'/);

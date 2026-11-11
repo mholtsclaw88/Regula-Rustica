@@ -1,6 +1,6 @@
 # Chore Window push reminders
 
-This feature is opt-in **on each device** under Settings → Chore Windows. It requires a connected Premium Homestead, a supported browser, and notification permission. iPhone/iPad users must open the installed Home Screen web app. A local `file://` copy cannot receive Web Push.
+This feature is opt-in **on each device** under Settings → Notifications. It requires a connected Premium Homestead, a supported browser, and notification permission. iPhone/iPad users must open the installed Home Screen web app. A local `file://` copy cannot receive Web Push.
 
 At the end of an enabled Chore Window, a Netlify scheduled function checks cloud-synced Tasks using the same recurring projection as the Calendar. It sends at most one reminder per window/date/device when work remains. The schedule runs every five minutes in the Homestead's timezone, with a 30-minute catch-up window. It does not send task titles to the phone's lock screen. The device's “Send a test reminder” button checks browser permission and display; it does **not** test the scheduled cloud sender.
 

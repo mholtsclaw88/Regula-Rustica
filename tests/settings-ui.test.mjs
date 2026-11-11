@@ -12,7 +12,7 @@ const [html, app, css, styles] = await Promise.all([
 test('Settings home exposes one focused destination for every category', () => {
   const categories = [...html.matchAll(/data-settings-category="([^"]+)"/g)].map(match => match[1]);
   const panels = [...html.matchAll(/data-settings-panel="([^"]+)"/g)].map(match => match[1]);
-  assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'cloud', 'about']);
+  assert.deepEqual(categories, ['identity', 'people', 'rhythm', 'notifications', 'cloud', 'about']);
   assert.deepEqual(panels.sort(), [...categories].sort());
   assert.match(app, /showSettingsSection\(button\.dataset\.settingsCategory\)/);
   assert.match(html, /data-settings-view="calendar"/);

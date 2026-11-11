@@ -73,7 +73,7 @@ try {
   // Register sync listeners before authentication can publish a cloud context.
   await import('./sync/runtime.mjs?v=chore-push-v1');
   await import('./cloud-auth.js?v=chore-push-v1');
-  await import('./chore-push-client.mjs?v=chore-push-v1');
+  await import('./chore-push-client.mjs?v=notifications-v1');
   await Promise.all([
     import('./cellarer-assisted-entry.mjs?v=cyril-dialog-copy-v1'),
     import('./cellarer-receipt-reader.mjs?v=cyril-dialog-copy-v1'),

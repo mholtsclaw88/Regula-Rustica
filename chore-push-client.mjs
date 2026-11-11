@@ -2,9 +2,15 @@ import { premiumSyncAvailable } from './sync/premium-access.mjs';
 
 const status = document.querySelector('#choreReminderStatus');
 const toggle = document.querySelector('#choreReminderToggle');
+const toggleState = document.querySelector('#choreReminderToggleState');
 const testButton = document.querySelector('#choreReminderTest');
 const deviceKey = 'regulaRusticaChorePushDeviceId';
 let busy = false;
+
+function setSwitch(enabled) {
+  toggle.setAttribute('aria-checked', String(enabled));
+  toggleState.textContent = enabled ? 'On' : 'Off';
+}
 
 function supported() {
   return Boolean(window.isSecureContext && 'serviceWorker' in navigator
@@ -59,16 +65,19 @@ async function refresh() {
   toggle.disabled = true;
   testButton.classList.add('hidden');
   if (!supported()) {
+    setSwitch(false);
     status.textContent = 'Push reminders are unavailable in this browser. On iPhone, add the app to your Home Screen first.';
     return;
   }
   if (!premiumSyncAvailable(context())) {
+    setSwitch(false);
     status.textContent = 'Connect a Premium Homestead to enable reminders on this device.';
     return;
   }
   try {
     const keyCheck = await fetch('/.netlify/functions/chore-push-public-key', { cache: 'no-store' });
     if (!keyCheck.ok) {
+      setSwitch(false);
       status.textContent = 'Reminders are not configured on this site yet.';
       return;
     }
@@ -78,10 +87,11 @@ async function refresh() {
     status.textContent = enabled
       ? 'Reminders are on for this device. You can turn them off at any time.'
       : 'Reminders are off on this device.';
-    toggle.textContent = enabled ? 'Disable on this device' : 'Enable on this device';
+    setSwitch(enabled);
     toggle.disabled = false;
     testButton.classList.toggle('hidden', !enabled);
   } catch (error) {
+    setSwitch(false);
     status.textContent = 'Could not check reminder settings. Please try again.';
     console.warn('Chore reminder status failed.', error);
   }
