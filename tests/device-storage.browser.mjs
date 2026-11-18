@@ -125,6 +125,57 @@ async function prepareControlledWorker(page) {
   } catch (error) { await reportWorkerControlFailure(page, 'before-large-copy-reload'); throw error; }
 }
 
+// Keep the original keyboard gate; emit only control/lifecycle metadata on failure.
+async function startKeyboardDiagnostic(page) {
+  await page.evaluate(() => {
+    const events = [];
+    const identify = node => node?.id || node?.getAttribute?.('name') || node?.tagName || null;
+    const record = event => {
+      const row = { type: event.type, key: event.key, shift: event.shiftKey,
+        target: identify(event.target), active: identify(document.activeElement),
+        hasFocus: document.hasFocus(), visibility: document.visibilityState };
+      events.push(row);
+      if (events.length > 100) events.shift();
+      queueMicrotask(() => { row.defaultPrevented = event.defaultPrevented; });
+    };
+    const types = ['keydown', 'keyup', 'focusin', 'focusout'];
+    for (const type of types) document.addEventListener(type, record, true);
+    window.storageKeyboardDiagnostic = { events, stop: () => {
+      for (const type of types) document.removeEventListener(type, record, true);
+    } };
+  });
+}
+async function keyboardDiagnosticSnapshot(page) {
+  return page.evaluate(() => {
+    const identify = node => node?.id || node?.getAttribute?.('name') || node?.tagName || null;
+    const controls = [...document.querySelectorAll('#modal button, #modal input, #modal select, #modal textarea, #modal [tabindex]')]
+      .map(node => ({ target: identify(node), disabled: node.matches(':disabled'), tabIndex: node.tabIndex,
+        visible: Boolean(node.getClientRects().length), bounds: node.getBoundingClientRect().toJSON() }));
+    return { platform: navigator.platform, userAgent: navigator.userAgent,
+      viewport: { width: innerWidth, height: innerHeight }, active: identify(document.activeElement),
+      hasFocus: document.hasFocus(), visibility: document.visibilityState,
+      modal: document.querySelector('#modal').matches(':modal'),
+      saving: document.querySelector('#modalForm').dataset.saving, controls,
+      events: window.storageKeyboardDiagnostic.events };
+  });
+}
+async function stopKeyboardDiagnostic(page) {
+  await page.evaluate(() => { window.storageKeyboardDiagnostic?.stop(); delete window.storageKeyboardDiagnostic; });
+}
+
+async function nativeKeyboardControlProbe(page) {
+  const control = await page.context().newPage();
+  try {
+    await control.setViewportSize(page.viewportSize());
+    await control.setContent('<dialog id="modal"><form id="modalForm" data-saving="false"><input name="controlInput"><button type="button" id="modalCancel">Cancel</button><button type="button" id="modalSubmit">Save</button></form></dialog>');
+    await control.locator('#modal').evaluate(node => node.showModal());
+    await startKeyboardDiagnostic(control);
+    await control.locator('#modalSubmit').focus();
+    await control.keyboard.press('Shift+Tab');
+    console.error('STORAGE_KEYBOARD_NATIVE_CONTROL', JSON.stringify(await keyboardDiagnosticSnapshot(control)));
+  } finally { await control.close(); }
+}
+
 async function ready(page) {
   await page.waitForFunction(() => window.RegulaRustica && window.RegulaRusticaSync && !document.querySelector('.device-storage-startup'), undefined, { timeout: 15_000 });
 }
@@ -340,11 +391,29 @@ try {
     assert.ok(save && save.y >= bounds.y + bounds.height && save.height >= 44 && save.y + save.height <= 844);
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('#modalSubmit').focus();
-  await page.keyboard.press('Shift+Tab');
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'modalCancel');
-  await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'modalSubmit');
+  await startKeyboardDiagnostic(page);
+  try {
+    await page.locator('#modalSubmit').focus();
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'modalCancel');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'modalSubmit');
+  } catch (error) {
+    try {
+      console.error('STORAGE_KEYBOARD_FAILURE', JSON.stringify(await keyboardDiagnosticSnapshot(page)));
+      // Observe whether native focus completes later, but always rethrow the original
+      // assertion: this diagnostic cannot turn the failing gate into a pass.
+      try {
+        await page.waitForFunction(() => document.activeElement.id === 'modalCancel', undefined, { timeout: 2000 });
+        console.error('STORAGE_KEYBOARD_LATE_CANCEL', JSON.stringify(await keyboardDiagnosticSnapshot(page)));
+      } catch { console.error('STORAGE_KEYBOARD_NO_LATE_CANCEL'); }
+      await nativeKeyboardControlProbe(page);
+    } catch (diagnosticError) { console.error('STORAGE_KEYBOARD_DIAGNOSTIC_ERROR', diagnosticError.name); }
+    throw error;
+  } finally {
+    try { await stopKeyboardDiagnostic(page); }
+    catch (diagnosticError) { console.error('STORAGE_KEYBOARD_DIAGNOSTIC_CLEANUP_ERROR', diagnosticError.name); }
+  }
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => window.failedLedgerCommits >= 2 && document.querySelector('#modalForm').dataset.saving === 'false');
   assert.ok(await page.locator('#modalSaveError').isVisible());
