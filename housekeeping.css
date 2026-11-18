@@ -401,7 +401,10 @@ input[type="checkbox"] { width: 22px; height: 22px; }
 #modalForm[data-form-mode='document'] textarea[name='body'] { min-height: 152px; }
 .form-modal-long #modalFields { padding-bottom: 74px; }
 .form-extension-slot { grid-column: 1 / -1; min-width: 0; }
-.form-modal-long .dialog-actions {
+.modal-save-footer { margin-top: 16px; }
+.modal-save-footer > .dialog-actions { margin-top: 0; }
+.modal-save-error { margin: 0 0 10px; padding: 8px 10px; border-left: 3px solid var(--red); color: var(--red); font: .88rem/1.4 Arial, sans-serif; }
+.form-modal-long .modal-save-footer {
   position: sticky;
   z-index: 3;
   bottom: -20px;
@@ -411,7 +414,7 @@ input[type="checkbox"] { width: 22px; height: 22px; }
   background: rgba(255, 253, 247, .97);
   box-shadow: 0 -8px 18px rgba(54, 44, 29, .06);
 }
-.form-modal-long .dialog-actions .btn { min-height: 44px; }
+.modal-save-footer .dialog-actions .btn { min-height: 44px; }
 .yield-task-completion { max-width: 560px; }
 .yield-task-completion .form-modal-header h2 { text-transform: none; }
 .yield-task-completion #modalFields { gap: 16px; }
@@ -442,7 +445,7 @@ input[type="checkbox"] { width: 22px; height: 22px; }
   #modal { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
   #modalForm { max-height: calc(100dvh - 12px); padding: 14px; }
   .form-field-row { grid-template-columns: 1fr; gap: 9px; }
-  .form-modal-long .dialog-actions {
+  .form-modal-long .modal-save-footer {
     bottom: -14px;
     margin: 14px -14px -14px;
     padding: 10px 14px calc(10px + env(safe-area-inset-bottom));

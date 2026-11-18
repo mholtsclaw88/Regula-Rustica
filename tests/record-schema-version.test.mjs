@@ -205,6 +205,23 @@ test('cloud replacement can preserve an intentionally empty Chore Window collect
   assert.deepEqual(Array.from(normalized.choreWindows), []);
 });
 
+test('current-schema explicit empty Chore Windows survive ordinary normalization and reload without losing legacy defaults', async () => {
+  const api = await dataApi();
+  api.window.RegulaRusticaTasks.DEFAULT_WINDOWS = [{ id: 'local-default', systemKey: 'morning' }];
+  const current = { ...currentData([]), schemaVersion: 14 };
+  assert.deepEqual(Array.from(api.normalizeData(current).choreWindows), []);
+  api.localStorage.setItem(api.storageKey, JSON.stringify(current));
+  assert.deepEqual(Array.from(api.loadData().choreWindows), []);
+  const edited = api.loadData();
+  edited.settings.homesteadName = 'An ordinary local edit';
+  api.localStorage.setItem(api.storageKey, JSON.stringify(api.normalizeData(edited)));
+  assert.deepEqual(Array.from(api.loadData().choreWindows), []);
+
+  assert.equal(api.normalizeData({ ...current, schemaVersion: 13 }).choreWindows[0].id, 'local-default');
+  const missing = { ...current }; delete missing.choreWindows;
+  assert.equal(api.normalizeData(missing).choreWindows[0].id, 'local-default');
+});
+
 test('v5 through v13 backups remain supported and legacy data still migrates', async () => {
   const api = await dataApi();
   for (const schemaVersion of [5, 6, 7, 8, 9, 10, 11, 12, 13]) {

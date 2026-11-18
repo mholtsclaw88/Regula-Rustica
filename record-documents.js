@@ -89,10 +89,14 @@
   }
 
   async function writeLocal(value) {
+    // WebKit can reject Blob/File structured clones. Store their exact bytes;
+    // callers still receive Blobs, and existing Blob rows remain readable.
+    const { blob, ...metadata } = value;
+    const stored = { ...metadata, bytes: await blob.arrayBuffer() };
     const database = await openLocalDatabase();
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(BLOB_STORE, 'readwrite');
-      transaction.objectStore(BLOB_STORE).put(value);
+      transaction.objectStore(BLOB_STORE).put(stored);
       transaction.oncomplete = () => resolve(value);
       transaction.onerror = () => reject(transaction.error || new Error('The attachment could not be saved on this device.'));
       transaction.onabort = () => reject(transaction.error || new Error('The attachment could not be saved on this device.'));
@@ -103,7 +107,14 @@
     const database = await openLocalDatabase();
     return new Promise((resolve, reject) => {
       const request = database.transaction(BLOB_STORE, 'readonly').objectStore(BLOB_STORE).get(id);
-      request.onsuccess = () => resolve(request.result || null);
+      request.onsuccess = () => {
+        const stored = request.result;
+        if (!stored || stored.blob) { resolve(stored || null); return; }
+        const { bytes, ...metadata } = stored;
+        resolve(bytes instanceof ArrayBuffer
+          ? { ...metadata, blob: new Blob([bytes], { type: stored.mimeType }) }
+          : stored);
+      };
       request.onerror = () => reject(request.error || new Error('The local attachment could not be read.'));
     });
   }

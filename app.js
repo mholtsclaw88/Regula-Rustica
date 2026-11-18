@@ -366,9 +366,13 @@ function normalizeData(source = {}, options = {}) {
     ledgerAllocations: asArray(source.ledgerAllocations).map(normalizeLedgerAllocation),
     calendarEvents: asArray(source.calendarEvents).map(normalizeCalendarEvent),
     yieldEntries,
+    // Current-schema empty arrays are saved intent; only missing/legacy lists need defaults.
     choreWindows: (asArray(source.choreWindows).length
       ? asArray(source.choreWindows)
-      : options.ensureDefaultChoreWindows === false ? [] : window.RegulaRusticaTasks.DEFAULT_WINDOWS)
+      : options.ensureDefaultChoreWindows === false
+        || ((source.schemaVersion === CURRENT_SCHEMA_VERSION || source.version === CURRENT_SCHEMA_VERSION)
+          && Array.isArray(source.choreWindows))
+        ? [] : window.RegulaRusticaTasks.DEFAULT_WINDOWS)
       .map(value => window.RegulaRusticaTasks.normalizeWindow(value, { applyBuiltInDefaults: options.applyBuiltInDefaults !== false })),
     ...(source.legacy ? { legacy: source.legacy } : {})
   };
@@ -458,6 +462,9 @@ const normalizeAttachment = value => window.RegulaRusticaDocuments.normalizeAtta
 
 function prepareImportedData(value, sourceName = 'backup') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup must contain a data object.');
+  if (!Array.isArray(value.records)) throw new Error('Choose a Farm Book backup containing a Records list.');
+  const version = value.schemaVersion ?? value.version;
+  if (version != null && !isSupportedData(value) && ![3, 4].includes(version)) throw new Error('This backup version is not supported by this app.');
   return isSupportedData(value) ? normalizeData(value) : migrateData(value, sourceName);
 }
 
@@ -604,12 +611,81 @@ window.RegulaRusticaLocal = {
   materializeRecurringTasks
 };
 
-async function importData(file) {
-  if (!file) return;
-  const parsed = JSON.parse(await file.text());
-  const imported = prepareImportedData(parsed, file.name || 'backup');
-  await safelyStoreBackup(IMPORT_BACKUP_KEY, JSON.stringify(data));
-  await saveData(imported);
+let pendingRestore = null;
+let restoreBusy = false;
+
+function restoreStatus(message) { $('#backupRestoreStatus').textContent = message; }
+
+function finishRestoreDialog() {
+  pendingRestore = null;
+  $('#importData').value = '';
+  $('#backupRestoreConfirm').close();
+  $('#restoreBackup').focus();
+}
+
+function cancelRestore() {
+  if (restoreBusy) return;
+  finishRestoreDialog();
+  restoreStatus('Restore cancelled. Your current Farm Book and safety copy have not changed.');
+}
+
+async function selectRestore(file) {
+  if (!file || restoreBusy || pendingRestore) return;
+  restoreBusy = true;
+  $('#restoreBackup').disabled = true;
+  try {
+    const imported = prepareImportedData(JSON.parse(await file.text()), file.name || 'backup');
+    pendingRestore = { imported, name: file.name || 'backup.json' };
+    $('#backupRestoreFile').textContent = `Selected file: ${pendingRestore.name}. Homestead: ${imported.settings.homesteadName}. ${imported.records.length} Records.`;
+    $('#backupRestoreConfirm').showModal();
+    $('#backupRestoreCancel').focus();
+    restoreStatus('Backup checked. Review the replacement before continuing.');
+  } catch (error) {
+    restoreStatus(`Backup could not be restored. ${error.message || 'The file could not be read.'} Your current Farm Book and safety copy have not changed.`);
+  } finally {
+    $('#importData').value = '';
+    restoreBusy = false;
+    $('#restoreBackup').disabled = false;
+  }
+}
+
+async function confirmRestore() {
+  if (restoreBusy || !pendingRestore) return;
+  restoreBusy = true;
+  const imported = pendingRestore.imported;
+  const previousData = structuredClone(data);
+  const previousRaw = appStorage.getItem(STORAGE_KEY) ?? JSON.stringify(previousData);
+  let replacementStarted = false;
+  for (const id of ['backupRestoreReplace', 'backupRestoreCancel', 'restoreBackup']) $(`#${id}`).disabled = true;
+  restoreStatus('Saving and checking your current Farm Book before replacement…');
+  try {
+    const rawValue = JSON.stringify(data);
+    await safelyStoreBackup(IMPORT_BACKUP_KEY, rawValue);
+    // Read the committed device copy, rather than the staged in-memory value.
+    const committed = await appStorage.backend.readAll();
+    if (JSON.parse(committed.get(IMPORT_BACKUP_KEY) || 'null')?.rawValue !== rawValue) throw new Error('The safety copy could not be verified. Your Farm Book has not been replaced.');
+    $('#downloadBeforeRestore').hidden = false;
+    replacementStarted = true;
+    await saveData(imported);
+    finishRestoreDialog();
+    restoreStatus('Backup restored and saved on this device. Download the pre-restore copy here if you need your previous work.');
+  } catch (error) {
+    if (replacementStarted) {
+      // Failed ordinary edits remain drafts, but a failed replacement must not
+      // become the next restore's pre-restore copy or an ordinary save's input.
+      // setItem stages the prior bytes synchronously, even if disk retries fail.
+      data = previousData;
+      try { await appStorage.setItem(STORAGE_KEY, previousRaw); }
+      catch { /* Original work remains staged for the shared Retry saving action. */ }
+      renderAll();
+    }
+    restoreStatus(`Backup could not be restored. ${error.message || 'Saving was interrupted.'} Keep this app open; your pre-restore copy is available if it was saved.`);
+    finishRestoreDialog();
+  } finally {
+    restoreBusy = false;
+    for (const id of ['backupRestoreReplace', 'backupRestoreCancel', 'restoreBackup']) $(`#${id}`).disabled = false;
+    $('#restoreBackup').focus();
+  }
 }
 
 const seedTimestamp = nowIso();
@@ -655,6 +731,9 @@ let calendarView = 'month';
 let calendarDefaultDate = null;
 let yieldCompletionTaskId = null;
 let pendingDocumentFiles = [];
+let pendingDocumentAttachments = new Map();
+let pendingDocumentFileKeys = new WeakMap();
+let eventDraftRecordState = null;
 let attachmentSyncPromise = null;
 let journalFilter = 'all';
 let profileCropAttachmentId = null;
@@ -976,7 +1055,20 @@ function reopenTaskFromModal(deleteLinkedYield = false) {
   });
 }
 
+function clearModalSaveError() {
+  $('#modalSaveError').textContent = '';
+  $('#modalSaveError').classList.add('hidden');
+}
+
+function showModalSaveError(message = 'Saving could not finish on this device.') {
+  $('#modalSaveError').textContent = modalMode === 'ledger'
+    ? `${message} Your draft is still here. Keep this form open and choose Save to try again.`
+    : `${message} Keep this form open and review your entries before closing.`;
+  $('#modalSaveError').classList.remove('hidden');
+}
+
 function openTaskReopen(task, linkedYields) {
+  clearModalSaveError();
   showTaskActionStatus('');
   yieldCompletionTaskId = null;
   modalMode = 'reopen-task';
@@ -2359,6 +2451,10 @@ function appendRecordFields(root, record, type) {
 }
 
 function openModal(nextMode, id = null, recordId = null, defaultType = '', defaultDate = null, completionTask = null) {
+  clearModalSaveError();
+  pendingDocumentAttachments = new Map();
+  pendingDocumentFileKeys = new WeakMap();
+  eventDraftRecordState = null;
   showTaskActionStatus('');
   yieldCompletionTaskId = completionTask?.id || null;
   modalMode = nextMode;
@@ -2666,7 +2762,7 @@ function openModal(nextMode, id = null, recordId = null, defaultType = '', defau
   }
 
   $('#modal').showModal();
-  setTimeout(() => root.querySelector('input,textarea,select')?.focus(), 30);
+  root.querySelector('input,textarea,select')?.focus();
 }
 
 function cellarerContext(preferredKind = null) {
@@ -2857,6 +2953,7 @@ $('#modalForm').addEventListener('submit', async event => {
   const modalForm = $('#modalForm');
   if (modalForm.dataset.saving === 'true') return;
   modalForm.dataset.saving = 'true';
+  clearModalSaveError();
   $('#modalSubmit').disabled = true;
   $('#modalClose').disabled = true;
   $('#modalCancel').disabled = true;
@@ -2933,7 +3030,13 @@ $('#modalForm').addEventListener('submit', async event => {
   }
   if (modalMode === 'note') {
     if (!form.text.trim()) return;
-    data.notes.unshift({ id: uid(), recordId: contextRecordId, text: form.text.trim(), createdAt: nowIso(), updatedAt: nowIso() });
+    const existing = data.notes.find(item => item.id === editId);
+    if (existing) Object.assign(existing, { text: form.text.trim(), updatedAt: nowIso() });
+    else {
+      const created = { id: uid(), recordId: contextRecordId, text: form.text.trim(), createdAt: nowIso(), updatedAt: nowIso() };
+      data.notes.unshift(created);
+      editId = created.id;
+    }
   }
   if (modalMode === 'document') {
     const files = [...pendingDocumentFiles];
@@ -2941,23 +3044,45 @@ $('#modalForm').addEventListener('submit', async event => {
       alert('Add a note or choose at least one attachment.');
       return;
     }
-    const documentEntry = normalizeDocument({ id: uid(), recordId: contextRecordId, title: form.title?.trim(), body: form.body?.trim(), createdAt: nowIso() });
-    const stored = [];
+    const existing = data.documents.find(item => item.id === editId);
+    const documentEntry = normalizeDocument({ id: editId || uid(), recordId: contextRecordId, title: form.title?.trim(), body: form.body?.trim(), createdAt: existing?.createdAt || nowIso(), updatedAt: nowIso() });
+    editId = documentEntry.id;
+    const stored = new Map();
+    const wanted = new Map();
     try {
       $('#modalSubmit').disabled = true;
       for (const file of files) {
+        window.RegulaRusticaDocuments.validateFile(file);
+        let key = pendingDocumentFileKeys.get(file);
+        if (!key) {
+          const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+          key = JSON.stringify([file.name, file.type, Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')]);
+          pendingDocumentFileKeys.set(file, key);
+        }
+        const retained = pendingDocumentAttachments.get(key) || stored.get(key);
+        if (retained) { wanted.set(key, retained); continue; }
         const attachmentId = uid();
         const attachment = await window.RegulaRusticaDocuments.saveLocal(file, { attachmentId, recordId: contextRecordId });
-        stored.push(normalizeAttachment({ ...attachment, documentId: documentEntry.id }));
+        const metadata = normalizeAttachment({ ...attachment, documentId: documentEntry.id });
+        stored.set(key, metadata);
+        wanted.set(key, metadata);
       }
     } catch (error) {
-      try { await window.RegulaRusticaDocuments.removeLocal(stored.map(attachment => attachment.id)); } catch (cleanupError) { console.warn('Local attachment cleanup failed.', cleanupError); }
-      alert(error.message || 'The attachment could not be saved on this device. No document entry was created.');
+      console.warn('Document attachments could not finish saving.', error);
+      try { await window.RegulaRusticaDocuments.removeLocal([...stored.values()].map(attachment => attachment.id)); } catch (cleanupError) { console.warn('Local attachment cleanup failed.', cleanupError); }
+      showModalSaveError('Attachments could not finish saving on this device.');
       return;
     }
-    data.documents.unshift(documentEntry);
-    data.attachments.push(...stored);
-    pendingDocumentFiles = [];
+    stored.forEach((attachment, key) => pendingDocumentAttachments.set(key, attachment));
+    const retainedDocument = data.documents.find(item => item.id === documentEntry.id);
+    if (retainedDocument) Object.assign(retainedDocument, documentEntry);
+    else data.documents.unshift(documentEntry);
+    const draftIds = new Set([...pendingDocumentAttachments.values()].map(attachment => attachment.id));
+    const wantedIds = new Set([...wanted.values()].map(attachment => attachment.id));
+    data.attachments = data.attachments.filter(attachment => !draftIds.has(attachment.id) || wantedIds.has(attachment.id));
+    for (const attachment of wanted.values()) {
+      if (!data.attachments.some(item => item.id === attachment.id)) data.attachments.push(attachment);
+    }
   }
   if (modalMode === 'event') {
     const record = recordById(contextRecordId);
@@ -2969,10 +3094,22 @@ $('#modalForm').addEventListener('submit', async event => {
       alert('Please describe what happened.');
       return;
     }
-    addEvent(contextRecordId, form.eventType, form.details.trim(), { date: form.date, value: form.value, unit: form.unit });
+    const existing = data.events.find(item => item.id === editId);
+    const values = { eventType: form.eventType, details: form.details.trim(), date: form.date, value: form.value, unit: form.unit };
+    if (existing) Object.assign(existing, values, { updatedAt: nowIso() });
+    else {
+      addEvent(contextRecordId, form.eventType, values.details, values);
+      editId = data.events[0].id;
+    }
+    if (eventDraftRecordState?.appliedAt && record?.status === 'Completed' && record.updatedAt === eventDraftRecordState.appliedAt) {
+      Object.assign(record, { status: eventDraftRecordState.status, updatedAt: eventDraftRecordState.updatedAt });
+      eventDraftRecordState.appliedAt = null;
+    }
     if (record?.type === 'Work' && form.eventType === 'Completed') {
+      eventDraftRecordState = { status: record.status, updatedAt: record.updatedAt, appliedAt: null };
       record.status = 'Completed';
       record.updatedAt = nowIso();
+      eventDraftRecordState.appliedAt = record.updatedAt;
     }
   }
   if (modalMode === 'calendar') {
@@ -3092,6 +3229,14 @@ $('#modalForm').addEventListener('submit', async event => {
   }
 
   await saveData();
+  if (modalMode === 'document') {
+    const retainedIds = new Set(data.attachments.map(attachment => attachment.id));
+    const unused = [...pendingDocumentAttachments.values()].filter(attachment => !retainedIds.has(attachment.id)).map(attachment => attachment.id);
+    try { await window.RegulaRusticaDocuments.removeLocal(unused); }
+    catch (error) { console.warn('Unused draft attachment cleanup failed.', error); }
+    pendingDocumentFiles = [];
+    pendingDocumentAttachments.clear();
+  }
   if (modalMode === 'yield' && yieldCompletionTaskId) {
     const task = data.tasks.find(item => item.id === yieldCompletionTaskId);
     const date = window.RegulaRusticaHousekeeping.taskWorkDate(task);
@@ -3100,6 +3245,7 @@ $('#modalForm').addEventListener('submit', async event => {
   $('#modal').close();
   } catch (error) {
     console.warn('The form could not be saved.', error);
+    showModalSaveError();
   } finally {
     modalForm.dataset.saving = 'false';
     $('#modalSubmit').disabled = false;
@@ -3224,16 +3370,17 @@ $('#modalClose').addEventListener('click', cancelModal);
 $('#modalCancel').addEventListener('click', cancelModal);
 $('#modalCompleteWithoutYield').addEventListener('click', async () => {
   if ($('#modalForm').dataset.saving === 'true') return;
+  clearModalSaveError();
   if (modalMode === 'reopen-task') {
     try { await reopenTaskFromModal(true); }
-    catch (error) { console.warn('The Task could not be reopened.', error); }
+    catch (error) { console.warn('The Task could not be reopened.', error); showModalSaveError(); }
     return;
   }
   const task = data.tasks.find(item => item.id === yieldCompletionTaskId);
   if (task) {
     completeTask(task);
     try { await saveData(); }
-    catch (error) { console.warn('The Task could not be saved.', error); return; }
+    catch (error) { console.warn('The Task could not be saved.', error); showModalSaveError(); return; }
   }
   $('#modal').close();
 });
@@ -3418,15 +3565,22 @@ $('#childForm').addEventListener('submit', event => {
   saveData();
 });
 $('#exportData').addEventListener('click', exportData);
-$('#importData').addEventListener('change', async event => {
+$('#restoreBackup').addEventListener('click', () => { if (!restoreBusy && !pendingRestore) $('#importData').click(); });
+$('#importData').addEventListener('change', event => selectRestore(event.target.files[0]));
+$('#backupRestoreCancel').addEventListener('click', cancelRestore);
+$('#backupRestoreConfirm').addEventListener('cancel', event => { event.preventDefault(); cancelRestore(); });
+$('#backupRestoreReplace').addEventListener('click', confirmRestore);
+$('#downloadBeforeRestore').hidden = !appStorage.getItem(IMPORT_BACKUP_KEY);
+$('#downloadBeforeRestore').addEventListener('click', () => {
   try {
-    await importData(event.target.files[0]);
-    alert('Backup restored.');
-  } catch (error) {
-    console.warn(error);
-    alert(`Backup could not be restored. ${error.message || ''}`.trim());
-  }
-  event.target.value = '';
+    const backup = JSON.parse(appStorage.getItem(IMPORT_BACKUP_KEY));
+    if (!backup?.rawValue) throw new Error('No pre-restore copy is available on this device.');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([backup.rawValue], { type: 'application/json' }));
+    link.download = 'regula-rustica-pre-restore.json';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  } catch (error) { restoreStatus(`The pre-restore copy could not be downloaded. ${error.message}`); }
 });
 $('#resetData').addEventListener('click', () => {
   if (confirm('Reset all records to sample data? Download a backup first if needed.')) saveData(structuredClone(SEED_DATA));

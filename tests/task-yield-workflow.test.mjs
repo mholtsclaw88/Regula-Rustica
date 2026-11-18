@@ -47,7 +47,7 @@ function workflow(taskList, yieldEntries = []) {
     saveData() { context.saved = JSON.stringify(context.data); context.data = JSON.parse(context.saved); context.saveCount++; }
   });
   $('#modal');
-  for (const name of ['completeTask', 'showTaskActionStatus', 'reopenTaskFromModal']) {
+  for (const name of ['completeTask', 'showTaskActionStatus', 'reopenTaskFromModal', 'clearModalSaveError', 'showModalSaveError']) {
     const start = source.indexOf(`function ${name}(`);
     vm.runInContext(source.slice(start, source.indexOf('\n}', start) + 2), context);
   }
