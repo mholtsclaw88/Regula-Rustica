@@ -45,3 +45,46 @@ served by the service worker; a fresh context without a worker must fail to
 connect. This avoids Playwright's documented WebKit offline-emulation defect
 ([microsoft/playwright#42775](https://github.com/microsoft/playwright/issues/42775))
 while still verifying actual network-failure cache recovery.
+
+The storage browser fixture finishes first worker activation and verifies a
+matching activated controller before its first large-copy reload. A navigation
+started during initial installation can commit after the activation-time claim
+has finished and remain uncontrolled. The later controller and real offline
+reload assertions are retained. Failure-only diagnostics report worker states,
+registration scope, controller, page visibility, and cache names.
+
+`service-worker-lifecycle.browser.mjs` gates a precache-only asset and the reload
+HTML response to verify this setup without sleeps. With the origin stopped it
+fetches every required asset, checking status, exact SHA256 bytes, and delivery
+by the worker. It also checks native Farm Book data, a worker-served reload,
+and rejection by a fresh context without a worker. This changes test
+lifecycle setup; the application's service-worker behavior is unchanged.
+
+Backup & Restore uses a keyboard-operable Restore button. Selecting a supported
+backup validates and previews it without changing the working copy or safety
+copy. Cancel and Escape return to Restore. Only Replace Farm Book saves and reads
+back the pre-restore copy from committed device storage before replacement.
+While that operation is pending, duplicate activation and cancellation are
+blocked. Errors remain visible in Backup & Restore and never claim success.
+After replacement, Download pre-restore copy exports the prior Farm Book as a
+normal JSON backup; it remains available after reopening the app, until the next
+confirmed restore. These actions use local device storage and require no network.
+The native browser suite also covers these restore and failure paths.
+
+An explicitly empty Chore Window list in a current-schema Farm Book remains
+empty through reload and ordinary local saves. Missing lists and older schemas
+still receive the initial defaults. This keeps an accepted empty cloud baseline
+from generating new local Chore Windows and an unintended upload queue on reopen.
+Native recovery checks wait for the completed Account & Storage overview as well
+as internal sync state before inspecting persistence and the write-free outbox.
+
+Note, event, and document forms retain a draft identity across failed main commits.
+Document selections stay available until the Farm Book commit finishes. Prepared
+attachments are reused by file name/type/content digest within that draft; removed
+selection bytes are deleted only after the updated document metadata commits.
+Partial attachment preparation failures clean up only newly prepared files, leaving
+retained draft attachments readable. A fresh modal starts a fresh preparation memo.
+Attachment rows now store exact ArrayBuffer bytes to avoid native WebKit Blob/File
+IndexedDB preparation failures. readLocal reconstructs the existing Blob API;
+legacy Blob rows remain readable without destructive migration. Filename, MIME
+type, size, IDs, private upload paths, and attachment metadata are unchanged.

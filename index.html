@@ -9,19 +9,19 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css?v=notifications-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=notifications-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=modal-save-feedback-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
   <script src="housekeeping-data.js?v=today-focus-v1" defer></script>
   <script src="task-foundation.js?v=today-focus-v1" defer></script>
-  <script src="record-documents.js?v=homestead-identity-v1" defer></script>
+  <script src="record-documents.js?v=attachment-bytes-v1" defer></script>
   <script src="journal-foundation.js?v=journal-consolidation-v3" defer></script>
   <script src="form-selector.js?v=responsible-party-selectors-v2" defer></script>
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="app-bootstrap.mjs?v=notifications-v1" type="module"></script>
+  <script src="app-bootstrap.mjs?v=generic-form-retry-v1" type="module"></script>
 </head>
 <body>
   <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
@@ -682,10 +682,23 @@
             <h3 class="settings-rule-title">Routine data actions</h3>
             <div class="quick compact-actions">
               <button class="btn secondary" id="exportData">Download backup</button>
-              <label class="btn secondary file-button">Restore backup<input id="importData" type="file" accept="application/json" hidden></label>
+              <button class="btn secondary" id="restoreBackup" type="button" style="min-height:44px">Restore backup</button>
+              <input id="importData" type="file" accept="application/json,.json" hidden>
+              <button class="btn secondary" id="downloadBeforeRestore" type="button" style="min-height:44px" hidden>Download pre-restore copy</button>
             </div>
+            <p id="backupRestoreStatus" role="status" aria-live="polite"></p>
+            <p class="muted">After a restore, download the pre-restore copy here to recover the work it replaced. This copy is kept on this device until the next confirmed restore.</p>
             <details class="danger-zone"><summary>Destructive actions</summary><p class="muted">Reset replaces every local record with the sample Homestead.</p><button class="btn danger" id="resetData">Reset sample data</button></details>
           </dialog>
+            <dialog class="account-cloud-dialog" id="backupRestoreConfirm" aria-labelledby="backupRestoreTitle" aria-describedby="backupRestoreWarning backupRestoreFile">
+              <h3 id="backupRestoreTitle">Replace this device’s Farm Book?</h3>
+              <p id="backupRestoreWarning">Restoring replaces the current Records, Tasks, Journal, Yield, and Ledger on this device. A safety copy of your current work will be saved and checked before replacement. You can download it from Backup &amp; Restore afterward.</p>
+              <p id="backupRestoreFile" style="overflow-wrap:anywhere"></p>
+              <div class="dialog-actions" style="flex-wrap:wrap">
+                <button class="btn secondary" id="backupRestoreCancel" type="button" style="min-height:44px" autofocus>Cancel</button>
+                <button class="btn danger" id="backupRestoreReplace" type="button" style="min-height:44px">Replace Farm Book</button>
+              </div>
+            </dialog>
         </article>
         <article class="card settings-section hidden" id="settingAbout" data-settings-panel="about">
           <button class="settings-back" type="button">← Settings</button>
@@ -786,11 +799,14 @@
       <div class="form-modal-header row"><div><h2 id="modalTitle">Add</h2><p class="muted form-modal-subtitle" id="modalSubtitle"></p></div><button type="button" class="btn ghost" id="modalClose" aria-label="Close">✕</button></div>
       <div class="form-modal-rule" aria-hidden="true"><span>◆</span></div>
       <div id="modalFields" class="form-grid"></div>
+      <div class="modal-save-footer">
+      <p id="modalSaveError" class="modal-save-error hidden" role="alert"></p>
       <div class="dialog-actions">
         <button type="button" class="btn danger hidden" id="modalDelete">Delete</button>
         <button type="button" class="btn secondary hidden" id="modalCompleteWithoutYield">Complete Without Yield</button>
         <button type="button" class="btn secondary" id="modalCancel">Cancel</button>
         <button type="submit" class="btn primary" id="modalSubmit">Save</button>
+      </div>
       </div>
     </form>
   </dialog>

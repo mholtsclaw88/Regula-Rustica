@@ -38,6 +38,7 @@ function installFakeIndexedDb() {
       return request;
     }
   };
+  return rows;
 }
 
 test('document and attachment metadata normalize without binary payloads', () => {
@@ -105,7 +106,7 @@ test('file validation accepts supported images/PDFs and rejects unsupported or o
 });
 
 test('IndexedDB keeps the local copy through cloud upload failure and retries by stable ID', async () => {
-  installFakeIndexedDb();
+  const rows = installFakeIndexedDb();
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
   const file = new Blob(['%PDF-local'], { type: 'application/pdf' });
   Object.defineProperty(file, 'name', { value: 'local.pdf' });
@@ -120,6 +121,14 @@ test('IndexedDB keeps the local copy through cloud upload failure and retries by
   }) } };
   documents.setContext({ client, session: { user: {} }, homesteadId: 'home-1' });
   const attachment = await documents.saveLocal(file, { attachmentId: 'stable-file-id', recordId: 'daisy' });
+  assert.ok(rows.get(attachment.id).bytes instanceof ArrayBuffer);
+  assert.equal('blob' in rows.get(attachment.id), false);
+  assert.equal(await (await documents.readLocal(attachment.id)).blob.text(), '%PDF-local');
+  rows.set('legacy-file-id', { id: 'legacy-file-id', blob: file, filename: file.name, mimeType: file.type, size: file.size });
+  const legacy = await documents.readLocal('legacy-file-id');
+  assert.equal(await legacy.blob.text(), '%PDF-local');
+  assert.equal(legacy.filename, file.name);
+  assert.equal(legacy.mimeType, file.type);
   assert.equal(attachment.id, 'stable-file-id');
   await assert.rejects(documents.uploadStored(attachment), /network unavailable/);
   assert.equal((await documents.readLocal(attachment.id)).blob.size, file.size);
