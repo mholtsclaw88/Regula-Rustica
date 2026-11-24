@@ -34,6 +34,7 @@ function workflow(taskList, yieldEntries = []) {
   };
   const context = vm.createContext({
     $, console, Date, Number, Object, structuredClone,
+    document: { activeElement: null, body: {} },
     FormData: class { constructor(target) { return Object.entries(target.values); } },
     window: { RegulaRusticaHousekeeping: housekeeping, RegulaRusticaTasks: tasks, RegulaRusticaSync: { isInitialized: () => true } },
     data: { tasks: structuredClone(taskList), yieldEntries: structuredClone(yieldEntries), records: [{ id: 'cow', type: 'Animal', status: 'Active', identity: { purpose: 'Dairy' } }] },

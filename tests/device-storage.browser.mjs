@@ -125,119 +125,6 @@ async function prepareControlledWorker(page) {
   } catch (error) { await reportWorkerControlFailure(page, 'before-large-copy-reload'); throw error; }
 }
 
-// Keep the original keyboard gate; emit only control/lifecycle metadata on failure.
-async function startKeyboardDiagnostic(page) {
-  await page.evaluate(() => {
-    const events = [];
-    const identify = node => node?.id || node?.getAttribute?.('name') || node?.tagName || null;
-    const record = event => {
-      const row = { type: event.type, phase: event.eventPhase, key: event.key, shift: event.shiftKey,
-        target: identify(event.target), active: identify(document.activeElement),
-        hasFocus: document.hasFocus(), visibility: document.visibilityState };
-      events.push(row);
-      if (events.length > 100) events.shift();
-      queueMicrotask(() => { row.defaultPrevented = event.defaultPrevented; });
-    };
-    const types = ['keydown', 'keyup', 'focusin', 'focusout'];
-    for (const type of types) document.addEventListener(type, record, true);
-    for (const type of ['keydown', 'keyup']) window.addEventListener(type, record);
-    window.storageKeyboardDiagnostic = { events, stop: () => {
-      for (const type of types) document.removeEventListener(type, record, true);
-      for (const type of ['keydown', 'keyup']) window.removeEventListener(type, record);
-    } };
-  });
-}
-async function keyboardDiagnosticSnapshot(page) {
-  return page.evaluate(() => {
-    const identify = node => node?.id || node?.getAttribute?.('name') || node?.tagName || null;
-    const controls = [...document.querySelectorAll('#modal button, #modal input, #modal select, #modal textarea, #modal [tabindex]')]
-      .map(node => ({ target: identify(node), disabled: node.matches(':disabled'), tabIndex: node.tabIndex,
-        visible: Boolean(node.getClientRects().length), bounds: node.getBoundingClientRect().toJSON() }));
-    return { platform: navigator.platform, userAgent: navigator.userAgent,
-      viewport: { width: innerWidth, height: innerHeight }, active: identify(document.activeElement),
-      hasFocus: document.hasFocus(), visibility: document.visibilityState,
-      modal: document.querySelector('#modal').matches(':modal'),
-      saving: document.querySelector('#modalForm').dataset.saving, controls,
-      events: window.storageKeyboardDiagnostic.events };
-  });
-}
-async function stopKeyboardDiagnostic(page) {
-  await page.evaluate(() => { window.storageKeyboardDiagnostic?.stop(); delete window.storageKeyboardDiagnostic; });
-}
-
-async function nativeKeyboardControlProbe(page) {
-  const fixture = await page.evaluate(() => {
-    const clone = document.querySelector('#modal').cloneNode(true);
-    clone.removeAttribute('open');
-    for (const node of clone.querySelectorAll('input,textarea')) {
-      node.value = ''; node.removeAttribute('value');
-      if (node.tagName === 'TEXTAREA') node.replaceChildren();
-    }
-    for (const node of clone.querySelectorAll('*')) {
-      for (const attr of [...node.attributes]) if (attr.name.startsWith('on')) node.removeAttribute(attr.name);
-    }
-    return { html: clone.outerHTML, styles: [...document.querySelectorAll('link[rel=stylesheet]')]
-      .map(node => node.href).filter(url => new URL(url).origin === location.origin) };
-  });
-  for (const variant of [
-    { label: 'bare-fresh' }, { label: 'bare-disabled-history', history: true },
-    { label: 'bare-disabled-history-blur-refocus', history: true, blur: true },
-    { label: 'app-css-clone-fresh', clone: true },
-    { label: 'app-css-clone-disabled-history', clone: true, history: true },
-    { label: 'app-css-clone-explicit-tabindex', clone: true, history: true, explicitTabIndex: true },
-    { label: 'app-css-clone-static-footer', clone: true, history: true, staticFooter: true }
-  ]) {
-    const control = await page.context().newPage();
-    try {
-      await control.setViewportSize(page.viewportSize());
-      await control.setContent('<!doctype html><html><head></head><body></body></html>');
-      await control.evaluate(async ({ fixture, useClone }) => {
-        document.body.innerHTML = useClone ? fixture.html : '<dialog id="modal"><form id="modalForm" data-saving="false"><input name="controlInput"><button type="button" id="modalCancel">Cancel</button><button type="submit" id="modalSubmit">Save</button></form></dialog>';
-        if (useClone) await Promise.all(fixture.styles.map(url => new Promise((resolve, reject) => {
-          const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = url;
-          link.onload = resolve; link.onerror = () => reject(new Error('Control CSS failed')); document.head.append(link);
-        })));
-      }, { fixture, useClone: Boolean(variant.clone) });
-      await control.evaluate(variant => {
-        // Cleared control fields are not exercising validation or saving data.
-        document.querySelector('#modalForm').noValidate = true;
-        if (variant.explicitTabIndex) for (const id of ['modalCancel', 'modalSubmit']) document.getElementById(id).setAttribute('tabindex', '0');
-        if (variant.staticFooter) document.querySelector('.modal-save-footer').style.position = 'static';
-      }, variant);
-      await control.locator('#modal').evaluate(node => node.showModal());
-      await startKeyboardDiagnostic(control);
-      if (variant.history) {
-        await control.evaluate(() => {
-          const form = document.querySelector('#modalForm');
-          form.addEventListener('submit', event => {
-            event.preventDefault(); form.dataset.saving = 'true';
-            for (const id of ['modalSubmit', 'modalCancel', 'modalClose']) {
-              const node = document.getElementById(id); if (node) node.disabled = true;
-            }
-            window.finishControlSave = () => {
-              for (const id of ['modalSubmit', 'modalCancel', 'modalClose']) {
-                const node = document.getElementById(id); if (node) node.disabled = false;
-              }
-              form.dataset.saving = 'false';
-            };
-          });
-        });
-        await control.locator('#modalSubmit').click();
-        await control.waitForFunction(() => document.querySelector('#modalSubmit').disabled && document.querySelector('#modalForm').dataset.saving === 'true');
-        await control.evaluate(() => window.finishControlSave());
-        await control.waitForFunction(() => !document.querySelector('#modalSubmit').disabled && document.querySelector('#modalForm').dataset.saving === 'false');
-      }
-      await control.locator('#modalSubmit').focus();
-      if (variant.blur) {
-        await control.locator('#modalSubmit').evaluate(node => node.blur());
-        await control.locator('#modalSubmit').focus();
-      }
-      await control.keyboard.press('Shift+Tab');
-      console.error('STORAGE_KEYBOARD_NATIVE_CONTROL', JSON.stringify({ variant: variant.label, ...await keyboardDiagnosticSnapshot(control) }));
-    } finally { await control.close(); }
-  }
-}
-
 async function ready(page) {
   await page.waitForFunction(() => window.RegulaRustica && window.RegulaRusticaSync && !document.querySelector('.device-storage-startup'), undefined, { timeout: 15_000 });
 }
@@ -453,31 +340,32 @@ try {
     assert.ok(save && save.y >= bounds.y + bounds.height && save.height >= 44 && save.y + save.height <= 844);
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await startKeyboardDiagnostic(page);
-  try {
-    await page.locator('#modalSubmit').focus();
-    await page.keyboard.press('Shift+Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.id), 'modalCancel');
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.id), 'modalSubmit');
-  } catch (error) {
-    try {
-      console.error('STORAGE_KEYBOARD_FAILURE', JSON.stringify(await keyboardDiagnosticSnapshot(page)));
-      // Observe whether native focus completes later, but always rethrow the original
-      // assertion: this diagnostic cannot turn the failing gate into a pass.
-      try {
-        await page.waitForFunction(() => document.activeElement.id === 'modalCancel', undefined, { timeout: 2000 });
-        console.error('STORAGE_KEYBOARD_LATE_CANCEL', JSON.stringify(await keyboardDiagnosticSnapshot(page)));
-      } catch { console.error('STORAGE_KEYBOARD_NO_LATE_CANCEL'); }
-      await nativeKeyboardControlProbe(page);
-    } catch (diagnosticError) { console.error('STORAGE_KEYBOARD_DIAGNOSTIC_ERROR', diagnosticError.name); }
-    throw error;
-  } finally {
-    try { await stopKeyboardDiagnostic(page); }
-    catch (diagnosticError) { console.error('STORAGE_KEYBOARD_DIAGNOSTIC_CLEANUP_ERROR', diagnosticError.name); }
-  }
+  await page.locator('#modalSubmit').focus();
+  await page.keyboard.press('Shift+Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'modalCancel');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'modalSubmit');
+  // Keep a keyboard-initiated retry pending so a user can choose another field.
+  await page.evaluate(() => {
+    const storage = window.RegulaRusticaStorage;
+    const failedCommit = storage.backend.commit;
+    storage.backend.commit = async (...args) => {
+      await new Promise(resolve => { window.releaseFailedRetry = resolve; });
+      storage.backend.commit = failedCommit;
+      return failedCommit(...args);
+    };
+  });
   await page.keyboard.press('Enter');
+  await page.waitForFunction(() => typeof window.releaseFailedRetry === 'function');
+  await page.locator('#modalForm [name="description"]').focus();
+  await page.evaluate(() => window.releaseFailedRetry());
   await page.waitForFunction(() => window.failedLedgerCommits >= 2 && document.querySelector('#modalForm').dataset.saving === 'false');
+  assert.equal(await page.evaluate(() => document.activeElement.name), 'description', 'a failed retry must not take focus from a field chosen while saving');
+  await page.locator('#modalSubmit').focus();
+  await page.keyboard.press('Shift+Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'modalCancel');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'modalSubmit');
   assert.ok(await page.locator('#modalSaveError').isVisible());
   assert.deepEqual(await page.evaluate(() => {
     const form = new FormData(document.querySelector('#modalForm'));

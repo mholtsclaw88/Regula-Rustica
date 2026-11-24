@@ -16,7 +16,7 @@ const server=createServer(async(request,response)=>{
  if(pathname==='/icons/icon-512-maskable.png'){installRequested.release();await installRelease.promise;}
  if(pathname==='/'&&holdHTML){htmlRequested.release();await htmlRelease.promise;}
  if(pathname==='/cloud-runtime-config.js'){response.writeHead(200,{'Content-Type':'text/javascript'});response.end('window.REGULA_RUSTICA_CLOUD_CONFIG={};');return;}
- try{const file=new URL(`.${pathname==='/'?'/index.html':pathname}`,root);if(!file.href.startsWith(root.href))throw Error('Invalid path');response.writeHead(200,{'Content-Type':({'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.png':'image/png'})[extname(file.pathname)]||'application/octet-stream','Cache-Control':'no-cache'});response.end(await readFile(file));}catch{response.writeHead(404);response.end('Not found');}
+ try{const file=new URL(`.${pathname==='/'?'/index.html':pathname}`,root);if(!file.href.startsWith(root.href))throw Error('Invalid path');const content=await readFile(file);response.writeHead(200,{'Content-Type':({'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.png':'image/png'})[extname(file.pathname)]||'application/octet-stream','Cache-Control':'no-cache'});response.end(content);}catch{response.writeHead(404);response.end('Not found');}
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const url=`http://127.0.0.1:${server.address().port}`,screenshots=[];

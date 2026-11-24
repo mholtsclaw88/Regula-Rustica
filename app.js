@@ -2954,6 +2954,11 @@ $('#modalForm').addEventListener('submit', async event => {
   if (modalForm.dataset.saving === 'true') return;
   modalForm.dataset.saving = 'true';
   clearModalSaveError();
+  const submitButton = $('#modalSubmit');
+  const restoreSubmitFocus = document.activeElement === submitButton;
+  // Release native focus before disabling the active control. WebKit can retain
+  // a disabled button as its focus target and then stop traversing on Tab.
+  if (restoreSubmitFocus) submitButton.blur();
   $('#modalSubmit').disabled = true;
   $('#modalClose').disabled = true;
   $('#modalCancel').disabled = true;
@@ -3251,6 +3256,10 @@ $('#modalForm').addEventListener('submit', async event => {
     $('#modalSubmit').disabled = false;
     $('#modalClose').disabled = false;
     $('#modalCancel').disabled = false;
+    if (restoreSubmitFocus && $('#modal').open
+      && (document.activeElement === document.body || document.activeElement === submitButton)) {
+      submitButton.focus();
+    }
   }
 });
 
