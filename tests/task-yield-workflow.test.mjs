@@ -34,6 +34,7 @@ function workflow(taskList, yieldEntries = []) {
   };
   const context = vm.createContext({
     $, console, Date, Number, Object, structuredClone,
+    document: { activeElement: null, body: {} },
     FormData: class { constructor(target) { return Object.entries(target.values); } },
     window: { RegulaRusticaHousekeeping: housekeeping, RegulaRusticaTasks: tasks, RegulaRusticaSync: { isInitialized: () => true } },
     data: { tasks: structuredClone(taskList), yieldEntries: structuredClone(yieldEntries), records: [{ id: 'cow', type: 'Animal', status: 'Active', identity: { purpose: 'Dairy' } }] },
@@ -47,7 +48,7 @@ function workflow(taskList, yieldEntries = []) {
     saveData() { context.saved = JSON.stringify(context.data); context.data = JSON.parse(context.saved); context.saveCount++; }
   });
   $('#modal');
-  for (const name of ['completeTask', 'showTaskActionStatus', 'reopenTaskFromModal']) {
+  for (const name of ['completeTask', 'showTaskActionStatus', 'reopenTaskFromModal', 'clearModalSaveError', 'showModalSaveError']) {
     const start = source.indexOf(`function ${name}(`);
     vm.runInContext(source.slice(start, source.indexOf('\n}', start) + 2), context);
   }
