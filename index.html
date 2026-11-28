@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=notifications-v1">
-  <link rel="stylesheet" href="housekeeping.css?v=modal-save-feedback-v1">
+  <link rel="stylesheet" href="styles.css?v=calendar-clearance-v1">
+  <link rel="stylesheet" href="housekeeping.css?v=calendar-clearance-v1">
   <link rel="stylesheet" href="cloud-auth.css">
   <link rel="stylesheet" href="onboarding.css?v=standard-onboarding-v1">
   <title>Regula Rustica</title>
@@ -21,7 +21,7 @@
   <script src="records-relationships.js?v=data-entry-forms-v2" defer></script>
   <script src="ledger-allocation-display.js?v=ledger-api-v2" defer></script>
   <script src="cloud-runtime-config.js" defer onerror="this.remove()"></script>
-  <script src="app-bootstrap.mjs?v=generic-form-retry-v1" type="module"></script>
+  <script src="app-bootstrap.mjs?v=calendar-clearance-v1" type="module"></script>
 </head>
 <body>
   <section class="onboarding-shell hidden" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
@@ -144,6 +144,7 @@
     </div>
   </header>
 
+  <div class="app-navigation">
   <nav class="nav" aria-label="Primary navigation">
     <button class="active" data-view="today">Today</button>
     <button data-view="records">Records</button>
@@ -153,6 +154,20 @@
     <button data-view="ledger">Ledger</button>
     <button data-view="settings">Settings</button>
   </nav>
+  <div class="cellarer-access">
+    <section id="cellarerDesk" class="cellarer-desk" aria-labelledby="cellarerDeskTitle" hidden>
+      <header class="cellarer-desk-header"><span class="label">The Cellarer's Desk</span><h2 id="cellarerDeskTitle">Cyril the Cellarer</h2><p>A little help keeping the Homestead in order.</p></header>
+      <div class="cellarer-desk-rows">
+        <button id="cellarerPrepare" class="cellarer-desk-row" type="button"><strong>Prepare an Entry</strong><span>Describe what happened or what needs doing. Cyril prepares a draft for your review.</span></button>
+        <button id="cellarerReceipt" class="cellarer-desk-row" type="button"><strong>Read a Receipt</strong><span>Turn a receipt photo into a Ledger draft for your review.</span></button>
+        <button id="cellarerConsult" class="cellarer-desk-row" type="button"><strong>Consult Cyril</strong><span>Ask about your Farm Book.</span></button>
+      </div>
+      <p class="cellarer-desk-stewardship">Cyril assists; you remain the steward.<span>Nothing is recorded without your review.</span></p>
+    </section>
+    <button id="cellarerDeskToggle" class="cellarer-desk-toggle" type="button" aria-controls="cellarerDesk" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7" cy="12" r="3.3"/><path d="M10.3 12H21m-3 0v3m-3-3v2"/></svg><span>Cyril the Cellarer</span></button>
+  </div>
+
+  </div>
 
   <main>
     <div id="taskActionStatus" class="task-action-status hidden" role="status" aria-live="polite" aria-atomic="true"><span id="taskActionStatusText"></span><button id="taskActionDismiss" class="btn ghost" type="button" aria-label="Dismiss Task confirmation">×</button></div>
@@ -781,18 +796,6 @@
 
   <footer class="footer">Regula Rustica v5 · The app remembers so you do not have to.</footer>
 
-  <div class="cellarer-access">
-    <section id="cellarerDesk" class="cellarer-desk" aria-labelledby="cellarerDeskTitle" hidden>
-      <header class="cellarer-desk-header"><span class="label">The Cellarer's Desk</span><h2 id="cellarerDeskTitle">Cyril the Cellarer</h2><p>A little help keeping the Homestead in order.</p></header>
-      <div class="cellarer-desk-rows">
-        <button id="cellarerPrepare" class="cellarer-desk-row" type="button"><strong>Prepare an Entry</strong><span>Describe what happened or what needs doing. Cyril prepares a draft for your review.</span></button>
-        <button id="cellarerReceipt" class="cellarer-desk-row" type="button"><strong>Read a Receipt</strong><span>Turn a receipt photo into a Ledger draft for your review.</span></button>
-        <button id="cellarerConsult" class="cellarer-desk-row" type="button"><strong>Consult Cyril</strong><span>Ask about your Farm Book.</span></button>
-      </div>
-      <p class="cellarer-desk-stewardship">Cyril assists; you remain the steward.<span>Nothing is recorded without your review.</span></p>
-    </section>
-    <button id="cellarerDeskToggle" class="cellarer-desk-toggle" type="button" aria-controls="cellarerDesk" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7" cy="12" r="3.3"/><path d="M10.3 12H21m-3 0v3m-3-3v2"/></svg><span>Cyril the Cellarer</span></button>
-  </div>
 
   <dialog id="modal">
     <form id="modalForm">

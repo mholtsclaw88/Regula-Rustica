@@ -1935,7 +1935,12 @@ function renderCalendarMonth(root, anchor, start) {
     cell.type = 'button';
     cell.className = `calendar-month-day workload-${projection.workloadLevel}${date.getMonth() !== anchor.getMonth() ? ' outside' : ''}${dateKey === today() ? ' current' : ''}`;
     cell.setAttribute('aria-label', `Open ${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}: ${projection.choreCount} chores, ${projection.otherWorkCount} other tasks, ${projection.eventCount} events`);
-    cell.innerHTML = `<span class="calendar-summary-date">${date.getDate()}</span><span class="calendar-month-counts"><span>${projection.choreCount} <em>chore${projection.choreCount === 1 ? '' : 's'}</em></span><span>${projection.otherWorkCount} <em>other work</em></span><span>${projection.eventCount} <em>event${projection.eventCount === 1 ? '' : 's'}</em></span></span>`;
+    const counts = [
+      projection.choreCount ? `<span>${projection.choreCount} <em>chore${projection.choreCount === 1 ? '' : 's'}</em></span>` : '',
+      projection.otherWorkCount ? `<span>${projection.otherWorkCount} <em>other work</em></span>` : '',
+      projection.eventCount ? `<span>${projection.eventCount} <em>event${projection.eventCount === 1 ? '' : 's'}</em></span>` : ''
+    ].join('');
+    cell.innerHTML = `<span class="calendar-summary-date">${date.getDate()}</span>${counts ? `<span class="calendar-month-counts" aria-hidden="true">${counts}</span>` : ''}`;
     cell.addEventListener('click', () => openCalendarDay(date));
     root.append(cell);
   }

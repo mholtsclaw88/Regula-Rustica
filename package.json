@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "test:browser": "node tests/device-storage.browser.mjs && node tests/backup-restore.browser.mjs && node tests/generic-form-retry.browser.mjs && node tests/service-worker-lifecycle.browser.mjs",
+    "test:browser": "node tests/device-storage.browser.mjs && node tests/backup-restore.browser.mjs && node tests/generic-form-retry.browser.mjs && node tests/service-worker-lifecycle.browser.mjs && node tests/calendar-clearance.browser.mjs",
     "test:storage": "node --test tests/device-storage.test.mjs tests/sync.test.mjs tests/record-schema-version.test.mjs",
     "build:cloud-config": "node scripts/generate-cloud-config.mjs",
     "test:cloud-auth": "node --test tests/cloud-invitations.test.mjs",
