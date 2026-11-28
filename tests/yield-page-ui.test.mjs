@@ -49,6 +49,6 @@ test('Yield page assets use the current offline cache version', () => {
   assert.match(worker, /regula-rustica-notifications-v1/);
   assert.match(worker, /housekeeping\.css\?v=calendar-clearance-v1/);
   assert.match(html, /housekeeping\.css\?v=calendar-clearance-v1/);
-  assert.match(worker, /app\.js\?v=calendar-clearance-v1/);
-  assert.match(bootstrap, /app\.js\?v=calendar-clearance-v1/);
+  assert.match(worker, /app\.js\?v=yield-task-link-v1/);
+  assert.match(bootstrap, /app\.js\?v=yield-task-link-v1/);
 });

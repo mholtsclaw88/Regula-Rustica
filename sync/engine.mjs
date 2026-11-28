@@ -47,7 +47,8 @@ const comparablePayload = payload => {
 function dependencyBlockers(operation, outbox) {
   if (operation.type === 'soft_delete') return [];
   return (DEPENDENCIES[operation.table] || []).flatMap(([table, path]) => {
-    const rowId = valueAt(operation.payload, path);
+    const rowId = valueAt(operation.payload, path)
+      || (operation.table === 'yield_entries' && path === 'task_id' ? operation.payload?.details?.task_id : null);
     if (!rowId) return [];
     return outbox.filter(item => item.id !== operation.id && item.table === table && item.rowId === rowId && ['create', 'restore'].includes(item.type));
   });
@@ -418,7 +419,11 @@ export class SyncEngine {
         this.state.fail(operation, legacyError);
         continue;
       }
-      if (isLegacyOperation(operation) && operation.attempts > 0
+      // Only a definite FK rejection permits changing this queued request.
+      // A network failure may have committed, even when attempts was zero.
+      const repairedTaskReference = this.repairRejectedYieldTaskReference(operation);
+      if (repairedTaskReference) await this.state.flush();
+      if (!repairedTaskReference && isLegacyOperation(operation) && operation.attempts > 0
         && LEGACY_PAYLOAD_REFRESH_CODES.has(String(operation.lastErrorCode || '').toUpperCase())) {
         const collection = COLLECTIONS[operation.table];
         const localRow = (this.readLocal()[collection] || []).find(item => item.id === operation.localId);
@@ -477,9 +482,47 @@ export class SyncEngine {
         else this.state.complete(operation, result.row);
       } catch (error) {
         this.state.fail(operation, error, { retryable: isRetryableSyncError(error) });
+        if (this.repairRejectedYieldTaskReference(operation)) {
+          // One bounded retry; persist the changed request/key before sending.
+          await this.state.flush();
+          try {
+            const result = await this.cloud.apply(operation);
+            if (result.status === 'conflict') this.state.addConflict(operation, result.row);
+            else this.state.complete(operation, result.row);
+          } catch (retryError) {
+            this.state.fail(operation, retryError, { retryable: isRetryableSyncError(retryError) });
+          }
+        }
       }
     }
     await this.state.flush();
+  }
+
+  repairRejectedYieldTaskReference(operation) {
+    if (operation.table !== 'yield_entries' || operation.type !== 'create'
+      || String(operation.lastErrorCode) !== '23503' || !(operation.attempts > 0)
+      || operation.homesteadId !== this.state.state.homesteadId) return false;
+    const payload = operation.payload;
+    const top = payload?.task_id;
+    const detail = payload?.details?.task_id;
+    if ((top && detail && top !== detail) || (!top && !detail)) return false;
+    const previousId = top || detail;
+    const local = this.readLocal();
+    const entry = (local.yieldEntries || []).find(item => item.id === operation.localId);
+    const task = (local.tasks || []).find(item => item.id === entry?.taskId);
+    if (!entry || entry.deletedAt || !task || task.deletedAt) return false;
+    const entity = this.state.state.entities[this.state.entityKey('tasks', task.id)];
+    const canonical = entity?.cloudRow;
+    if (!entity?.cloudId || entity.cloudId === previousId || canonical?.id !== entity.cloudId
+      || canonical.homestead_id !== operation.homesteadId || canonical.deleted_at
+      || !(previousId === task.id || entity.previousCloudIds?.includes(previousId))) return false;
+    operation.payload = { ...payload, task_id: entity.cloudId,
+      details: { ...payload.details, task_id: entity.cloudId } };
+    operation.idempotencyKey = crypto.randomUUID();
+    operation.status = 'pending';
+    operation.blockedBy = [];
+    this.state.save();
+    return true;
   }
 
   async adoptSystemChoreWindow(operation, cloudRow) {
