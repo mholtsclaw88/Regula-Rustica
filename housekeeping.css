@@ -731,13 +731,13 @@ summary:focus-visible {
 .action-cluster { align-items: center; }
 .action-cluster .primary { box-shadow: 0 4px 10px rgba(40,69,54,.16); }
 .section-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.cellarer-access { position: fixed; right: 18px; bottom: 18px; z-index: 40; }
+.cellarer-access { position: relative; flex: 0 0 auto; z-index: 40; }
 .cellarer-desk-toggle { display: flex; min-height: 48px; align-items: center; gap: 9px; padding: 9px 14px; border: 1px solid var(--gold); border-radius: 8px; background: var(--forest); color: var(--paper); box-shadow: 0 5px 15px rgba(35,66,46,.2); cursor: pointer; font: 700 .85rem Georgia,serif; white-space: nowrap; }
 .cellarer-desk-toggle:hover { background: var(--forest2); }
 .cellarer-desk-toggle:focus-visible,.cellarer-desk-row:focus-visible,.cellarer-kind-choice summary:focus-visible,.cellarer-privacy-details summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .cellarer-desk-toggle svg { width: 22px; height: 22px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .cellarer-desk[hidden] { display: none; }
-.cellarer-desk { position: absolute; right: 0; bottom: calc(100% + 10px); width: min(354px,calc(100vw - 24px)); max-height: calc(100dvh - 100px); overflow-y: auto; border: 1px solid var(--line); border-top: 3px double var(--gold); border-radius: 12px; background: var(--paper); box-shadow: 0 14px 32px rgba(35,43,34,.22); }
+.cellarer-desk { position: absolute; right: 0; top: calc(100% + 6px); width: min(354px,calc(100vw - 24px)); max-height: calc(100dvh - 220px); overflow-y: auto; border: 1px solid var(--line); border-top: 3px double var(--gold); border-radius: 12px; background: var(--paper); box-shadow: 0 14px 32px rgba(35,43,34,.22); }
 .cellarer-desk-header { padding: 16px 17px 12px; }
 .cellarer-desk-header h2 { margin: 4px 0 5px; color: var(--forest); font-size: 1.3rem; }
 .cellarer-desk-header p { margin: 0; color: var(--muted); font: .82rem/1.4 Arial,sans-serif; }
@@ -1420,7 +1420,7 @@ html:has(#calendar.active) { scrollbar-gutter: stable; }
 .calendar-month-day.workload-3 { background: #d2d1aa; }
 .calendar-month-day.workload-4 { background: #b8bf91; }
 .calendar-month-day.workload-5 { background: #929f72; }
-.calendar-month-counts { display: grid; gap: 2px; font: 700 .62rem/1.25 Arial, sans-serif; }
+.calendar-month-counts { display: grid; gap: 2px; font: 700 .72rem/1.25 Arial, sans-serif; }
 .calendar-month-counts span { white-space: nowrap; }
 .calendar-month-counts em { color: #62594f; font-style: normal; font-weight: 400; }
 .calendar-summary-day:hover,
@@ -1443,16 +1443,16 @@ html:has(#calendar.active) { scrollbar-gutter: stable; }
   .calendar-week.calendar-summary-grid { display: grid; grid-template-columns: repeat(7, minmax(104px,1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--line); }
   .calendar-week .calendar-summary-day { display: flex; min-height: 210px; padding: 6px 4px; border: 0; border-radius: 0; }
   .calendar-month-day { min-height: 78px; padding: 3px; }
-  .calendar-month-counts { gap: 1px; font-size: .56rem; }
+  .calendar-month-counts { gap: 3px; font-size: .7rem; }
   .calendar-month-counts span { display: grid; white-space: normal; }
-  .calendar-month-counts em { font-size: .5rem; line-height: 1; }
+  .calendar-month-counts em { font-size: inherit; line-height: 1.15; overflow-wrap: anywhere; }
   .calendar-task-disclosure > summary { min-height: 54px; padding: 7px 8px 7px 0; }
   .calendar-task-row > .shared-task-check { margin-top: 15px; }
 }
 
 @media (max-width: 800px) {
   main { padding-bottom: 110px; }
-  .cellarer-access { right: 12px; bottom: calc(77px + env(safe-area-inset-bottom,0px)); }
+
   .cellarer-desk { max-height: calc(100dvh - 158px - env(safe-area-inset-bottom,0px)); }
 }
 
@@ -1464,3 +1464,22 @@ html:has(#calendar.active) { scrollbar-gutter: stable; }
 .device-storage-startup { max-width: 32rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: 1rem; color: var(--forest); background: var(--cream); }
 .device-storage-error { position: sticky; top: 0; z-index: 1000; padding: 1rem; color: #834b43; background: #fff6df; border: 2px solid #834b43; }
 .device-storage-error .btn, .device-storage-startup .btn { margin: .5rem .5rem 0 0; }
+
+/* Reserve Cyril's space in the sticky navigation instead of covering working content. */
+.app-navigation { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-right: max(12px,calc((100vw - 1100px)/2)); border-bottom: 1px solid var(--line); background: var(--raised); }
+.app-navigation > .nav { position: static; min-width: 0; border-bottom: 0; padding-right: 0; }
+.app-navigation .cellarer-desk-toggle { min-height: 44px; box-shadow: none; }
+.app-navigation .cellarer-desk { width: min(354px,calc(100vw - 48px)); max-height: calc(100dvh - 220px - env(safe-area-inset-bottom,0px)); }
+#calendar .section-masthead:has(.section-masthead-seal.hidden) { grid-template-columns: minmax(0,1fr) auto; }
+#calendar .section-actions .btn { min-height: 44px; }
+html { scroll-padding-top: 65px; scroll-padding-bottom: 85px; }
+@media (max-width:800px) {
+  .app-navigation { top: 59px; justify-content: flex-end; min-height: 48px; padding: 2px 12px; }
+  body.mobile-home .app-navigation { top: 76px; }
+  .record-section-nav { top: 107px; }
+  html { scroll-padding-top: 164px; }
+  #settingIdentity button { min-height: 44px; }
+}
+@media (max-width:370px) {
+  #calendar .section-head.section-masthead { grid-template-columns: minmax(0,1fr); }
+}
