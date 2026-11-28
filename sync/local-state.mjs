@@ -173,6 +173,12 @@ export class LocalSyncState {
 
   complete(operation, serverRow) {
     const entity = this.entity(operation.table, operation.localId);
+    // Retain evidence of a Task UUID adopted by the recurrence RPC. A child
+    // rejected later can then distinguish that alias from an unrelated UUID.
+    if (operation.table === 'tasks' && serverRow?.id && serverRow.id !== entity.cloudId
+      && serverRow.homestead_id === operation.homesteadId && !serverRow.deleted_at) {
+      entity.previousCloudIds = [...new Set([...(entity.previousCloudIds || []), entity.cloudId])].slice(-8);
+    }
     if (serverRow?.id) entity.cloudId = serverRow.id;
     entity.cloudVersion = serverRow?.version ?? entity.cloudVersion;
     entity.cloudRow = serverRow || entity.cloudRow;

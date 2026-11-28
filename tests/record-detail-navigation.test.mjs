@@ -44,8 +44,8 @@ test('updated Record detail assets share one offline cache version', () => {
   assert.match(worker, /regula-rustica-notifications-v1/);
   assert.match(worker, /housekeeping\.css\?v=calendar-clearance-v1/);
   assert.match(html, /housekeeping\.css\?v=calendar-clearance-v1/);
-  assert.match(worker, /app\.js\?v=calendar-clearance-v1/);
-  assert.match(bootstrap, /app\.js\?v=calendar-clearance-v1/);
+  assert.match(worker, /app\.js\?v=yield-task-link-v1/);
+  assert.match(bootstrap, /app\.js\?v=yield-task-link-v1/);
   assert.match(worker, /ui-refinements\.js\?v=cyril-record-matching-v1/);
   assert.match(bootstrap, /ui-refinements\.js\?v=cyril-record-matching-v1/);
 });
